@@ -28,7 +28,11 @@ namespace protocols {
 namespace mux {
 
 ParseState ParseFullFrame(BinaryDecoder* decoder, Frame* frame) {
-  PL_ASSIGN_OR(frame->tag, decoder->ExtractInt<uint24_t>(), return ParseState::kInvalid);
+  PL_ASSIGN_OR(uint24_t tag, decoder->ExtractInt<uint24_t>(), return ParseState::kInvalid);
+
+  if (tag < 1 || tag > ((1 << 23) - 1)) {
+        return ParseState::kInvalid;
+  }
 
   Type frame_type = static_cast<Type>(frame->type);
 
@@ -119,7 +123,7 @@ ParseState ParseFrame(message_type_t, std::string_view* buf, mux::Frame* frame, 
 
   ParseState parse_state = mux::ParseFullFrame(&decoder, frame);
   if (parse_state == ParseState::kSuccess) {
-    buf->remove_prefix(frame->length);
+    buf->remove_prefix(frame->length + 4);
   }
   return parse_state;
 }
