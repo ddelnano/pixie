@@ -28,10 +28,10 @@ namespace protocols {
 namespace mux {
 
 ParseState ParseFullFrame(BinaryDecoder* decoder, Frame* frame) {
-  PL_ASSIGN_OR(uint24_t tag, decoder->ExtractInt<uint24_t>(), return ParseState::kInvalid);
+  PL_ASSIGN_OR(frame->tag, decoder->ExtractInt<uint24_t>(), return ParseState::kInvalid);
 
-  if (tag < 1 || tag > ((1 << 23) - 1)) {
-        return ParseState::kInvalid;
+  if (frame->tag < 1 || frame->tag > ((1 << 23) - 1)) {
+    return ParseState::kInvalid;
   }
 
   Type frame_type = static_cast<Type>(frame->type);
@@ -45,6 +45,10 @@ ParseState ParseFullFrame(BinaryDecoder* decoder, Frame* frame) {
 
   if (frame_type == Type::kRinit || frame_type == Type::kTinit) {
     // TODO(ddelnano): Add support for reading Tinit and Rinit compression, tls and other parameters
+    return ParseState::kSuccess;
+  }
+
+  if (frame_type == Type::kTping || frame_type == Type::kRping) {
     return ParseState::kSuccess;
   }
 
