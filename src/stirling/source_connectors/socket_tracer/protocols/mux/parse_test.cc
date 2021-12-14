@@ -186,7 +186,7 @@ TEST_F(MuxParserTest, ParseFrameTdispatch) {
   mux::Frame frame;
   ParseState state = ParseFrame(message_type_t::kRequest, &frame_view, &frame);
 
-  // Verify that tags 24 bit wide are properly constructed
+  // Verify that tags 24 bit wide are properly constructed (only 23 bits are usable)
   ASSERT_EQ(frame.tag, 0x40000F);
   ASSERT_EQ(frame.type, static_cast<int8_t>(mux::Type::kTdispatch));
   ASSERT_EQ(state, ParseState::kSuccess);
