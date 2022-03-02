@@ -18,4 +18,3 @@ $ docker run --entrypoint /usr/bin/java bazel/src/stirling/source_connectors/soc
 ```
 
 See `mux_container_bpf_test.cc` for use case.
-
