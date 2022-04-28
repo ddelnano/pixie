@@ -23,6 +23,7 @@
 
 #include "src/common/base/base.h"
 #include "src/common/exec/exec.h"
+#include "src/stirling/core/data_table.h"
 #include "src/common/testing/test_environment.h"
 #include "src/shared/types/column_wrapper.h"
 #include "src/shared/types/types.h"
@@ -36,9 +37,10 @@
 namespace px {
 namespace stirling {
 
-namespace http = protocols::http;
+namespace mux = protocols::mux;
 
 using ::px::stirling::testing::EqHTTPRecord;
+using ::px::stirling::testing::EqMuxRecord;
 using ::px::stirling::testing::FindRecordIdxMatchesPID;
 using ::px::stirling::testing::GetTargetRecords;
 using ::px::stirling::testing::SocketTraceBPFTest;
@@ -70,12 +72,11 @@ class Node14_18_1AlpineContainerWrapper
   int32_t PID() const { return process_pid(); }
 };
 
-// Includes all information we need to extract from the trace records, which are used to verify
-// against the expected results.
-struct TraceRecords {
-  std::vector<http::Record> http_records;
-  std::vector<std::string> remote_address;
+class ThriftMuxServerContainerWrapper : public ::px::stirling::testing::ThriftMuxServerContainer {
+ public:
+  int32_t PID() const { return process_pid(); }
 };
+
 
 template <typename TServerContainer, bool TForceFptrs>
 class BaseOpenSSLTraceTest : public SocketTraceBPFTest</* TClientSideTracing */ false> {
@@ -84,8 +85,9 @@ class BaseOpenSSLTraceTest : public SocketTraceBPFTest</* TClientSideTracing */ 
     // Run the nginx HTTPS server.
     // The container runner will make sure it is in the ready state before unblocking.
     // Stirling will run after this unblocks, as part of SocketTraceBPFTest SetUp().
-    StatusOr<std::string> run_result = server_.Run(std::chrono::seconds{60});
+    StatusOr<std::string> run_result = server_.Run(std::chrono::seconds{60}, {}, {"--use-tls", "true"});
     PL_CHECK_OK(run_result);
+    PL_CHECK_OK(this->RunThriftMuxClient());
 
     // Sleep an additional second, just to be safe.
     sleep(1);
@@ -97,25 +99,54 @@ class BaseOpenSSLTraceTest : public SocketTraceBPFTest</* TClientSideTracing */ 
     SocketTraceBPFTest::SetUp();
   }
 
-  // Returns the trace records of the process specified by the input pid.
-  TraceRecords GetTraceRecords(int pid) {
-    std::vector<TaggedRecordBatch> tablets =
-        this->ConsumeRecords(SocketTraceConnector::kHTTPTableNum);
-    if (tablets.empty()) {
-      return {};
+  StatusOr<int32_t> RunThriftMuxClient() {
+
+    std::string classpath =
+      "@/app/px/src/stirling/source_connectors/socket_tracer/testing/containers/thriftmux/"
+      "server_image.classpath";
+    std::string thriftmux_client_output = "StringString";
+
+    std::string keytool_cmd =
+        absl::StrFormat("docker exec %s /usr/lib/jvm/java-11-openjdk-amd64/bin/keytool -importcert -keystore /etc/ssl/certs/java/cacerts -file /etc/ssl/ca.crt -noprompt -storepass changeit",
+                        server_.container_name());
+    PL_ASSIGN_OR_RETURN(std::string keytool_out, px::Exec(keytool_cmd));
+
+    LOG(INFO) << absl::StrFormat("keytool -importcert command output: '%s'", keytool_out);
+
+    std::string cmd =
+        absl::StrFormat("docker exec %s /usr/bin/java -cp %s Client --use-tls true & echo $! && wait",
+                        server_.container_name(), classpath);
+    PL_ASSIGN_OR_RETURN(std::string out, px::Exec(cmd));
+
+    LOG(INFO) << absl::StrFormat("thriftmux client command output: '%s'", out);
+
+    std::vector<std::string> tokens = absl::StrSplit(out, "\n");
+
+    int32_t client_pid;
+    if (!absl::SimpleAtoi(tokens[0], &client_pid)) {
+      return error::Internal("Could not extract PID.");
     }
-    types::ColumnWrapperRecordBatch record_batch = tablets[0].records;
-    std::vector<size_t> server_record_indices =
-        FindRecordIdxMatchesPID(record_batch, kHTTPUPIDIdx, pid);
-    std::vector<http::Record> http_records = ToRecordVector(record_batch, server_record_indices);
-    std::vector<std::string> remote_addresses =
-        testing::GetRemoteAddrs(record_batch, server_record_indices);
-    return {std::move(http_records), std::move(remote_addresses)};
+
+    LOG(INFO) << absl::StrFormat("Client PID: %d", client_pid);
+
+    if (!absl::StrContains(out, thriftmux_client_output)) {
+      return error::Internal(
+          absl::StrFormat("Expected output from thriftmux to include '%s', received '%s' instead",
+                          thriftmux_client_output, out));
+    }
+    return client_pid;
   }
 
   TServerContainer server_;
   bool force_fptr_ = TForceFptrs;
 };
+
+mux::Record RecordWithType(mux::Type req_type) {
+  mux::Record r = {};
+  r.req.type = static_cast<int8_t>(req_type);
+
+  return r;
+}
 
 //-----------------------------------------------------------------------------
 // Test Scenarios
@@ -144,20 +175,12 @@ working. Further configuration is required.</p>
 Commercial support is available at
 <a href... [TRUNCATED])";
 
-http::Record GetExpectedHTTPRecord() {
-  http::Record expected_record;
-  expected_record.req.minor_version = 1;
-  expected_record.req.req_method = "GET";
-  expected_record.req.req_path = "/index.html";
-  expected_record.req.body = "";
-  expected_record.resp.resp_status = 200;
-  expected_record.resp.resp_message = "OK";
-  expected_record.resp.body = kNginxRespBody;
+mux::Record GetExpectedHTTPRecord() {
+  mux::Record expected_record;
   return expected_record;
 }
 
-typedef ::testing::Types<NginxOpenSSL_1_1_0_ContainerWrapper, NginxOpenSSL_1_1_1_ContainerWrapper,
-                         Node12_3_1ContainerWrapper, Node14_18_1AlpineContainerWrapper>
+typedef ::testing::Types<ThriftMuxServerContainerWrapper>
     OpenSSLServerImplementations;
 
 template <typename T>
@@ -167,97 +190,32 @@ template <typename T>
 using OpenSSLTraceRawFptrsTest = BaseOpenSSLTraceTest<T, true>;
 
 #define OPENSSL_TYPED_TEST(TestCase, CodeBlock)            \
-  TYPED_TEST(OpenSSLTraceDlsymTest, TestCase)              \
-  CodeBlock TYPED_TEST(OpenSSLTraceRawFptrsTest, TestCase) \
+  TYPED_TEST(OpenSSLTraceRawFptrsTest, TestCase)              \
   CodeBlock
 
 TYPED_TEST_SUITE(OpenSSLTraceDlsymTest, OpenSSLServerImplementations);
 TYPED_TEST_SUITE(OpenSSLTraceRawFptrsTest, OpenSSLServerImplementations);
 
-OPENSSL_TYPED_TEST(ssl_capture_curl_client, {
+OPENSSL_TYPED_TEST(mtls_thriftmux_client, {
   this->StartTransferDataThread();
 
-  // Make an SSL request with curl.
-  // Because the server uses a self-signed certificate, curl will normally refuse to connect.
-  // This is similar to the warning pages that Firefox/Chrome would display.
-  // To take an exception and make the SSL connection anyways, we use the --insecure flag.
+  ASSERT_OK(this->RunThriftMuxClient());
 
-  // Run the client in the network of the server, so they can connect to each other.
-  ::px::stirling::testing::CurlContainer client;
-  ASSERT_OK(client.Run(std::chrono::seconds{60},
-                       {absl::Substitute("--network=container:$0", this->server_.container_name())},
-                       {"--insecure", "-s", "-S", "https://localhost:443/index.html"}));
-  client.Wait();
   this->StopTransferDataThread();
 
-  TraceRecords records = this->GetTraceRecords(this->server_.PID());
-  http::Record expected_record = GetExpectedHTTPRecord();
+  std::vector<TaggedRecordBatch> tablets = this->ConsumeRecords(SocketTraceConnector::kMuxTableNum);
+  ASSERT_NOT_EMPTY_AND_GET_RECORDS(const types::ColumnWrapperRecordBatch& record_batch, tablets);
+  std::vector<mux::Record> server_records = GetTargetRecords(record_batch, this->server_.process_pid());
 
-  EXPECT_THAT(records.http_records, UnorderedElementsAre(EqHTTPRecord(expected_record)));
-  EXPECT_THAT(records.remote_address, UnorderedElementsAre(StrEq("127.0.0.1")));
-})
+  mux::Record tinitCheck = RecordWithType(mux::Type::kRerrOld);
+  mux::Record tinit = RecordWithType(mux::Type::kTinit);
+  mux::Record pingRecord = RecordWithType(mux::Type::kTping);
+  mux::Record dispatchRecord = RecordWithType(mux::Type::kTdispatch);
 
-OPENSSL_TYPED_TEST(ssl_capture_ruby_client, {
-  this->StartTransferDataThread();
-
-  // Make multiple requests and make sure we capture all of them.
-  std::string rb_script = R"(
-        require 'net/http'
-        require 'uri'
-
-        $i = 0
-        while $i < 3 do
-          uri = URI.parse('https://localhost:443/index.html')
-          http = Net::HTTP.new(uri.host, uri.port)
-          http.use_ssl = true
-          http.verify_mode = OpenSSL::SSL::VERIFY_NONE
-          request = Net::HTTP::Get.new(uri.request_uri)
-          response = http.request(request)
-          p response.body
-
-          sleep(1)
-
-          $i += 1
-        end
-  )";
-
-  // Make an SSL request with the client.
-  // Run the client in the network of the server, so they can connect to each other.
-  ::px::stirling::testing::RubyContainer client;
-  ASSERT_OK(client.Run(std::chrono::seconds{60},
-                       {absl::Substitute("--network=container:$0", this->server_.container_name())},
-                       {"ruby", "-e", rb_script}));
-  client.Wait();
-  this->StopTransferDataThread();
-
-  TraceRecords records = this->GetTraceRecords(this->server_.PID());
-  http::Record expected_record = GetExpectedHTTPRecord();
-
-  EXPECT_THAT(records.http_records,
-              UnorderedElementsAre(EqHTTPRecord(expected_record), EqHTTPRecord(expected_record),
-                                   EqHTTPRecord(expected_record)));
-  EXPECT_THAT(records.remote_address,
-              UnorderedElementsAre(StrEq("127.0.0.1"), StrEq("127.0.0.1"), StrEq("127.0.0.1")));
-})
-
-OPENSSL_TYPED_TEST(ssl_capture_node_client, {
-  this->StartTransferDataThread();
-
-  // Make an SSL request with the client.
-  // Run the client in the network of the server, so they can connect to each other.
-  ::px::stirling::testing::NodeClientContainer client;
-  ASSERT_OK(client.Run(std::chrono::seconds{60},
-                       {absl::Substitute("--network=container:$0", this->server_.container_name())},
-                       {"node", "/etc/node/https_client.js"}));
-  client.Wait();
-  this->StopTransferDataThread();
-
-  TraceRecords records = this->GetTraceRecords(this->server_.PID());
-  http::Record expected_record = GetExpectedHTTPRecord();
-
-  EXPECT_THAT(records.http_records, UnorderedElementsAre(EqHTTPRecord(expected_record)));
-  EXPECT_THAT(records.remote_address, UnorderedElementsAre(StrEq("127.0.0.1")));
-  LOG(INFO) << "Trigger tests to see if it reduces flakiness";
+  EXPECT_THAT(server_records, Contains(EqMuxRecord(tinitCheck)));
+  EXPECT_THAT(server_records, Contains(EqMuxRecord(tinit)));
+  EXPECT_THAT(server_records, Contains(EqMuxRecord(pingRecord)));
+  EXPECT_THAT(server_records, Contains(EqMuxRecord(dispatchRecord)));
 })
 
 }  // namespace stirling

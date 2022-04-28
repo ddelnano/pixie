@@ -26,7 +26,9 @@
 
 #include "src/shared/types/column_wrapper.h"
 #include "src/stirling/source_connectors/socket_tracer/http_table.h"
+#include "src/stirling/source_connectors/socket_tracer/mux_table.h"
 #include "src/stirling/source_connectors/socket_tracer/protocols/http/types.h"
+#include "src/stirling/source_connectors/socket_tracer/protocols/mux/types.h"
 
 namespace px {
 namespace stirling {
@@ -36,11 +38,11 @@ namespace testing {
 // HTTP Checkers
 //-----------------------------------------------------------------------------
 
-std::vector<protocols::http::Record> ToRecordVector(const types::ColumnWrapperRecordBatch& rb,
-                                                    const std::vector<size_t>& indices);
+std::vector<protocols::mux::Record> ToRecordVector(const types::ColumnWrapperRecordBatch& rb,
+                                        const std::vector<size_t>& indices);
 
-std::vector<protocols::http::Record> GetTargetRecords(
-    const types::ColumnWrapperRecordBatch& record_batch, int32_t pid);
+std::vector<protocols::mux::Record> GetTargetRecords(const types::ColumnWrapperRecordBatch& record_batch,
+                                          int32_t pid);
 
 inline auto EqHTTPReq(const protocols::http::Message& x) {
   using ::testing::Field;
@@ -65,6 +67,18 @@ inline auto EqHTTPRecord(const protocols::http::Record& x) {
 
   return AllOf(Field(&protocols::http::Record::req, EqHTTPReq(x.req)),
                Field(&protocols::http::Record::resp, EqHTTPResp(x.resp)));
+}
+
+inline auto EqMux(const protocols::mux::Frame& x) { 
+  using ::testing::Field;
+
+  return Field(&protocols::mux::Frame::type, ::testing::Eq(x.type));
+}
+
+inline auto EqMuxRecord(const protocols::mux::Record& x) {
+  using ::testing::Field;
+
+  return AllOf(Field(&protocols::mux::Record::req, EqMux(x.req)), Field(&protocols::mux::Record::resp, EqMux(x.resp)));
 }
 
 inline std::vector<std::string> GetRemoteAddrs(const types::ColumnWrapperRecordBatch& rb,

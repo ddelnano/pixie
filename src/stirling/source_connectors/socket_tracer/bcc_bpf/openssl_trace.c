@@ -109,6 +109,7 @@ BPF_HASH(active_ssl_write_args_map, uint64_t, struct data_args_t);
 // Function signature being probed:
 // int SSL_write(SSL *ssl, const void *buf, int num);
 int probe_entry_SSL_write(struct pt_regs* ctx) {
+  bpf_trace_printk("Calling probe_entry_SSL_write");
   uint64_t id = bpf_get_current_pid_tgid();
   uint32_t tgid = id >> 32;
 
@@ -135,6 +136,7 @@ int probe_entry_SSL_write(struct pt_regs* ctx) {
 }
 
 int probe_ret_SSL_write(struct pt_regs* ctx) {
+  bpf_trace_printk("Calling probe_ret_SSL_write");
   uint64_t id = bpf_get_current_pid_tgid();
 
   const struct data_args_t* write_args = active_ssl_write_args_map.lookup(&id);
@@ -149,6 +151,7 @@ int probe_ret_SSL_write(struct pt_regs* ctx) {
 // Function signature being probed:
 // int SSL_read(SSL *s, void *buf, int num)
 int probe_entry_SSL_read(struct pt_regs* ctx) {
+  bpf_trace_printk("Calling probe_entry_SSL_read");
   uint64_t id = bpf_get_current_pid_tgid();
   uint32_t tgid = id >> 32;
 
@@ -175,6 +178,7 @@ int probe_entry_SSL_read(struct pt_regs* ctx) {
 }
 
 int probe_ret_SSL_read(struct pt_regs* ctx) {
+  bpf_trace_printk("Calling probe_ret_SSL_read");
   uint64_t id = bpf_get_current_pid_tgid();
 
   const struct data_args_t* read_args = active_ssl_read_args_map.lookup(&id);

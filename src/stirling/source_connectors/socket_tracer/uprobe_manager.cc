@@ -221,13 +221,14 @@ StatusOr<std::vector<std::filesystem::path>> FindHostPathForPIDPath(
 
     for (const auto& mapped_lib_path : mapped_lib_paths) {
       if (absl::EndsWith(mapped_lib_path, lib_name)) {
+        LOG(WARNING) << absl::Substitute("Path matched $0", lib_name);
         // We found a mapped_lib_path that matches to the desired lib_name.
         // First, get the containerized file path using ResolvePath().
         StatusOr<std::filesystem::path> container_lib_status =
             fp_resolver->ResolvePath(mapped_lib_path);
 
         if (!container_lib_status.ok()) {
-          VLOG(1) << absl::Substitute("Unable to resolve $0 path. Message: $1", lib_name,
+          LOG(WARNING) << absl::Substitute("Unable to resolve $0 path. Message: $1", lib_name,
                                       container_lib_status.msg());
           continue;
         }
@@ -237,7 +238,7 @@ StatusOr<std::vector<std::filesystem::path>> FindHostPathForPIDPath(
         // and continue to search current set of mapped libs for next desired lib.
         container_libs[lib_idx] = container_lib_status.ValueOrDie();
         found_vector[lib_idx] = true;
-        VLOG(1) << absl::Substitute("Resolved lib $0 to $1", lib_name,
+        LOG(WARNING) << absl::Substitute("Resolved lib $0 to $1", lib_name,
                                     container_libs[lib_idx].string());
         break;
       }
@@ -249,8 +250,8 @@ StatusOr<std::vector<std::filesystem::path>> FindHostPathForPIDPath(
 // Return error if something unexpected occurs.
 // Return 0 if nothing unexpected, but there is nothing to deploy (e.g. no OpenSSL detected).
 StatusOr<int> UProbeManager::AttachOpenSSLUProbesOnDynamicLib(uint32_t pid) {
-  constexpr std::string_view kLibSSL = "libssl.so.1.1";
-  constexpr std::string_view kLibCrypto = "libcrypto.so.1.1";
+  constexpr std::string_view kLibSSL = "libnetty_tcnative_linux_x86.so";
+  constexpr std::string_view kLibCrypto = "libnetty_tcnative_linux_x86.so";
   const std::vector<std::string_view> lib_names = {kLibSSL, kLibCrypto};
 
   const system::Config& sysconfig = system::Config::GetInstance();
@@ -268,6 +269,7 @@ StatusOr<int> UProbeManager::AttachOpenSSLUProbesOnDynamicLib(uint32_t pid) {
     // Return "0" to indicate zero probes were attached. This is not an error.
     return 0;
   }
+  LOG(WARNING) << "About to create ElfReader";
 
   auto reader = ElfReader::Create(container_libcrypto).ConsumeValueOrDie();
   auto fptr_manager = std::unique_ptr<RawFptrManager>(
