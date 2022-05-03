@@ -211,6 +211,7 @@ TYPED_TEST_SUITE(OpenSSLTraceDlsymTest, OpenSSLServerImplementations);
 TYPED_TEST_SUITE(OpenSSLTraceRawFptrsTest, OpenSSLServerImplementations);
 
 OPENSSL_TYPED_TEST(mtls_thriftmux_client, {
+  FLAGS_stirling_conn_trace_pid = this->server_.process_pid();
   this->StartTransferDataThread();
 
   ASSERT_OK(this->RunThriftMuxClient());
