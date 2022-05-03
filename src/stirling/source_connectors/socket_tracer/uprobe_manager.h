@@ -337,29 +337,29 @@ class UProbeManager {
   inline static const auto kOpenSSLUProbes = MakeArray<bpf_tools::UProbeSpec>({
       bpf_tools::UProbeSpec{
           .binary_path = "/tmp/libnetty_tcnative_linux_x86.so",
-          /* .symbol = "SSL_write", */
-          .address = 0x34690,
+          .symbol = "SSL_write",
+          /* .address = 0x34690, */
           .attach_type = bpf_tools::BPFProbeAttachType::kEntry,
           .probe_fn = "probe_entry_SSL_write",
       },
       bpf_tools::UProbeSpec{
           .binary_path = "/tmp/libnetty_tcnative_linux_x86.so",
-          /* .symbol = "SSL_write", */
-          .address = 0x34690,
+          .symbol = "SSL_write",
+          /* .address = 0x34690, */
           .attach_type = bpf_tools::BPFProbeAttachType::kReturn,
           .probe_fn = "probe_ret_SSL_write",
       },
       bpf_tools::UProbeSpec{
           .binary_path = "/tmp/libnetty_tcnative_linux_x86.so",
-          /* .symbol = "SSL_read", */
-          .address = 0x36990,
+          .symbol = "SSL_read",
+          /* .address = 0x36990, */
           .attach_type = bpf_tools::BPFProbeAttachType::kEntry,
           .probe_fn = "probe_entry_SSL_read",
       },
       bpf_tools::UProbeSpec{
           .binary_path = "/tmp/libnetty_tcnative_linux_x86.so",
-          /* .symbol = "SSL_read", */
-          .address = 0x36990,
+          .symbol = "SSL_read",
+          /* .address = 0x36990, */
           .attach_type = bpf_tools::BPFProbeAttachType::kReturn,
           .probe_fn = "probe_ret_SSL_read",
       },

@@ -202,15 +202,17 @@ Status BCCWrapper::AttachTracepoint(const TracepointSpec& probe) {
 }
 
 Status BCCWrapper::AttachUProbe(const UProbeSpec& probe) {
-  VLOG(1) << "Deploying uprobe: " << probe.ToString();
+  LOG(WARNING) << "Deploying uprobe: " << probe.ToString();
   // TODO(oazizi): Natively support this attach type in BCCWrapper.
   DCHECK(probe.attach_type != BPFProbeAttachType::kReturnInsts);
   DCHECK((probe.symbol.empty() && probe.address != 0) ||
          (!probe.symbol.empty() && probe.address == 0))
       << "Exactly one of 'symbol' and 'address' must be specified.";
-  PL_RETURN_IF_ERROR(bpf_.attach_uprobe(
+  auto p = bpf_.attach_uprobe(
       probe.binary_path, probe.symbol, std::string(probe.probe_fn), probe.address,
-      static_cast<bpf_probe_attach_type>(probe.attach_type), probe.pid));
+      static_cast<bpf_probe_attach_type>(probe.attach_type), probe.pid);
+  LOG(WARNING) << absl::Substitute("The output of the uprobe is $0 and message $1", p.code(), p.msg());
+  PL_RETURN_IF_ERROR(p);
   uprobes_.push_back(probe);
   ++num_attached_uprobes_;
   return Status::OK();
