@@ -26,13 +26,18 @@ import (
 	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/prompb"
+
+	version "px.dev/pixie/src/shared/goversion"
 )
 
 // ParsePrometheusTextToWriteReq parses prometheus metrics in prometheus' text-based exposition format, into a prometheus WriteRequest protobuf.
 func ParsePrometheusTextToWriteReq(text string, clusterID string, podName string) (*prompb.WriteRequest, error) {
 	dec := &expfmt.SampleDecoder{
-		Dec:  expfmt.NewDecoder(strings.NewReader(text), expfmt.FmtText),
-		Opts: &expfmt.DecodeOptions{},
+		Dec: expfmt.NewDecoder(strings.NewReader(text), expfmt.FmtText),
+		Opts: &expfmt.DecodeOptions{
+			// Default timestamp for metrics that come in without a timestamp.
+			Timestamp: model.Now(),
+		},
 	}
 	var samples model.Vector
 	for {
@@ -49,6 +54,7 @@ func ParsePrometheusTextToWriteReq(text string, clusterID string, podName string
 	for _, s := range samples {
 		s.Metric["cluster_id"] = model.LabelValue(clusterID)
 		s.Metric["pod_name"] = model.LabelValue(podName)
+		s.Metric["vizier_version"] = model.LabelValue(version.GetVersion().ToString())
 	}
 	return toWriteRequest(samples), nil
 }

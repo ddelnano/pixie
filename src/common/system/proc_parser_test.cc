@@ -340,12 +340,11 @@ TEST_F(ProcParserTest, GetMapPaths) {
 
 TEST_F(ProcParserTest, GetExecutableMapEntry) {
   {
-    ProcParser::ProcessSMaps m{
-        .vmem_start = 0x565078f8c000,
-        .vmem_end = 0x565079054000,
-        .permissions = "r-xp",
-        .pathname = "/usr/sbin/nginx",
-    };
+    ProcParser::ProcessSMaps m;
+    m.vmem_start = 0x565078f8c000;
+    m.vmem_end = 0x565079054000;
+    m.permissions = "r-xp";
+    m.pathname = "/usr/sbin/nginx";
     auto smap = parser_->GetExecutableMapEntry(123, "/usr/sbin/nginx", m.vmem_start);
     EXPECT_OK_AND_THAT(smap, m);
   }

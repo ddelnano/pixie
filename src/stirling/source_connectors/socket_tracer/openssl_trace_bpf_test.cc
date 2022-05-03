@@ -92,7 +92,6 @@ bool Init() {
 
 bool kInit = Init();
 
-
 template <typename TServerContainer, bool TForceFptrs>
 class BaseOpenSSLTraceTest : public SocketTraceBPFTest</* TClientSideTracing */ false> {
  protected:
