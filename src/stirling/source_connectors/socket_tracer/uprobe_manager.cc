@@ -31,6 +31,7 @@
 #include "src/common/fs/fs_wrapper.h"
 #include "src/stirling/bpf_tools/macros.h"
 #include "src/stirling/obj_tools/dwarf_reader.h"
+#include "src/stirling/source_connectors/socket_tracer/uprobe_symaddrs.h"
 #include "src/stirling/obj_tools/go_syms.h"
 #include "src/stirling/source_connectors/socket_tracer/bcc_bpf_intf/symaddrs.h"
 #include "src/stirling/utils/proc_path_tools.h"
@@ -287,6 +288,7 @@ StatusOr<int> UProbeManager::AttachOpenSSLUProbesOnDynamicLib(uint32_t pid) {
   }
 
   PL_RETURN_IF_ERROR(UpdateOpenSSLSymAddrs(fptr_manager.get(), container_libcrypto, pid));
+
 
   // Only try probing .so files that we haven't already set probes on.
   auto result = openssl_probed_binaries_.insert(container_libssl);

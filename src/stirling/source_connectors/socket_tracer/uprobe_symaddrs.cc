@@ -722,14 +722,14 @@ StatusOr<struct openssl_symaddrs_t> OpenSSLSymAddrs(RawFptrManager* fptrManager,
   // Verified to be valid for following versions:
   //  - 1.1.0a to 1.1.0k
   //  - 1.1.1a to 1.1.1e
-  constexpr int32_t kSSL_RBIO_offset = 0x10;
+  constexpr int32_t kSSL_RBIO_offset = 0x18;
 
   // Offset of num in struct bio_st.
   // Struct is defined in crypto/bio/bio_lcl.h, crypto/bio/bio_local.h depending on the version.
   //  - In 1.1.1a to 1.1.1e, the offset appears to be 0x30
   //  - In 1.1.0, the value appears to be 0x28.
-  constexpr int32_t kOpenSSL_1_1_0_RBIO_num_offset = 0x28;
-  constexpr int32_t kOpenSSL_1_1_1_RBIO_num_offset = 0x30;
+  constexpr int32_t kOpenSSL_1_1_0_RBIO_num_offset = 0x18;
+  constexpr int32_t kOpenSSL_1_1_1_RBIO_num_offset = 0x18;
 
   struct openssl_symaddrs_t symaddrs;
   symaddrs.SSL_rbio_offset = kSSL_RBIO_offset;
@@ -865,6 +865,86 @@ StatusOr<struct node_tlswrap_symaddrs_t> NodeTLSWrapSymAddrsFromVersion(const Se
   }
   return iter->second;
 }
+
+  /**
+   * This was determined by the following:
+   * 1. Search for ssl_st DIEs
+   *
+   *      llvm-dwarfdump  --name ssl_st -c -p   libnetty_tcnative_linux_x86.so  | less
+   *
+   * 2. Once in less, search for 'rbio' to find the DIE mentioned below
+   *
+   *  0x00033849:     DW_TAG_member
+                    DW_AT_name    ("rbio")
+                    DW_AT_decl_file       ("/code/netty-tcnative/boringssl-static/target/boringssl-chromium-stable/build/../ssl/internal.h")
+                    DW_AT_decl_line       (3397)
+                    DW_AT_decl_column     (0x18)
+                    DW_AT_type    (0x000479b5 "UniquePtr")
+                    DW_AT_data_member_location    (0x18)
+
+   */
+
+  /**
+   * 0x00034a01:       DW_TAG_member
+                    DW_AT_name  ("_M_t")
+                    DW_AT_decl_file     ("/usr/include/c++/9/bits/unique_ptr.h")
+                    DW_AT_decl_line     (167)
+                    DW_AT_decl_column   (0x1b)
+                    DW_AT_type  (0x00034ede "tuple<bio_st*, bssl::internal::Deleter<bio_st> >")
+                    DW_AT_data_member_location  (0x00)
+
+     0x00034d28:       DW_TAG_member
+                         DW_AT_name  ("_M_head_impl")
+                         DW_AT_decl_file     ("/usr/include/c++/9/tuple")
+                         DW_AT_decl_line     (165)
+                         DW_AT_decl_column   (0x0d)
+                         DW_AT_type  (0x000481a6 "bio_st*")
+                         DW_AT_data_member_location  (0x00)
+
+      0x0003501e:     DW_TAG_class_type
+                        DW_AT_name    ("unique_ptr<bio_st, bssl::internal::Deleter<bio_st> >")
+                        DW_AT_byte_size       (0x08)
+                        DW_AT_decl_file       ("/usr/include/c++/9/bits/unique_ptr.h")
+                        DW_AT_decl_line       (172)
+                        DW_AT_decl_column     (0x0b)
+                        DW_AT_sibling (0x0003525e)
+
+      0x0003502b:       DW_TAG_member
+                          DW_AT_name  ("_M_t")
+                          DW_AT_decl_file     ("/usr/include/c++/9/bits/unique_ptr.h")
+                          DW_AT_decl_line     (178)
+                          DW_AT_decl_column   (0x21)
+                          DW_AT_type  (0x000348e3 "__uniq_ptr_impl<bio_st, bssl::internal::Deleter<bio_st> >")
+                          DW_AT_data_member_location  (0x00)
+
+
+   */
+
+  /**
+   * This was determined by the following:
+   *
+   * 1. llvm-dwarfdump  --name bio_st -c -p   libnetty_tcnative_linux_x86.so  | less
+   *
+   * 2. Once in less, search for 'num' to find the DIE mentioned below
+   *
+   *  0x000071e6:     DW_TAG_member
+                  DW_AT_name    ("num")
+                  DW_AT_decl_file       ("/code/netty-tcnative/boringssl-static/target/boringssl-chromium-stable/include/openssl/bio.h")
+                  DW_AT_decl_line       (836)
+                  DW_AT_decl_column     (0x07)
+                  DW_AT_type    (0x00003fb2 "int")
+                  DW_AT_data_member_location    (0x18)
+   *
+   */
+
+  /* symaddrs.RBIO_num_offset = 0x18; */
+  /* LOG(INFO) << absl::Substitute("Found RBIO_num_offset: $0", symaddrs.RBIO_num_offset); */
+
+  /* auto ssl_st_rbio_offset = 0x18; */
+  /* LOG(INFO) << absl::Substitute("Found ssl_st_rbio_offset: $0", ssl_st_rbio_offset); */
+  /* symaddrs.SSL_rbio_offset = ssl_st_rbio_offset; */
+/* return symaddrs; */
+/* } */
 
 StatusOr<struct node_tlswrap_symaddrs_t> NodeTLSWrapSymAddrsFromDwarf(DwarfReader* dwarf_reader) {
   struct node_tlswrap_symaddrs_t symaddrs = {};
