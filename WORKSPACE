@@ -204,3 +204,12 @@ pip_parse(
 load("@amqp_gen_reqs//:requirements.bzl", "install_deps")
 
 install_deps()
+
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_jar")
+
+http_jar(
+    name = "netty_tcnative_boringssl_static_osx_x86_64",
+    url = "https://repo1.maven.org/maven2/io/netty/netty-tcnative-boringssl-static/2.0.53.Final/netty-tcnative-boringssl-static-2.0.53.Final-osx-x86_64.jar",
+    sha256 = "51b43e8e178e94de9ec27017e03173dfb19bd1aaf15677a90347188cf60e799b",
+)
+
