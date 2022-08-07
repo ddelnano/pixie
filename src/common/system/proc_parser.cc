@@ -827,7 +827,7 @@ StatusOr<ProcParser::ProcessSMaps> ProcParser::GetExecutableMapEntry(pid_t pid, 
   std::vector<ProcParser::ProcessSMaps> map_entries;
   PL_RETURN_IF_ERROR(ParseProcPIDMaps(pid, &map_entries));
   for (const auto& entry : map_entries) {
-    if (entry.pathname.compare(libpath) != 0 || entry.permissions.compare("r-xp") != 0 ||
+    if (entry.permissions.compare("r-xp") != 0 ||
         entry.vmem_start != vmem_start)
       continue;
 
