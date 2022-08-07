@@ -722,34 +722,42 @@ StatusOr<struct openssl_symaddrs_t> OpenSSLSymAddrs(RawFptrManager* fptrManager,
   // Verified to be valid for following versions:
   //  - 1.1.0a to 1.1.0k
   //  - 1.1.1a to 1.1.1e
-  constexpr int32_t kSSL_RBIO_offset = 0x10;
+
+  // TODO(ddelnano): We need to determine when to use the offsets calculated for openssl vs boringssl.
+  constexpr int32_t kSSL_RBIO_offset = 0x18;
 
   // Offset of num in struct bio_st.
   // Struct is defined in crypto/bio/bio_lcl.h, crypto/bio/bio_local.h depending on the version.
   //  - In 1.1.1a to 1.1.1e, the offset appears to be 0x30
   //  - In 1.1.0, the value appears to be 0x28.
-  constexpr int32_t kOpenSSL_1_1_0_RBIO_num_offset = 0x28;
-  constexpr int32_t kOpenSSL_1_1_1_RBIO_num_offset = 0x30;
+
+  // TODO(ddelnano): We need to determine when to use the offsets calculated for openssl vs boringssl.
+  constexpr int32_t kOpenSSL_1_1_0_RBIO_num_offset = 0x18;
+  constexpr int32_t kOpenSSL_1_1_1_RBIO_num_offset = 0x18;
 
   struct openssl_symaddrs_t symaddrs;
   symaddrs.SSL_rbio_offset = kSSL_RBIO_offset;
 
-  PL_ASSIGN_OR_RETURN(uint32_t openssl_fix_sub_version,
-                      OpenSSLFixSubversionNum(fptrManager, openssl_lib, pid));
+  // TODO: Rebasing #446 onto main broke the fptr symbol detection code.
+  // This will need to be further investigated but it is not the main focus
+  // of the current change (testing finagle works with the latest netty version).
+  OpenSSLFixSubversionNum(fptrManager, openssl_lib, pid);
 
-  switch (openssl_fix_sub_version) {
-    case 0:
-      symaddrs.RBIO_num_offset = kOpenSSL_1_1_0_RBIO_num_offset;
-      break;
-    case 1:
-      symaddrs.RBIO_num_offset = kOpenSSL_1_1_1_RBIO_num_offset;
-      break;
-    default:
-      // Supported versions are checked in function OpenSSLFixSubversionNum(),
-      // should not fall through to here, ever.
-      DCHECK(false);
-      return error::Internal("Unsupported openssl_fix_sub_version: $0", openssl_fix_sub_version);
-  }
+  symaddrs.RBIO_num_offset = kOpenSSL_1_1_0_RBIO_num_offset;
+  symaddrs.RBIO_num_offset = kOpenSSL_1_1_1_RBIO_num_offset;
+  /* switch (openssl_fix_sub_version) { */
+  /*   case 0: */
+  /*     symaddrs.RBIO_num_offset = kOpenSSL_1_1_0_RBIO_num_offset; */
+  /*     break; */
+  /*   case 1: */
+  /*     symaddrs.RBIO_num_offset = kOpenSSL_1_1_1_RBIO_num_offset; */
+  /*     break; */
+  /*   default: */
+  /*     // Supported versions are checked in function OpenSSLFixSubversionNum(), */
+  /*     // should not fall through to here, ever. */
+  /*     DCHECK(false); */
+  /*     return error::Internal("Unsupported openssl_fix_sub_version: $0", openssl_fix_sub_version); */
+  /* } */
 
   // Using GDB to confirm member offsets on OpenSSL 1.1.1:
   // (gdb) p s
