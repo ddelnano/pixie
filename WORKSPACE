@@ -155,7 +155,15 @@ pxapi_py_doc_install_deps()
 
 # Setup thrift: used for building Stirling tracing targets.
 load("//bazel:thrift.bzl", "thrift_deps")
+load("//bazel:netty.bzl", "fetch_netty_tcnative_jars")
 
+# TODO(ddelnano): Remove once rules_jvm_external is no longer impacted.
+# Recent netty-tcnative releases cause rules_jvm_external to fail with a
+# cyclic dependency issue due to its use of multi-classifiers. This is fixed
+# by installing the netty jars manually and then overriding maven to use them. See
+# https://github.com/bazelbuild/rules_jvm_external/issues/704 for more details.
+netty_tcnative_version = "2.0.53.Final"
+fetch_netty_tcnative_jars(netty_tcnative_version)
 thrift_deps(scala_version = scala_version)
 
 # twitter_scrooge will use incompatible versions of @scrooge_jars and @thrift_jars.
@@ -204,41 +212,3 @@ pip_parse(
 load("@amqp_gen_reqs//:requirements.bzl", "install_deps")
 
 install_deps()
-
-load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_jar")
-
-http_jar(
-    name = "netty_tcnative_boringssl_static",
-    url = "https://repo1.maven.org/maven2/io/netty/netty-tcnative-boringssl-static/2.0.53.Final/netty-tcnative-boringssl-static-2.0.53.Final.jar",
-    sha256 = "0d8d16adadb19e065a5ac05738f0c2503c685cf3edafba14f7a1c246aafa09ef",
-)
-
-http_jar(
-    name = "netty_tcnative_boringssl_static_osx_x86_64",
-    url = "https://repo1.maven.org/maven2/io/netty/netty-tcnative-boringssl-static/2.0.53.Final/netty-tcnative-boringssl-static-2.0.53.Final-osx-x86_64.jar",
-    sha256 = "51b43e8e178e94de9ec27017e03173dfb19bd1aaf15677a90347188cf60e799b",
-)
-
-http_jar(
-    name = "netty_tcnative_boringssl_static_osx_aarch_64",
-    url = "https://repo1.maven.org/maven2/io/netty/netty-tcnative-boringssl-static/2.0.53.Final/netty-tcnative-boringssl-static-2.0.53.Final-osx-aarch_64.jar",
-    sha256 = "9d9cf706e89b81e07e9983a06b8ff5348a658a89752ec6f426925cc645e54b54",
-)
-
-http_jar(
-    name = "netty_tcnative_boringssl_static_linux_x86_64",
-    url = "https://repo1.maven.org/maven2/io/netty/netty-tcnative-boringssl-static/2.0.53.Final/netty-tcnative-boringssl-static-2.0.53.Final-linux-x86_64.jar",
-    sha256 = "83e3357da5567a93cb5ff6cb807d70573359d7ef9676fa8169405121bae05723",
-)
-
-http_jar(
-    name = "netty_tcnative_boringssl_static_linux_aarch_64",
-    url = "https://repo1.maven.org/maven2/io/netty/netty-tcnative-boringssl-static/2.0.53.Final/netty-tcnative-boringssl-static-2.0.53.Final-linux-aarch_64.jar",
-    sha256 = "ce3d12e3ae2ad0b9225df347b55715b0ad24342d0195bb238f5e3f60b3f6b868",
-)
-
-http_jar(
-    name = "netty_tcnative_boringssl_static_windows_x86_64",
-    url = "https://repo1.maven.org/maven2/io/netty/netty-tcnative-boringssl-static/2.0.53.Final/netty-tcnative-boringssl-static-2.0.53.Final-windows-x86_64.jar",
-    sha256 = "e348fcfab697ffc30bacc083e9393e5b6bd398029acac1a570e53267f89804a3",
-)

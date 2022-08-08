@@ -38,13 +38,12 @@ def thrift_deps(scala_version):
             "ch.qos.logback:logback-classic:1.2.10",
         ],
         repositories = ["https://repo1.maven.org/maven2"],
-        # TODO(ddelnano): Update this once I've determined how to use it
         override_targets = {
-            "io.netty:netty-tcnative-boringssl-static": "@//workaround:io_netty_netty_tcnative_boringssl_static",
-            "io.netty:netty-tcnative-boringssl-static:osx-x86_64": "@//workaround:io_netty_netty_tcnative_boringssl_static_osx_x86_64",
-            "io.netty:netty-tcnative-boringssl-static:osx-aarch_64": "@//workaround:io_netty_netty_tcnative_boringssl_static_osx_aarch_64",
-            "io.netty:netty-tcnative-boringssl-static:windows-x86_64": "@//workaround:io_netty_netty_tcnative_boringssl_static_windows_x86_64",
-            "io.netty:netty-tcnative-boringssl-static:linux-x86_64": "@//workaround:io_netty_netty_tcnative_boringssl_static_linux_x86_64",
-            "io.netty:netty-tcnative-boringssl-static:linux-aarch_64": "@//workaround:io_netty_netty_tcnative_boringssl_static_linux_aarch_64",
+            "io.netty:netty-tcnative-boringssl-static": "@//src/stirling/source_connectors/socket_tracer/testing/containers/thriftmux/netty_deps:io_netty_netty_tcnative_boringssl_static",
+            "io.netty:netty-tcnative-boringssl-static:osx-x86_64": "@//src/stirling/source_connectors/socket_tracer/testing/containers/thriftmux/netty_deps:io_netty_netty_tcnative_boringssl_static_osx_x86_64",
+            "io.netty:netty-tcnative-boringssl-static:osx-aarch_64": "@//src/stirling/source_connectors/socket_tracer/testing/containers/thriftmux/netty_deps:io_netty_netty_tcnative_boringssl_static_osx_aarch_64",
+            "io.netty:netty-tcnative-boringssl-static:windows-x86_64": "@//src/stirling/source_connectors/socket_tracer/testing/containers/thriftmux/netty_deps:io_netty_netty_tcnative_boringssl_static_windows_x86_64",
+            "io.netty:netty-tcnative-boringssl-static:linux-x86_64": "@//src/stirling/source_connectors/socket_tracer/testing/containers/thriftmux/netty_deps:io_netty_netty_tcnative_boringssl_static_linux_x86_64",
+            "io.netty:netty-tcnative-boringssl-static:linux-aarch_64": "@//src/stirling/source_connectors/socket_tracer/testing/containers/thriftmux/netty_deps:io_netty_netty_tcnative_boringssl_static_linux_aarch_64",
         },
     )
