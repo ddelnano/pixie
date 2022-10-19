@@ -43,7 +43,7 @@ DEFINE_bool(
 
 // TODO(ddelnano): Set this to disabled by default since using function pointers can cause
 // segmentation faults. The default can be changed once this feature has been battle tested.
-DEFINE_bool(openssl_raw_fptrs_enabled, false,
+DEFINE_bool(openssl_raw_fptrs_enabled, true,
             "If true, allows the openssl tracing implementation to fall back to function pointers "
             "if dlopen/dlsym is unable to find symbols");
 
