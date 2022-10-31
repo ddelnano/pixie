@@ -345,7 +345,7 @@ StatusOr<int> UProbeManager::AttachOpenSSLUProbesOnDynamicLib(uint32_t pid) {
       return error::Internal("libcrypto not found [path = $0]", container_libcrypto.string());
     }
 
-    auto fptr_manager = std::make_unique<obj_tools::RawFptrManager>(container_libcrypto);
+    auto fptr_manager = std::make_unique<obj_tools::RawFptrManager>(container_libcrypto, pid);
 
     PL_RETURN_IF_ERROR(UpdateOpenSSLSymAddrs(fptr_manager.get(), container_libcrypto, pid));
 
