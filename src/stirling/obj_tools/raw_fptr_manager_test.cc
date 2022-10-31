@@ -21,7 +21,13 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <cerrno>
+#include <fcntl.h>
+#include <sched.h>
+#include <linux/sched.h>
+#include <sys/syscall.h>
 #include <memory>
+#include <sys/mount.h>
 
 #include "src/common/testing/testing.h"
 #include "src/stirling/obj_tools/elf_reader.h"
@@ -45,12 +51,33 @@ StatusOr<T*> DLSym(void* handle, const std::string& name) {
   return fptr;
 }
 
+static int child_func(void*) {
+    /* auto rv = unshare(CLONE_NEWNS); */
+    /* if (rv != 0) return -10; */
+
+    auto fd = open("/usr/lib/libdependency.so", O_CREAT);
+    if (fd == -1) { 
+      /* FAIL() << "open() call failed"; */
+      return -1;
+    }
+    auto out = mount("/vagrant/bazel-out/host/bin/src/stirling/obj_tools/testdata/c/libdependency.so", "/usr/lib/libdependency.so", NULL, MS_SLAVE, NULL);
+    if (out != 0) {
+      /* FAIL() << "mount() call failed"; */
+      return -2;
+    }
+
+    printf("this is working");
+    sleep(30);
+    return 0;
+}
+
 // This test does not use RawFptrManager, but shows the behavior of trying to call a function in a
 // shared object's dynsym table vs a function in the symtab table.
 TEST(Basic, DlopenBySymbolTypes) {
   std::filesystem::path so_path =
       px::testing::BazelRunfilePath("src/stirling/obj_tools/testdata/c/library.so");
 
+  LOG(WARNING) << absl::Substitute("Bazel runfile path: $0", so_path.string());
   void* handle = dlopen(so_path.c_str(), RTLD_LAZY);
   ASSERT_NE(handle, nullptr);
   DEFER(dlclose(handle));
@@ -83,10 +110,19 @@ TEST(Basic, DlopenBySymbolTypes) {
 TEST(RawFptrManager, OpenDynamicLibraryAndGetFunctionPointers) {
   std::filesystem::path so_path =
       px::testing::BazelRunfilePath("src/stirling/obj_tools/testdata/c/library.so");
-
-  auto fptr_manager = std::make_unique<obj_tools::RawFptrManager>(so_path);
+  const int STACK_SIZE = 65536;
+  void* stack = malloc(STACK_SIZE);
+  unsigned long flags = SIGCHLD | CLONE_NEWNS;
+  printf("this is working");
+  auto pid = clone(child_func, (char *)stack + STACK_SIZE, flags, NULL);
+  if (pid == -1) {
+      FAIL() << absl::Substitute("Call to clone failed: $0", std::strerror(errno));
+  }
 
   // Test a symbol from the .dynsym table.
+
+  auto fptr_manager = std::make_unique<obj_tools::RawFptrManager>(so_path, pid);
+
   {
     ASSERT_OK_AND_ASSIGN(auto fptr, fptr_manager->RawSymbolToFptr<int()>("dyn_func"));
     ASSERT_TRUE(fptr != nullptr);
@@ -99,6 +135,10 @@ TEST(RawFptrManager, OpenDynamicLibraryAndGetFunctionPointers) {
     ASSERT_TRUE(fptr != nullptr);
     EXPECT_EQ(fptr(), 3);
   }
+
+  int status;
+  wait(&status);
+  LOG(WARNING) << absl::Substitute("Child exited with $0", status);
 }
 
 }  // namespace obj_tools

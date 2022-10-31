@@ -32,7 +32,7 @@ namespace px {
 namespace stirling {
 namespace obj_tools {
 
-RawFptrManager::RawFptrManager(std::string lib_path) : lib_path_(std::move(lib_path)) {}
+RawFptrManager::RawFptrManager(std::string lib_path, int pid) : lib_path_(std::move(lib_path)), pid_(pid) {}
 
 Status RawFptrManager::LazyInit() {
   if (elf_reader_ == nullptr) {
@@ -40,6 +40,9 @@ Status RawFptrManager::LazyInit() {
   }
 
   if (dl_vmem_start_ == 0) {
+
+    /* if (pid_) {} */
+    PL_ASSIGN_OR_RETURN(ns_, system::ScopedNamespace::Create(pid_, "mnt"));
     dlopen_handle_ = dlopen(lib_path_.c_str(), RTLD_LAZY);
     if (dlopen_handle_ == nullptr) {
       return error::Internal("Failed to dlopen so file: $0, $1", lib_path_, dlerror());

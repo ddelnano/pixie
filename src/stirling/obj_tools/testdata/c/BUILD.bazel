@@ -16,12 +16,25 @@
 
 package(default_visibility = ["//src/stirling:__subpackages__"])
 
+genrule(
+    name = "dependency",
+    srcs = ["dependency.c"],
+    outs = ["libdependency.so"],
+    # $< is srcs; $@ is outs (see https://docs.bazel.build/versions/3.0.0/be/make-variables.html).
+    cmd = "clang -shared -fPIC $< -o $@",
+)
+
 # We build test_exe with clang regardless of the bazel config.
 # This is test data, so we want determinism.
 genrule(
     name = "library",
-    srcs = ["library.c"],
+    srcs = [
+        "library.c",
+    ],
     outs = ["library.so"],
     # $< is srcs; $@ is outs (see https://docs.bazel.build/versions/3.0.0/be/make-variables.html).
-    cmd = "clang -shared -fPIC $< -o $@",
+    cmd = "clang -shared -fPIC $< -o $@ -L bazel-out/host/bin/src/stirling/obj_tools/testdata/c -ldependency",
+    tools = [
+        "//src/stirling/obj_tools/testdata/c:dependency",
+    ],
 )

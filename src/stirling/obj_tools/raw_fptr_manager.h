@@ -22,6 +22,7 @@
 #include <string>
 
 #include "src/stirling/obj_tools/elf_reader.h"
+#include "src/common/system/scoped_namespace.h"
 
 namespace px {
 namespace stirling {
@@ -32,7 +33,7 @@ namespace obj_tools {
 // provided the symbols are not stripped.
 class RawFptrManager : NotCopyMoveable {
  public:
-  explicit RawFptrManager(std::string lib_path);
+  explicit RawFptrManager(std::string lib_path, int pid);
 
   ~RawFptrManager();
 
@@ -52,7 +53,9 @@ class RawFptrManager : NotCopyMoveable {
   std::string lib_path_;
   std::unique_ptr<obj_tools::ElfReader> elf_reader_;
   void* dlopen_handle_ = nullptr;
+  std::unique_ptr<system::ScopedNamespace> ns_ = nullptr;
   uint64_t dl_vmem_start_ = 0;
+  int pid_ = 0;
 };
 
 }  // namespace obj_tools

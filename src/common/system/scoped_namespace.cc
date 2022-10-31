@@ -39,6 +39,7 @@ StatusOr<std::unique_ptr<ScopedNamespace>> ScopedNamespace::Create(int ns_pid,
 ScopedNamespace::~ScopedNamespace() { ExitNamespace(); }
 
 Status ScopedNamespace::EnterNamespace(int ns_pid, std::string_view ns_type) {
+  LOG(WARNING) << "Entering namespace";
   const auto& proc_path = system::Config::GetInstance().proc_path();
 
   std::filesystem::path orig_ns_path = proc_path / "self/ns" / ns_type;
@@ -66,6 +67,7 @@ Status ScopedNamespace::EnterNamespace(int ns_pid, std::string_view ns_type) {
 
 void ScopedNamespace::ExitNamespace() {
   // Process in reverse order of EnterNamespace.
+  LOG(WARNING) << "Exiting namespace";
   if (setns_retval_ != 0) {
     return;
   }

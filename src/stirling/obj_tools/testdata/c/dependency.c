@@ -16,15 +16,4 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-void dependency(void);
-
-int num = 3;
-
-// A symbol that will end up in the symtab section.
-static int static_func(void) {
-    dependency();
-    return num;
-}
-
-// A symbol that will end up in the dynsym section.
-int dyn_func(void) { return static_func(); }
+void dependency(void) {}
