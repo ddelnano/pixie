@@ -123,3 +123,9 @@ profiles:
     path: /deploy/kustomize/paths
     value:
     - k8s/vizier/etcd_metadata
+- name: finagle
+  patches:
+  - op: add
+    path: /deploy/kustomize/paths
+    value:
+    - k8s/finagle_tls

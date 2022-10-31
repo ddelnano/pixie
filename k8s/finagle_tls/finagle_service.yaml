@@ -1,0 +1,15 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: finagle-service
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+  - port: 8080
+    protocol: TCP
+    targetPort: 8080
+    name: tcp-thrftmux
+  selector:
+    name: finagle-server

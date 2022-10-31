@@ -1,0 +1,53 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: finagle-server
+spec:
+  selector:
+    matchLabels:
+      name: finagle-server
+  template:
+    metadata:
+      labels:
+        name: finagle-server
+        plane: data
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/os
+                operator: Exists
+              - key: kubernetes.io/os
+                operator: In
+                values:
+                - linux
+            - matchExpressions:
+              - key: beta.kubernetes.io/os
+                operator: Exists
+              - key: beta.kubernetes.io/os
+                operator: In
+                values:
+                - linux
+      containers:
+      - name: app
+        # TODO: Have skaffold build this image
+        # image: gcr.io/pixie-oss/pixie-dev/vizier/finagle-server_image:latest
+        image: bazel/src/stirling/source_connectors/socket_tracer/testing/containers/thriftmux:server_image
+        command:
+          - /usr/bin/java
+          - -cp
+          - "@/app/px/src/stirling/source_connectors/socket_tracer/testing/containers/thriftmux/server_image.classpath"
+          - -Dio.netty.native.deleteLibAfterLoading=false
+          - Server
+          - --use-tls
+          - "true"
+        # env:
+        # - name: PL_HOST_PATH
+        #   value: "/host"
+        ports:
+        - containerPort: 8080
+        resources: {}
+      terminationGracePeriodSeconds: 30

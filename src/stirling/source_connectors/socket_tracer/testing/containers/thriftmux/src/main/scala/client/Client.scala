@@ -4,11 +4,13 @@ import com.twitter.finagle.ssl._
 import com.twitter.finagle.ssl.client.SslClientConfiguration
 import com.twitter.finagle.{Thrift, ThriftMux}
 
-import java.io.File;
+import java.io.File
+import sys.env
 
 object Client {
   def main(args: Array[String]): Unit = {
     var useTls = false
+    var serviceHostname = sys.env.getOrElse("SERVICE_NAME", "localhost")
     args.grouped(2).toList.collect {
       case Array("--use-tls", tls: String) => useTls = tls.toBoolean
     }
@@ -29,7 +31,7 @@ object Client {
         .withLabel("thriftmux_example")
     }
     val svcPerEndpoint = stackClient
-      .methodBuilder("inet!localhost:8080")
+      .methodBuilder(s"inet!$serviceHostname:8080")
       .servicePerEndpoint[TestService.ServicePerEndpoint]
     val svc = ThriftMux.Client.methodPerEndpoint[TestService.ServicePerEndpoint, TestService.MethodPerEndpoint](svcPerEndpoint)
     val r = Await.result(svc.query("String"))

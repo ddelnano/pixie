@@ -22,7 +22,7 @@ object Server {
     val sslConfig = SslServerConfiguration(
       keyCredentials=keyCredentials,
     )
-    val addr = new InetSocketAddress(InetAddress.getLoopbackAddress, 8080)
+    val addr = new InetSocketAddress(8080)
     val testSvc = new TestService.MethodPerEndpoint {
       def query(x: String): Future[String] = Future.value(x + x)
       def question(y: String): Future[String] = Future.value(y + y)
