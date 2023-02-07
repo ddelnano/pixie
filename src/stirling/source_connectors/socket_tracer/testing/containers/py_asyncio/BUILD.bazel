@@ -55,31 +55,31 @@ pkg_tar(
     ],
     mode = "0755",
     package_dir = "/etc/ssl",
-    strip_prefix = "/src/stirling/source_connectors/socket_tracer/testing/containers/thriftmux",
+    strip_prefix = "/src/stirling/source_connectors/socket_tracer/testing/containers/py_asyncio",
 )
 
-# container_image(
-#     name = "thriftmux_base",
-#     base = DEFAULT_JAVA_BASE,
-#     debs = [
-#         packages["libcrypt1"],
-#     ],
-#     tars = [
-#         ":ssl_keys",
-#     ],
-# )
 container_image(
     name = "py_asyncio_base",
     base = DEFAULT_BASE,
     tars = [":ssl_keys"],
-    layers = [
-        requirement("tornado"),
-    ],
 )
 
 py3_image(
     name = "tornado_server",
     base = ":py_asyncio_base",
     srcs = ["main.py"],
+    deps = [
+        requirement("tornado"),
+    ],
     main = "main.py",
+)
+
+py3_image(
+    name = "blocking_server",
+    base = ":py_asyncio_base",
+    srcs = ["blocking_server.py"],
+    deps = [
+        requirement("tornado"),
+    ],
+    main = "blocking_server.py",
 )

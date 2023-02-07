@@ -426,9 +426,22 @@ class PythonAsyncioContainer : public ContainerRunner {
                         kReadyMessage) {}
  private:
   static constexpr std::string_view kBazelImageTar =
-      "src/stirling/source_connectors/socket_tracer/testing/containers/py_asyncio.tar";
-  static constexpr std::string_view kContainerNamePrefix = "python_asyncio";
+      "src/stirling/source_connectors/socket_tracer/testing/containers/py_asyncio/tornado_server.tar";
+  static constexpr std::string_view kContainerNamePrefix = "python_tornado";
   static constexpr std::string_view kReadyMessage = "pid";
+};
+
+class PythonBlockingContainer : public ContainerRunner {
+ public:
+  PythonBlockingContainer()
+      : ContainerRunner(::px::testing::BazelRunfilePath(kBazelImageTar), kContainerNamePrefix,
+                        kReadyMessage) {}
+ private:
+  static constexpr std::string_view kBazelImageTar =
+      "src/stirling/source_connectors/socket_tracer/testing/containers/py_asyncio/blocking_server.tar";
+  static constexpr std::string_view kContainerNamePrefix = "python_blocking_server";
+  static constexpr std::string_view kReadyMessage = "pid";
+};
 
 class PythonMySQLConnectorContainer : public ContainerRunner {
  public:

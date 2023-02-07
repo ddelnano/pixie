@@ -1,14 +1,14 @@
-import asyncio
 import logging
+import ssl
 import os
-
-import tornado.httpserver
-import tornado.ioloop
-import tornado.web
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
 logging.basicConfig(level=logging.INFO,
   format='%(asctime)s %(levelname)s %(message)s',
   handlers=[logging.StreamHandler()])
+
+pid = os.getpid()
+logging.info(f"pid={pid}")
 
 response = """
 <!DOCTYPE html>
@@ -33,22 +33,18 @@ working. Further configuration is required.</p>
 Commercial support is available at
 <a href... [TRUNCATED])""";
 
-class getOK(tornado.web.RequestHandler):
-    def get(self):
-        self.write(response)
+class MyRequestHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-type", "text/html")
+        self.end_headers()
+        self.wfile.write(bytes(response, 'utf-8'))
+        # self.wfile.close()
 
-async def main():
-    pid = os.getpid()
-    logging.info(f"pid={pid}")
-    application = tornado.web.Application([
-        (r'/index.html', getOK),
-    ])
-    http_server = tornado.httpserver.HTTPServer(application, ssl_options={
-        "certfile": "/etc/ssl/server.crt",
-        "keyfile": "/etc/ssl/server.key",
-    })
-    http_server.listen(443)
-    await asyncio.Event().wait()
+httpd = HTTPServer(('localhost', 443), MyRequestHandler)
 
-if __name__ == '__main__':
-    asyncio.run(main())
+httpd.socket = ssl.wrap_socket(httpd.socket,
+                               keyfile="/etc/ssl/server.key",
+                               certfile='/etc/ssl/server.crt', server_side=True)
+
+httpd.serve_forever()
