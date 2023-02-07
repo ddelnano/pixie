@@ -273,6 +273,15 @@ load("@amqp_bpf_test_requirements//:requirements.bzl", ampq_bpf_test_install_dep
 
 ampq_bpf_test_install_deps()
 
+pip_parse(
+    name = "py_asyncio_deps",
+    requirements_lock = "//src/stirling/source_connectors/socket_tracer/testing/containers/py_asyncio:requirements.txt",
+)
+
+load("@py_asyncio_deps//:requirements.bzl", py_asyncio_install_deps = "install_deps")
+
+py_asyncio_install_deps()
+
 load("@rules_jvm_external//:defs.bzl", "maven_install")
 
 maven_install(
