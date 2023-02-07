@@ -49,18 +49,6 @@ static __inline void* get_tls_wrap_for_memfn() {
   return *args;
 }
 
-static __inline void update_node_ssl_tls_wrap_map(void* ssl) {
-  void* tls_wrap = get_tls_wrap_for_memfn();
-  if (tls_wrap == NULL) {
-    return;
-  }
-
-  // The TLSWrap object associated with SSL object might change. So even if node_ssl_tls_wrap_map
-  // might already have value for &ssl, we still blindly update to the new one.
-  // TODO(yzhao): Investigate how SSL can associate with different TLSWrap objects.
-  node_ssl_tls_wrap_map.update(&ssl, &tls_wrap);
-}
-
 // Reads fd by chasing pointers fields and offsets starting from the pointer to a TLSWrap object.
 // TODO(yzhao): Add a doc to explain the layout of the data structures.
 static __inline int32_t get_fd_from_tlswrap_ptr(const struct node_tlswrap_symaddrs_t* symaddrs,
@@ -97,7 +85,6 @@ static __inline int32_t get_fd_from_tlswrap_ptr(const struct node_tlswrap_symadd
 
   return fd;
 }
-
 // TLSWrap holds a pointer to a SSL object. SSL object does not store the file descriptor used for
 // socket IO, TLSWrap does. So the overall process of obtaining the file descriptor works as
 // follows:
@@ -116,6 +103,25 @@ static __inline int32_t get_fd_node(uint32_t tgid, void* ssl) {
 
   return get_fd_from_tlswrap_ptr(symaddrs, *tls_wrap_ptr);
 }
+
+
+static __inline void update_node_ssl_tls_wrap_map(void* ssl) {
+  void* tls_wrap = get_tls_wrap_for_memfn();
+  if (tls_wrap == NULL) {
+    return;
+  }
+
+  int64_t tgid = bpf_get_current_pid_tgid() >> 32;
+  int fd = get_fd_node(tgid, ssl);
+  if (fd != kInvalidFD) {
+    set_conn_as_ssl(tgid, fd);
+  }
+  // The TLSWrap object associated with SSL object might change. So even if node_ssl_tls_wrap_map
+  // might already have value for &ssl, we still blindly update to the new one.
+  // TODO(yzhao): Investigate how SSL can associate with different TLSWrap objects.
+  node_ssl_tls_wrap_map.update(&ssl, &tls_wrap);
+}
+
 
 // SSL_new is invoked by TLSWrap::TLSWrap(). Its return value is used to update the map.
 int probe_ret_SSL_new(struct pt_regs* ctx) {
