@@ -273,6 +273,14 @@ def stirling_test_images():
         "pixie-oss/demo-apps/rabbitmq/rabbitmq:3-management",
     )
 
+    # Built and pushed by src/stirling/testing/demo_apps/py_asyncio/update_gcr.sh
+    container_pull(
+        name = "py_asyncio",
+        registry = "index.docker.io",
+        digest = "sha256:3ba53e2d1c159960948dbb144e3f6db2510e9c2354357669f2ed28786b976747",
+        repository = "ddelnano/python-asyncio:latest",
+    )
+
     # Built and pushed by src/stirling/testing/demo_apps/py_grpc/update_gcr.sh
     _gcr_io_image(
         "py_grpc_helloworld_image",

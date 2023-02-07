@@ -367,6 +367,17 @@ class MySQLContainer : public ContainerRunner {
       "'/var/lib/mysql/mysql.sock'  port: 3306";
 };
 
+class PythonAsyncioContainer : public ContainerRunner {
+ public:
+  PythonAsyncioContainer()
+      : ContainerRunner(::px::testing::BazelRunfilePath(kBazelImageTar), kContainerNamePrefix,
+                        kReadyMessage) {}
+ private:
+  static constexpr std::string_view kBazelImageTar =
+      "src/stirling/source_connectors/socket_tracer/testing/containers/py_asyncio.tar";
+  static constexpr std::string_view kContainerNamePrefix = "python_asyncio";
+  static constexpr std::string_view kReadyMessage = "pid";
+
 class PythonMySQLConnectorContainer : public ContainerRunner {
  public:
   PythonMySQLConnectorContainer()
