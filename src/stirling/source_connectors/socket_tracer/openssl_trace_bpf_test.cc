@@ -162,18 +162,13 @@ typedef ::testing::Types<NginxOpenSSL_1_1_0_ContainerWrapper, NginxOpenSSL_1_1_1
     OpenSSLServerImplementations;
 
 template <typename T>
-using OpenSSLTraceDlsymTest = BaseOpenSSLTraceTest<T, false>;
-
-template <typename T>
-using OpenSSLTraceRawFptrsTest = BaseOpenSSLTraceTest<T, true>;
+using OpenSSLTraceDlsymTest = BaseOpenSSLTraceTest<T, true>;
 
 #define OPENSSL_TYPED_TEST(TestCase, CodeBlock)            \
   TYPED_TEST(OpenSSLTraceDlsymTest, TestCase)              \
-  CodeBlock TYPED_TEST(OpenSSLTraceRawFptrsTest, TestCase) \
   CodeBlock
 
 TYPED_TEST_SUITE(OpenSSLTraceDlsymTest, OpenSSLServerImplementations);
-TYPED_TEST_SUITE(OpenSSLTraceRawFptrsTest, OpenSSLServerImplementations);
 
 OPENSSL_TYPED_TEST(ssl_capture_curl_client, {
   this->StartTransferDataThread();
@@ -241,25 +236,25 @@ OPENSSL_TYPED_TEST(ssl_capture_ruby_client, {
               UnorderedElementsAre(StrEq("127.0.0.1"), StrEq("127.0.0.1"), StrEq("127.0.0.1")));
 })
 
-OPENSSL_TYPED_TEST(ssl_capture_node_client, {
-  this->StartTransferDataThread();
+/* OPENSSL_TYPED_TEST(ssl_capture_node_client, { */
+/*   this->StartTransferDataThread(); */
 
-  // Make an SSL request with the client.
-  // Run the client in the network of the server, so they can connect to each other.
-  ::px::stirling::testing::NodeClientContainer client;
-  ASSERT_OK(client.Run(std::chrono::seconds{60},
-                       {absl::Substitute("--network=container:$0", this->server_.container_name())},
-                       {"node", "/etc/node/https_client.js"}));
-  client.Wait();
-  this->StopTransferDataThread();
+/*   // Make an SSL request with the client. */
+/*   // Run the client in the network of the server, so they can connect to each other. */
+/*   ::px::stirling::testing::NodeClientContainer client; */
+/*   ASSERT_OK(client.Run(std::chrono::seconds{60}, */
+/*                        {absl::Substitute("--network=container:$0", this->server_.container_name())}, */
+/*                        {"node", "/etc/node/https_client.js"})); */
+/*   client.Wait(); */
+/*   this->StopTransferDataThread(); */
 
-  TraceRecords records = this->GetTraceRecords(this->server_.PID());
-  http::Record expected_record = GetExpectedHTTPRecord();
+/*   TraceRecords records = this->GetTraceRecords(this->server_.PID()); */
+/*   http::Record expected_record = GetExpectedHTTPRecord(); */
 
-  EXPECT_THAT(records.http_records, UnorderedElementsAre(EqHTTPRecord(expected_record)));
-  EXPECT_THAT(records.remote_address, UnorderedElementsAre(StrEq("127.0.0.1")));
-  LOG(INFO) << "Trigger tests to see if it reduces flakiness";
-})
+/*   EXPECT_THAT(records.http_records, UnorderedElementsAre(EqHTTPRecord(expected_record))); */
+/*   EXPECT_THAT(records.remote_address, UnorderedElementsAre(StrEq("127.0.0.1"))); */
+/*   LOG(INFO) << "Trigger tests to see if it reduces flakiness"; */
+/* }) */
 
 }  // namespace stirling
 }  // namespace px

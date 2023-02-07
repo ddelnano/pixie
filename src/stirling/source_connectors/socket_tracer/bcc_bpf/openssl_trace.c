@@ -52,6 +52,15 @@ static __inline void process_openssl_data(struct pt_regs* ctx, uint64_t id,
   process_data(/* vecs */ false, ctx, id, direction, args, bytes_count, /* ssl */ true);
 }
 
+static int get_fd_active_syscall(uint64_t id) {
+  int* fd = ssl_fd_map.lookup(&id);
+  if (fd == NULL) {
+    return kInvalidFD;
+  }
+
+  return *fd;
+}
+
 /***********************************************************
  * Argument parsing helpers
  ***********************************************************/
@@ -62,7 +71,8 @@ static __inline void process_openssl_data(struct pt_regs* ctx, uint64_t id,
 // so this function may break with OpenSSL updates.
 // To help combat this, the is parameterized with symbol addresses which are set by user-space,
 // base on the OpenSSL version detected.
-static int get_fd_symaddrs(uint32_t tgid, void* ssl) {
+static int get_fd_symaddrs(uint64_t id, void* ssl) {
+  uint32_t tgid = id >> 32;
   struct openssl_symaddrs_t* symaddrs = openssl_symaddrs_map.lookup(&tgid);
   if (symaddrs == NULL) {
     return kInvalidFD;
@@ -80,7 +90,8 @@ static int get_fd_symaddrs(uint32_t tgid, void* ssl) {
   return rbio_num;
 }
 
-static int get_fd(uint32_t tgid, void* ssl) {
+static int get_fd(uint64_t id, void* ssl) {
+  uint32_t tgid = id >> 32;
   int fd = kInvalidFD;
 
   // OpenSSL is used by nodejs in an asynchronous way, where the SSL_read/SSL_write functions don't
@@ -91,7 +102,7 @@ static int get_fd(uint32_t tgid, void* ssl) {
     return fd;
   }
 
-  fd = get_fd_symaddrs(tgid, ssl);
+  fd = get_fd_active_syscall(id);
   if (fd != kInvalidFD && /*not any of the standard fds*/ fd > 2) {
     return fd;
   }
@@ -111,25 +122,18 @@ BPF_HASH(active_ssl_write_args_map, uint64_t, struct data_args_t);
 int probe_entry_SSL_write(struct pt_regs* ctx) {
   uint64_t id = bpf_get_current_pid_tgid();
   uint32_t tgid = id >> 32;
+  bool call_happening = true;
+  ssl_userspace_call_map.update(&id, &call_happening);
 
   void* ssl = (void*)PT_REGS_PARM1(ctx);
   update_node_ssl_tls_wrap_map(ssl);
 
   char* buf = (char*)PT_REGS_PARM2(ctx);
-  int32_t fd = get_fd(tgid, ssl);
-
-  if (fd == kInvalidFD) {
-    return 0;
-  }
 
   struct data_args_t write_args = {};
   write_args.source_fn = kSSLWrite;
-  write_args.fd = fd;
   write_args.buf = buf;
   active_ssl_write_args_map.update(&id, &write_args);
-
-  // Mark connection as SSL right away, so encrypted traffic does not get traced.
-  set_conn_as_ssl(tgid, write_args.fd);
 
   return 0;
 }
@@ -137,12 +141,22 @@ int probe_entry_SSL_write(struct pt_regs* ctx) {
 int probe_ret_SSL_write(struct pt_regs* ctx) {
   uint64_t id = bpf_get_current_pid_tgid();
 
-  const struct data_args_t* write_args = active_ssl_write_args_map.lookup(&id);
+  void* ssl = (void*)PT_REGS_PARM1(ctx);
+  int fd = get_fd(id, ssl);
+  if (fd == kInvalidFD) {
+    return 0;
+  }
+  bpf_trace_printk("Found socket fd (%d) for tgid: %d", fd, id);
+  struct data_args_t* write_args = active_ssl_write_args_map.lookup(&id);
+  // Set socket fd
   if (write_args != NULL) {
+    write_args->fd = fd;
     process_openssl_data(ctx, id, kEgress, write_args);
   }
 
   active_ssl_write_args_map.delete(&id);
+  ssl_userspace_call_map.delete(&id);
+
   return 0;
 }
 
@@ -154,22 +168,15 @@ int probe_entry_SSL_read(struct pt_regs* ctx) {
 
   void* ssl = (void*)PT_REGS_PARM1(ctx);
   update_node_ssl_tls_wrap_map(ssl);
+  bool call_happening = true;
+  ssl_userspace_call_map.update(&id, &call_happening);
 
   char* buf = (char*)PT_REGS_PARM2(ctx);
-  int32_t fd = get_fd(tgid, ssl);
-
-  if (fd == kInvalidFD) {
-    return 0;
-  }
 
   struct data_args_t read_args = {};
   read_args.source_fn = kSSLRead;
-  read_args.fd = fd;
   read_args.buf = buf;
   active_ssl_read_args_map.update(&id, &read_args);
-
-  // Mark connection as SSL right away, so encrypted traffic does not get traced.
-  set_conn_as_ssl(tgid, read_args.fd);
 
   return 0;
 }
@@ -177,11 +184,21 @@ int probe_entry_SSL_read(struct pt_regs* ctx) {
 int probe_ret_SSL_read(struct pt_regs* ctx) {
   uint64_t id = bpf_get_current_pid_tgid();
 
-  const struct data_args_t* read_args = active_ssl_read_args_map.lookup(&id);
+  void* ssl = (void*)PT_REGS_PARM1(ctx);
+  int fd = get_fd(id, ssl);
+
+  if (fd == kInvalidFD) {
+    return 0;
+  }
+  bpf_trace_printk("Found socket fd (%d) for tgid: %d", fd, id);
+
+  struct data_args_t* read_args = active_ssl_read_args_map.lookup(&id);
   if (read_args != NULL) {
+    read_args->fd = fd;
     process_openssl_data(ctx, id, kIngress, read_args);
   }
 
   active_ssl_read_args_map.delete(&id);
+  ssl_userspace_call_map.delete(&id);
   return 0;
 }
