@@ -282,6 +282,15 @@ load("@py_asyncio_deps//:requirements.bzl", py_asyncio_install_deps = "install_d
 
 py_asyncio_install_deps()
 
+pip_parse(
+    name = "locust_deps",
+    requirements_lock = "//src/stirling/source_connectors/socket_tracer/testing/containers/locust:requirements.bazel.txt",
+)
+
+load("@locust_deps//:requirements.bzl", locust_install_deps = "install_deps")
+
+locust_install_deps()
+
 load("@rules_jvm_external//:defs.bzl", "maven_install")
 
 maven_install(
