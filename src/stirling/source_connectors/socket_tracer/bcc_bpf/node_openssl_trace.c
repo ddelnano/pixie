@@ -90,19 +90,19 @@ static __inline int32_t get_fd_from_tlswrap_ptr(const struct node_tlswrap_symadd
 // follows:
 // * Get TLSWrap object's address from node_ssl_tls_wrap_map
 // * Get FD from TLSWrap object, with fields' offsets from userspace
-static __inline int32_t get_fd_node(uint32_t tgid, void* ssl) {
-  void** tls_wrap_ptr = node_ssl_tls_wrap_map.lookup(&ssl);
-  if (tls_wrap_ptr == NULL) {
-    return kInvalidFD;
-  }
+/* static __inline int32_t get_fd_node(uint32_t tgid, void* ssl) { */
+/*   void** tls_wrap_ptr = node_ssl_tls_wrap_map.lookup(&ssl); */
+/*   if (tls_wrap_ptr == NULL) { */
+/*     return kInvalidFD; */
+/*   } */
 
-  const struct node_tlswrap_symaddrs_t* symaddrs = node_tlswrap_symaddrs_map.lookup(&tgid);
-  if (symaddrs == NULL) {
-    return kInvalidFD;
-  }
+/*   const struct node_tlswrap_symaddrs_t* symaddrs = node_tlswrap_symaddrs_map.lookup(&tgid); */
+/*   if (symaddrs == NULL) { */
+/*     return kInvalidFD; */
+/*   } */
 
-  return get_fd_from_tlswrap_ptr(symaddrs, *tls_wrap_ptr);
-}
+/*   return get_fd_from_tlswrap_ptr(symaddrs, *tls_wrap_ptr); */
+/* } */
 
 
 static __inline void update_node_ssl_tls_wrap_map(void* ssl) {
@@ -111,11 +111,11 @@ static __inline void update_node_ssl_tls_wrap_map(void* ssl) {
     return;
   }
 
-  int64_t tgid = bpf_get_current_pid_tgid() >> 32;
-  int fd = get_fd_node(tgid, ssl);
-  if (fd != kInvalidFD) {
-    set_conn_as_ssl(tgid, fd);
-  }
+  /* int64_t tgid = bpf_get_current_pid_tgid() >> 32; */
+  /* int fd = get_fd_node(tgid, ssl); */
+  /* if (fd != kInvalidFD) { */
+  /*   set_conn_as_ssl(tgid, fd); */
+  /* } */
   // The TLSWrap object associated with SSL object might change. So even if node_ssl_tls_wrap_map
   // might already have value for &ssl, we still blindly update to the new one.
   // TODO(yzhao): Investigate how SSL can associate with different TLSWrap objects.

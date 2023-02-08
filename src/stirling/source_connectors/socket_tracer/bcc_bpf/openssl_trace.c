@@ -97,10 +97,6 @@ static int get_fd(uint64_t id, void* ssl) {
   // OpenSSL is used by nodejs in an asynchronous way, where the SSL_read/SSL_write functions don't
   // immediately relay the traffic to/from the socket. If we notice that this SSL call was made from
   // node, we use the FD that we obtained from a separate nodejs uprobe.
-  fd = get_fd_node(tgid, ssl);
-  if (fd != kInvalidFD && /*not any of the standard fds*/ fd > 2) {
-    return fd;
-  }
 
   fd = get_fd_active_syscall(id);
   if (fd != kInvalidFD && /*not any of the standard fds*/ fd > 2) {
@@ -146,7 +142,6 @@ int probe_ret_SSL_write(struct pt_regs* ctx) {
   if (fd == kInvalidFD) {
     return 0;
   }
-  bpf_trace_printk("Found socket fd (%d) for tgid: %d", fd, id);
   struct data_args_t* write_args = active_ssl_write_args_map.lookup(&id);
   // Set socket fd
   if (write_args != NULL) {
@@ -190,7 +185,6 @@ int probe_ret_SSL_read(struct pt_regs* ctx) {
   if (fd == kInvalidFD) {
     return 0;
   }
-  bpf_trace_printk("Found socket fd (%d) for tgid: %d", fd, id);
 
   struct data_args_t* read_args = active_ssl_read_args_map.lookup(&id);
   if (read_args != NULL) {

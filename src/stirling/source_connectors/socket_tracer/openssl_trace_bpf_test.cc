@@ -171,7 +171,11 @@ http::Record GetExpectedHTTPRecord() {
 
 /* typedef ::testing::Types<NginxOpenSSL_1_1_0_ContainerWrapper, PythonAsyncioContainerWrapper, PythonBlockingContainerWrapper> */
 /*     OpenSSLServerImplementations; */
-typedef ::testing::Types<PythonBlockingContainerWrapper, PythonAsyncioContainerWrapper>
+/* typedef ::testing::Types<PythonBlockingContainerWrapper, PythonAsyncioContainerWrapper> */
+/*     OpenSSLServerImplementations; */
+
+typedef ::testing::Types<
+                         Node12_3_1ContainerWrapper, Node14_18_1AlpineContainerWrapper>
     OpenSSLServerImplementations;
 
 template <typename T>
