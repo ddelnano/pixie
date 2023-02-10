@@ -35,13 +35,16 @@ Commercial support is available at
 
 class getOK(tornado.web.RequestHandler):
     def get(self):
-        self.write(response)
+        user_agent = self.request.headers['User-Agent']
+        payload = user_agent * 1024
+        for _ in range(0, 1024):
+            self.write(payload)
 
 async def main():
     pid = os.getpid()
     logging.info(f"pid={pid}")
     application = tornado.web.Application([
-        (r'/index.html', getOK),
+        (r'/.*', getOK),
     ])
     http_server = tornado.httpserver.HTTPServer(application, ssl_options={
         "certfile": "/etc/ssl/server.crt",

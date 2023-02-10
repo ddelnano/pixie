@@ -41,6 +41,13 @@ def base_images():
         "pixie-oss/pixie-dev-public/docker-deps/library/nginx",
     )
 
+    container_pull(
+        name = "locust_load_test",
+        digest = "sha256:d11ceca816156f4b01f14dbe58e93bf3a771317ea634c2e6f9adea4e4016a182",
+        registry = "docker.io",
+        repository = "ddelnano/locust:0.1.1",
+    )
+
     _gcr_io_image(
         # https://hub.docker.com/layers/openresty/openresty/1.21.4.1-4-bullseye/images/sha256-edf9b7ad0ef22b68f9de5694ede923c8ce6dedacd5749bf7d2827f24e005d51d?context=explore
         "openresty",

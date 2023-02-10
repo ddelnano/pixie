@@ -66,6 +66,7 @@ pl_cc_test_library(
         "//src/stirling/source_connectors/socket_tracer/testing/containers/thriftmux:server_image.tar",
         "//src/stirling/source_connectors/socket_tracer/testing/containers/py_asyncio:tornado_server.tar",
         "//src/stirling/source_connectors/socket_tracer/testing/containers/py_asyncio:blocking_server.tar",
+        "//src/stirling/source_connectors/socket_tracer/testing/containers:locust_load_testing.tar",
         "//src/stirling/testing/demo_apps/go_grpc_tls_pl/client:golang_1_17_grpc_tls_client.tar",
         "//src/stirling/testing/demo_apps/go_grpc_tls_pl/client:golang_1_18_grpc_tls_client.tar",
         "//src/stirling/testing/demo_apps/go_grpc_tls_pl/client:golang_1_19_grpc_tls_client.tar",

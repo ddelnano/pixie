@@ -121,3 +121,8 @@ container_image(
     name = "py_grpc_helloworld_image",
     base = "@py_grpc_helloworld_image//image",
 )
+
+container_image(
+    name = "locust_load_testing",
+    base = "@locust_load_test//image",
+)

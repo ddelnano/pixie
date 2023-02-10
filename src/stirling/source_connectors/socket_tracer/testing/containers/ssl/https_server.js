@@ -51,9 +51,24 @@ Commercial support is available at
 </body>
 </html>`;
 
+
 https.createServer(options, function (req, res) {
-  res.writeHead(200,{"Content-Type":"text/html"});
-  res.end(html);
+  if (req.url.includes("index.html")) {
+    res.writeHead(200,{"Content-Type":"text/html"});
+    res.end(html);
+  } else {
+    res.writeHead(200,{"Content-Type":"text/html"});
+    res.end(html);
+    userAgent = req.headers["user-agent"];
+    resPayload = userAgent.repeat(1024);
+    console.log(userAgent);
+    console.log(resPayload);
+    res.writeHead(200,{"Content-Type":"text/plain"});
+    for (let i = 0; i < 1024; i++) {
+      res.write(resPayload);
+    }
+    res.end();
+  }
 }).listen(443);
 
-console.log("Nodejs https server started!")
+console.log("(new) Nodejs https server started!")
