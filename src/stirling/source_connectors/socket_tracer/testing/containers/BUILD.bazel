@@ -128,6 +128,6 @@ container_image(
 )
 
 container_image(
-    name = "py_asyncio",
-    base = "@py_asyncio//image",
+    name = "locust_load_testing",
+    base = "@locust_load_test//image",
 )

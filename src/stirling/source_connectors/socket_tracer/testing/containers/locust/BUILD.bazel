@@ -64,18 +64,30 @@ package(default_visibility = ["//src/stirling:__subpackages__"])
 #     tars = [":ssl_keys"],
 # )
 
-py3_image(
-    name = "locust_image",
-    base = ":py_asyncio_base",
-    srcs = ["*.py"],
-    deps = [
+# py3_image(
+#     name = "locust_image",
+#     base = ":py_asyncio_base",
+#     srcs = ["*.py"],
+#     deps = [
+#         requirement("locust"),
+#     ],
+#     main = "locustfile.py",
+# )
+container_layer(
+    name = "pip_deps_layer",
+    directory = "/root/.local/lib/python3.9/site-packages/locust",
+    files = [
         requirement("locust"),
+        requirement("gevent"),
     ],
-    main = "locustfile.py",
 )
 
 container_image(
     name = "load_test",
-    base = ":locust_image",
-    entrypoint = "locust",
+    base = DEFAULT_BASE,
+    # entrypoint = "locust",
+    files = glob(["*.py"]),
+    layers = [
+        ":pip_deps_layer",
+    ],
 )

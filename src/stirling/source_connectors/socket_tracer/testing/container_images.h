@@ -153,6 +153,20 @@ class NodeClientContainer : public ContainerRunner {
   static constexpr std::string_view kReadyMessage = "";
 };
 
+class LocustContainer : public ContainerRunner {
+ public:
+  LocustContainer()
+      : ContainerRunner(::px::testing::BazelRunfilePath(kBazelImageTar), kContainerNamePrefix,
+                        kReadyMessage) {}
+
+ private:
+  static constexpr std::string_view kBazelImageTar =
+      "src/stirling/source_connectors/socket_tracer/testing/containers/"
+      "locust_load_testing.tar";
+  static constexpr std::string_view kContainerNamePrefix = "locust";
+  static constexpr std::string_view kReadyMessage = "Starting Locust";
+};
+
 class Go1_17_TLSServerContainer : public ContainerRunner {
  public:
   Go1_17_TLSServerContainer()
