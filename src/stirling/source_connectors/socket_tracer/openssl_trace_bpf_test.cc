@@ -94,7 +94,7 @@ template <typename TServerContainer, bool TForceFptrs>
 class BaseOpenSSLTraceTest : public SocketTraceBPFTestFixture</* TClientSideTracing */ false> {
 
  protected:
-  std::size_t response_length_ = 1024 * 1024 * 1024;
+  std::size_t response_length_ = 5 * 1024;
 
   BaseOpenSSLTraceTest() {
     // Run the nginx HTTPS server.
@@ -174,7 +174,7 @@ http::Record GetExpectedHTTPRecord() {
   return expected_record;
 }
 
-http::Record GetExpectedHTTPRecord(std::string req_path, std::string resp_body) {
+http::Record GetExpectedHTTPRecord(std::string req_path) {
   http::Record expected_record;
   expected_record.req.minor_version = 1;
   expected_record.req.req_method = "GET";
@@ -182,7 +182,6 @@ http::Record GetExpectedHTTPRecord(std::string req_path, std::string resp_body) 
   expected_record.req.body = "";
   expected_record.resp.resp_status = 200;
   expected_record.resp.resp_message = "OK";
-  expected_record.resp.body = resp_body;
   return expected_record;
 }
 
@@ -269,25 +268,33 @@ TYPED_TEST_SUITE(OpenSSLTraceDlsymTest, OpenSSLServerImplementations);
 /*   EXPECT_THAT(records.remote_address, */
 /*               UnorderedElementsAre(StrEq("127.0.0.1"), StrEq("127.0.0.1"), StrEq("127.0.0.1"))); */
 /* }) */
-inline auto RegexEqHTTPResp(const protocols::http::Message& x, std::string s, size_t times) {
+
+/* inline auto RegexEqHTTPResp(const protocols::http::Message& x, std::string s) { */
+/*   using ::testing::Field; */
+
+/*   return Field(&protocols::http::Message::body, ::testing::ContainsRegex(s)); */
+/* } */
+
+inline auto PartialEqHTTPResp(const protocols::http::Message& x) {
   using ::testing::Field;
 
   return AllOf(Field(&protocols::http::Message::resp_status, ::testing::Eq(x.resp_status)),
-               Field(&protocols::http::Message::resp_message, ::testing::StrEq(x.resp_message)),
-               Field(&protocols::http::Message::body, ::testing::Contains(s).Times(times))
-               );
+               Field(&protocols::http::Message::resp_message, ::testing::StrEq(x.resp_message)));
 }
 
-// TODO(yzhao): http::Record misses many fields from the records in http data table. Consider adding
-// additional fields.
-inline auto EqHTTPRecord(const protocols::http::Record& x) {
+inline auto PartialEqHTTPRecord(const protocols::http::Record& x) {
   using ::testing::Field;
 
-  return AllOf(Field(&protocols::http::Record::req, EqHTTPReq(x.req)),
-               Field(&protocols::http::Record::resp, EqHTTPResp(x.resp)));
+  return AllOf(Field(&protocols::http::Record::req, testing::EqHTTPReq(x.req)),
+               Field(&protocols::http::Record::resp, PartialEqHTTPResp(x.resp)));
 }
 
 OPENSSL_TYPED_TEST(ssl_capture_locust_load_test, {
+  using ::testing::StrEq;
+  using ::testing::Gt;
+
+  FLAGS_stirling_conn_trace_pid = this->server_.process_pid();
+
   this->StartTransferDataThread();
 
   auto container_name = this->server_.container_name();
@@ -313,11 +320,24 @@ OPENSSL_TYPED_TEST(ssl_capture_locust_load_test, {
 
   TraceRecords records = this->GetTraceRecords(this->server_.PID());
 
-  http::Record v1 = GetExpectedHTTPRecord("/1", std::string(this->response_length_, "1"));
-  http::Record v2 = GetExpectedHTTPRecord("/2", std::string(this->response_length_, "2"));
+  http::Record v1 = GetExpectedHTTPRecord("/1");
+  http::Record v2 = GetExpectedHTTPRecord("/2");
+  /* int times = 1024 * 1024 * 1024; */
   for (auto& http_record : records.http_records) {
 
-    EXPECT_THAT((std::array{v1, v2}), Contains(EqHTTPRecord(http_record)));
+    EXPECT_THAT((std::array{v1, v2}), Contains(PartialEqHTTPRecord(http_record)));
+
+    std::string s = http_record.resp.body;
+    size_t one_count = std::count_if( s.begin(), s.end(), []( char c ){return c =='1';});
+    size_t two_count = std::count_if( s.begin(), s.end(), []( char c ){return c =='2';});
+    LOG(WARNING) << absl::Substitute("Found body with len $0 and chars $1. One and two count: $2 $3\n", s.length(), s.substr(0, 10), one_count, two_count);
+    if (http_record.req.req_path == "/1") {
+        EXPECT_THAT(one_count, this->response_length_);
+        EXPECT_THAT(two_count, 0);
+    } else {
+        EXPECT_THAT(two_count, this->response_length_);
+        EXPECT_THAT(one_count, 0);
+    }
   }
 })
 

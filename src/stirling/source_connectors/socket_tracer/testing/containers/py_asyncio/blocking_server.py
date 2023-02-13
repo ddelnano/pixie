@@ -18,7 +18,10 @@ class MyRequestHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-type", "text/plain")
         self.end_headers()
-        for _ in range(0, 1024):
+
+        # TODO(ddelnano): Allow the write times to be configured with a cli
+        # argument to make testing different interations easier.
+        for _ in range(0, 5):
             self.wfile.write(bytes(payload, 'utf-8'))
 
 httpd = HTTPServer(('localhost', 443), MyRequestHandler)
