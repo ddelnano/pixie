@@ -21,7 +21,7 @@ class MyRequestHandler(BaseHTTPRequestHandler):
 
         # TODO(ddelnano): Allow the write times to be configured with a cli
         # argument to make testing different interations easier.
-        for _ in range(0, 5):
+        for _ in range(0, 1024):
             self.wfile.write(bytes(payload, 'utf-8'))
 
 httpd = HTTPServer(('localhost', 443), MyRequestHandler)

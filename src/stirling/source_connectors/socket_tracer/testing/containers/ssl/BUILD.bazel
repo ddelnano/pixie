@@ -64,6 +64,12 @@ container_layer(
     files = ["nginx.conf"],
 )
 
+container_layer(
+    name = "large_static_files",
+    directory = "/usr/share/nginx/html",
+    files = ["1", "2"],
+)
+
 pkg_tar(
     name = "node_client_server",
     srcs = [

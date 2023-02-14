@@ -27,6 +27,7 @@
 #include "src/shared/types/column_wrapper.h"
 #include "src/shared/types/types.h"
 #include "src/stirling/source_connectors/socket_tracer/socket_trace_connector.h"
+#include "src/stirling/source_connectors/socket_tracer/protocols/http/parse.h"
 #include "src/stirling/source_connectors/socket_tracer/testing/container_images.h"
 #include "src/stirling/source_connectors/socket_tracer/testing/protocol_checkers.h"
 #include "src/stirling/source_connectors/socket_tracer/testing/socket_trace_bpf_test_fixture.h"
@@ -94,7 +95,7 @@ template <typename TServerContainer, bool TForceFptrs>
 class BaseOpenSSLTraceTest : public SocketTraceBPFTestFixture</* TClientSideTracing */ false> {
 
  protected:
-  std::size_t response_length_ = 5 * 1024;
+  std::size_t response_length_ = 1024 * 1024;
 
   BaseOpenSSLTraceTest() {
     // Run the nginx HTTPS server.
@@ -110,6 +111,7 @@ class BaseOpenSSLTraceTest : public SocketTraceBPFTestFixture</* TClientSideTrac
   void SetUp() override {
     FLAGS_openssl_force_raw_fptrs = force_fptr_;
     FLAGS_max_body_bytes = response_length_;
+    FLAGS_http_body_limit_bytes = response_length_;
 
     SocketTraceBPFTestFixture::SetUp();
   }
@@ -187,7 +189,7 @@ http::Record GetExpectedHTTPRecord(std::string req_path) {
 
 /* typedef ::testing::Types<NginxOpenSSL_1_1_0_ContainerWrapper, PythonAsyncioContainerWrapper, PythonBlockingContainerWrapper> */
 /*     OpenSSLServerImplementations; */
-typedef ::testing::Types<PythonBlockingContainerWrapper, PythonAsyncioContainerWrapper>
+typedef ::testing::Types<NginxOpenSSL_1_1_1_ContainerWrapper, PythonBlockingContainerWrapper, PythonAsyncioContainerWrapper>
     OpenSSLServerImplementations;
 
 /* typedef ::testing::Types<NginxOpenSSL_1_1_0_ContainerWrapper, NginxOpenSSL_1_1_1_ContainerWrapper, */
@@ -291,9 +293,7 @@ inline auto PartialEqHTTPRecord(const protocols::http::Record& x) {
 
 OPENSSL_TYPED_TEST(ssl_capture_locust_load_test, {
   using ::testing::StrEq;
-  using ::testing::Gt;
-
-  FLAGS_stirling_conn_trace_pid = this->server_.process_pid();
+  /* FLAGS_stirling_conn_trace_pid = this->server_.PID(); */
 
   this->StartTransferDataThread();
 
