@@ -40,7 +40,7 @@ class getOK(tornado.web.RequestHandler):
 
         # TODO(ddelnano): Allow the write times to be configured with a cli
         # argument to make testing different interations easier.
-        for _ in range(0, 5):
+        for _ in range(0, 1024):
             self.write(payload)
 
 async def main():
