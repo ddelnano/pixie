@@ -43,9 +43,9 @@ def base_images():
 
     container_pull(
         name = "locust_load_test",
-        digest = "sha256:d11ceca816156f4b01f14dbe58e93bf3a771317ea634c2e6f9adea4e4016a182",
+        digest = "sha256:6da247a384f26fafbf87c07dc0146caa89a5c4f0f228c642141e0eb92c88cddd",
         registry = "docker.io",
-        repository = "ddelnano/locust:0.1.1",
+        repository = "ddelnano/locust:0.2.4",
     )
 
     _gcr_io_image(
