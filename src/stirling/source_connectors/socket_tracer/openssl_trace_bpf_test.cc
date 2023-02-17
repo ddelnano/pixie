@@ -95,7 +95,7 @@ template <typename TServerContainer, bool TForceFptrs>
 class BaseOpenSSLTraceTest : public SocketTraceBPFTestFixture</* TClientSideTracing */ false> {
 
  protected:
-  std::size_t response_length_ = 1024 * 1024;
+  std::size_t response_length_ = 5 * 1024;
 
   BaseOpenSSLTraceTest() {
     // Run the nginx HTTPS server.
@@ -187,14 +187,8 @@ http::Record GetExpectedHTTPRecord(std::string req_path) {
   return expected_record;
 }
 
-/* typedef ::testing::Types<NginxOpenSSL_1_1_0_ContainerWrapper, PythonAsyncioContainerWrapper, PythonBlockingContainerWrapper> */
-/*     OpenSSLServerImplementations; */
-typedef ::testing::Types<NginxOpenSSL_1_1_1_ContainerWrapper, PythonBlockingContainerWrapper, PythonAsyncioContainerWrapper>
+typedef ::testing::Types<NginxOpenSSL_1_1_1_ContainerWrapper, PythonAsyncioContainerWrapper, PythonBlockingContainerWrapper>
     OpenSSLServerImplementations;
-
-/* typedef ::testing::Types<NginxOpenSSL_1_1_0_ContainerWrapper, NginxOpenSSL_1_1_1_ContainerWrapper, */
-/*                          Node12_3_1ContainerWrapper, Node14_18_1AlpineContainerWrapper> */
-/*     OpenSSLServerImplementations; */
 
 template <typename T>
 using OpenSSLTraceDlsymTest = BaseOpenSSLTraceTest<T, true>;
@@ -298,19 +292,25 @@ OPENSSL_TYPED_TEST(ssl_capture_locust_load_test, {
   this->StartTransferDataThread();
 
   auto container_name = this->server_.container_name();
+  auto target_http_records = 100;
+  // Divide total http requests by number of locust containers
+  auto iterations = target_http_records / 2;
+  // This controls the concurrency locust will have. The total number of
+  // http requests will be divided up between these 'workers'.
+  auto users = 5;
 
-  std::thread locust_client1([&container_name]() {
+  std::thread locust_client1([&container_name, &iterations, &users]() {
       ::px::stirling::testing::LocustContainer client1;
       ASSERT_OK(client1.Run(std::chrono::seconds{60},
                            {absl::Substitute("--network=container:$0", container_name)},
-                           {"--user-agent=1", "--users=10", "-t=5s"}));
+                           {"--loglevel=debug", "--user-agent=1", absl::Substitute("--users=$0", users), absl::Substitute("-i=$0", iterations)}));
       client1.Wait();
   });
-  std::thread locust_client2([&container_name]() {
+  std::thread locust_client2([&container_name, &iterations, &users]() {
       ::px::stirling::testing::LocustContainer client2;
       ASSERT_OK(client2.Run(std::chrono::seconds{60},
                            {absl::Substitute("--network=container:$0", container_name)},
-                           {"--user-agent=2", "--users=10", "-t=5s"}));
+                           {"--loglevel=debug", "--user-agent=2", absl::Substitute("--users=$0", users), absl::Substitute("-i=$0", iterations)}));
       client2.Wait();
   });
   locust_client1.join();
@@ -322,7 +322,8 @@ OPENSSL_TYPED_TEST(ssl_capture_locust_load_test, {
 
   http::Record v1 = GetExpectedHTTPRecord("/1");
   http::Record v2 = GetExpectedHTTPRecord("/2");
-  /* int times = 1024 * 1024 * 1024; */
+
+  EXPECT_THAT(records.http_records.size(), target_http_records);
   for (auto& http_record : records.http_records) {
 
     EXPECT_THAT((std::array{v1, v2}), Contains(PartialEqHTTPRecord(http_record)));
