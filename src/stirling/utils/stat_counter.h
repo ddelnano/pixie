@@ -27,6 +27,9 @@
 
 #include <magic_enum.hpp>
 
+#include <prometheus/counter.h>
+#include <prometheus/registry.h>
+
 namespace px {
 namespace stirling {
 namespace utils {
@@ -53,6 +56,38 @@ class StatCounter {
 
  private:
   std::vector<int64_t> counts_ = std::vector<int64_t>(magic_enum::enum_count<TKeyType>(), 0);
+};
+
+template <typename TKeyType>
+class PromStatCounter {
+
+ public:
+  /* void Increment(TKeyType key, int count = 1) { counts_[static_cast<int>(key)] += count; } */
+  /* void Decrement(TKeyType key, int count = 1) { counts_[static_cast<int>(key)] -= count; } */
+  /* void Reset(TKeyType key) { counts_[static_cast<int>(key)] = 0; } */
+  /* int64_t Get(TKeyType key) const { return counts_[static_cast<int>(key)]; } */
+  /* std::string Print() const { */
+  /*   std::string out; */
+  /*   for (auto key : magic_enum::enum_values<TKeyType>()) { */
+  /*     absl::StrAppend(&out, absl::Substitute("$0=$1 ", magic_enum::enum_name(key), Get(key))); */
+  /*   } */
+  /*   return out; */
+  /* } */
+
+  PromStatCounter(prometheus::Registry* registry) {
+    auto keys = magic_enum::enum_values<TKeyType>();
+    std::for_each(keys.begin(), keys.end(),
+      [this, &registry](int &key){
+        counters_[key] = prometheus::BuildCounter()
+          .Name(magic_enum::enum_name(key))
+          .Register(registry);
+      }
+    );
+  }
+
+  private:
+    /* std::vector<prometheus::Counter&> counters_(magic_enum::enum_count<TKeyType>()); */
+    std::vector<std::unique_ptr<prometheus::Counter>> counters_ = std::vector<std::unique_ptr<prometheus::Counter>>(magic_enum::enum_count<TKeyType>());
 };
 
 }  // namespace utils
