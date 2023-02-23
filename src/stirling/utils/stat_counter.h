@@ -30,6 +30,8 @@
 #include <prometheus/counter.h>
 #include <prometheus/registry.h>
 
+#include "src/common/metrics/metrics.h"
+
 namespace px {
 namespace stirling {
 namespace utils {
@@ -62,32 +64,31 @@ template <typename TKeyType>
 class PromStatCounter {
 
  public:
-  /* void Increment(TKeyType key, int count = 1) { counts_[static_cast<int>(key)] += count; } */
-  /* void Decrement(TKeyType key, int count = 1) { counts_[static_cast<int>(key)] -= count; } */
-  /* void Reset(TKeyType key) { counts_[static_cast<int>(key)] = 0; } */
-  /* int64_t Get(TKeyType key) const { return counts_[static_cast<int>(key)]; } */
-  /* std::string Print() const { */
-  /*   std::string out; */
-  /*   for (auto key : magic_enum::enum_values<TKeyType>()) { */
-  /*     absl::StrAppend(&out, absl::Substitute("$0=$1 ", magic_enum::enum_name(key), Get(key))); */
-  /*   } */
-  /*   return out; */
-  /* } */
+  void Increment(TKeyType key, int count = 1) { counters_[static_cast<int>(key)].get()->Increment(count); }
+  void Decrement(TKeyType key, int count = 1) { counters_[static_cast<int>(key)].get()->Decrement(count); }
+  void Reset(TKeyType key) { counters_[static_cast<int>(key)].get()->Set(0); }
+  float Get(TKeyType key) const { return counters_[static_cast<int>(key)].get()->Value(); }
+  std::string Print() const {
+    std::string out;
+    for (auto key : magic_enum::enum_values<TKeyType>()) {
+      absl::StrAppend(&out, absl::Substitute("$0=$1 ", magic_enum::enum_name(key), Get(key)));
+    }
+    return out;
+  }
 
-  PromStatCounter(prometheus::Registry* registry) {
+  PromStatCounter() {
     auto keys = magic_enum::enum_values<TKeyType>();
     std::for_each(keys.begin(), keys.end(),
-      [this, &registry](int &key){
-        counters_[key] = prometheus::BuildCounter()
-          .Name(magic_enum::enum_name(key))
-          .Register(registry);
+      [this](auto &key){
+        const std::string name(magic_enum::enum_name(key));
+        counters_[static_cast<int>(key)] = std::make_unique<prometheus::Gauge>(BuildGauge(name, "Helo message"));
       }
     );
   }
 
   private:
-    /* std::vector<prometheus::Counter&> counters_(magic_enum::enum_count<TKeyType>()); */
-    std::vector<std::unique_ptr<prometheus::Counter>> counters_ = std::vector<std::unique_ptr<prometheus::Counter>>(magic_enum::enum_count<TKeyType>());
+    std::vector<std::unique_ptr<prometheus::Gauge>> counters_
+      = std::vector<std::unique_ptr<prometheus::Gauge>>(magic_enum::enum_count<TKeyType>());
 };
 
 }  // namespace utils

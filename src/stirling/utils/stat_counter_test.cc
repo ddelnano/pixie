@@ -39,7 +39,7 @@ TEST(StatCounterTest, CheckValuesAndPrint) {
   StatCounter<Key> counter;
 
   counter.Increment(Key::kFirst);
-  EXPECT_EQ(counter.Get(Key::kFirst), 1);
+  EXPECT_EQ(counter.Get(Key::kFirst), 1.0);
 
   counter.Increment(Key::kFirst, 2);
   EXPECT_EQ(counter.Get(Key::kFirst), 3);
@@ -54,6 +54,27 @@ TEST(StatCounterTest, CheckValuesAndPrint) {
   EXPECT_EQ(counter.Get(Key::kFirst), -1);
 
   EXPECT_THAT(counter.Print(), StrEq("kFirst=-1 kSecond=0 "));
+}
+
+TEST(StatCounterTest, PromStatCheckValuesAndPrint) {
+  PromStatCounter<Key> counter;
+
+  counter.Increment(Key::kFirst);
+  EXPECT_EQ(counter.Get(Key::kFirst), 1.0);
+
+  /* counter.Increment(Key::kFirst, 2); */
+  /* EXPECT_EQ(counter.Get(Key::kFirst), 3); */
+
+  /* counter.Decrement(Key::kFirst); */
+  /* EXPECT_EQ(counter.Get(Key::kFirst), 2.0); */
+
+  /* counter.Decrement(Key::kFirst, 2); */
+  /* EXPECT_EQ(counter.Get(Key::kFirst), 0.0); */
+
+  /* counter.Decrement(Key::kFirst); */
+  /* EXPECT_EQ(counter.Get(Key::kFirst), -1.0); */
+
+  /* EXPECT_THAT(counter.Print(), StrEq("kFirst=-1 kSecond=0 ")); */
 }
 
 }  // namespace utils
