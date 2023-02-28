@@ -6,3 +6,4 @@ go_deps.bzl -diff linguist-generated=true
 src/ui/.yarn/releases/** -diff linguist-generated=true
 src/ui/.yarn/plugins/** -diff linguist-generated=true
 *.pxl linguist-language=python
+.github/workflows/fork_sync.yml merge=theirs
