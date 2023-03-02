@@ -136,6 +136,8 @@ class SocketTraceConnector : public SourceConnector, public bpf_tools::BCCWrappe
   // specified by --test_only_socket_trace_target_pid.
   Status TestOnlySetTargetPID();
   Status DisableSelfTracing();
+  Status DisableKubeSystemTracing();
+  Status UpdateKubeSystemIgnoredPIDs(const absl::flat_hash_set<md::UPID>& upids);
 
   void DisablePIDTrace(int pid) override {
     SourceConnector::DisablePIDTrace(pid);
@@ -227,6 +229,8 @@ class SocketTraceConnector : public SourceConnector, public bpf_tools::BCCWrappe
   ConnTrackersManager conn_trackers_mgr_;
 
   ConnStats conn_stats_;
+
+  bool init_bpf_ = false;
 
   absl::flat_hash_set<int> pids_to_trace_disable_;
 

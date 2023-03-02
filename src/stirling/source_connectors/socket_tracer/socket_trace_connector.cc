@@ -428,9 +428,12 @@ Status SocketTraceConnector::InitBPF() {
   if (FLAGS_stirling_disable_self_tracing) {
     PX_RETURN_IF_ERROR(DisableSelfTracing());
   }
+  PX_RETURN_IF_ERROR(DisableSelfTracing());
   if (!FLAGS_socket_trace_data_events_output_path.empty()) {
     SetupOutput(FLAGS_socket_trace_data_events_output_path);
   }
+
+  init_bpf_ = true;
 
   return Status::OK();
 }
@@ -568,6 +571,37 @@ std::string BPFMapsInfo(bpf_tools::BCCWrapper* bcc) {
 
 }  // namespace
 
+Status SocketTraceConnector::UpdateKubeSystemIgnoredPIDs(const absl::flat_hash_set<md::UPID>& upids) {
+
+  if (!init_bpf_) return Status::OK();
+
+  LOG(WARNING) << "Running UpdateKubeSystemIgnoredPIDs";
+  system::ProcParser proc_parser;
+  auto control_map_handle = GetPerCPUArrayTable<int64_t>(kControlValuesArrayName);
+  for (const auto& upid : upids) {
+    int64_t pid = upid.pid();
+    PX_ASSIGN_OR(auto exec_path, proc_parser.GetExePath(pid), continue);
+
+    auto filename = exec_path.filename();
+    if (filename == "metrics-server") {
+
+      auto status = bpf_tools::UpdatePerCPUArrayValue(kMetricsServerTGIDIndex, pid, &control_map_handle);
+      if (!status.ok()) return status;
+      LOG(WARNING) << "Disabled tracing for metrics-server";
+  }
+
+    if (filename == "kublet") {
+      auto status = bpf_tools::UpdatePerCPUArrayValue(kKubeletTGIDIndex, pid, &control_map_handle);
+      if (!status.ok()) return status;
+
+      LOG(WARNING) << "Disabled tracing for kubelet";
+    }
+  }
+
+  return Status::OK();
+}
+
+
 void SocketTraceConnector::UpdateCommonState(ConnectorContext* ctx) {
   // Since events may be pushed into the perf buffer while reading it,
   // we establish a cutoff time before draining the perf buffer.
@@ -592,6 +626,11 @@ void SocketTraceConnector::UpdateCommonState(ConnectorContext* ctx) {
   // Let it run in the background.
   if (thread.joinable()) {
     thread.detach();
+  }
+
+  auto ok = UpdateKubeSystemIgnoredPIDs(ctx->GetUPIDs());
+  if (!ok.ok()) {
+      LOG(WARNING) << absl::Substitute("UpdateKubeSystemIgnoredPIDs failed with $0", ok.msg());
   }
 
   conn_trackers_mgr_.CleanupTrackers();
@@ -714,6 +753,17 @@ Status SocketTraceConnector::TestOnlySetTargetPID() {
   }
   auto control_map_handle = GetPerCPUArrayTable<int64_t>(kControlValuesArrayName);
   return bpf_tools::UpdatePerCPUArrayValue(kTargetTGIDIndex, pid, &control_map_handle);
+}
+
+Status SocketTraceConnector::DisableKubeSystemTracing() {
+  auto control_map_handle = GetPerCPUArrayTable<int64_t>(kControlValuesArrayName);
+  int64_t self_pid = getpid();
+  std::vector indexes{kKubeletTGIDIndex, kMetricsServerTGIDIndex};
+  for (size_t idx = 0; idx < indexes.size(); idx++) {
+    auto status = bpf_tools::UpdatePerCPUArrayValue(indexes[idx], self_pid, &control_map_handle);
+    if (!status.ok()) return status;
+  }
+  return Status::OK();
 }
 
 Status SocketTraceConnector::DisableSelfTracing() {

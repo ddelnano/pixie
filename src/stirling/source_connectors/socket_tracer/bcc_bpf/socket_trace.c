@@ -229,6 +229,26 @@ static __inline bool is_stirling_tgid(const uint32_t tgid) {
   return *stirling_tgid == tgid;
 }
 
+static __inline bool is_disabled_pid(const uint32_t tgid) {
+  int idx = kKubeletTGIDIndex;
+  int64_t* kubelet_tgid = control_values.lookup(&idx);
+  if (kubelet_tgid == NULL) {
+    return false;
+  } else {
+      return *kubelet_tgid == tgid;
+  }
+
+  int idx2 = kMetricsServerTGIDIndex;
+  int64_t* metrics_server_tgid = control_values.lookup(&idx2);
+  if (metrics_server_tgid == NULL) {
+    return false;
+  } else {
+      return *metrics_server_tgid == tgid;
+  }
+
+  return false;
+}
+
 enum target_tgid_match_result_t {
   TARGET_TGID_UNSPECIFIED,
   TARGET_TGID_ALL,
@@ -641,6 +661,10 @@ static __inline bool should_send_data(uint32_t tgid, uint64_t conn_disabled_tsid
                                       bool force_trace_tgid, struct conn_info_t* conn_info) {
   // Never trace stirling.
   if (is_stirling_tgid(tgid)) {
+    return false;
+  }
+
+  if (is_disabled_pid(tgid)) {
     return false;
   }
 
