@@ -170,6 +170,9 @@ void DataStream::ProcessBytesToFrames(message_type_t type, TStateType* state) {
     size_t bytes_lost = num_bytes_advanced - frame_bytes;
     SocketTracerMetrics::GetProtocolMetrics(protocol_, is_ssl_)
         .data_loss_bytes.Increment(bytes_lost);
+    if constexpr (std::is_same_v<TFrameType, protocols::mux::Frame>) {
+      LOG(WARNING) << absl::Substitute("Lost mux protocol bytes $0 \n\n $1", bytes_lost, data_buffer_.DebugInfo());
+    }
   }
   last_processed_pos_ = data_buffer_.position();
 

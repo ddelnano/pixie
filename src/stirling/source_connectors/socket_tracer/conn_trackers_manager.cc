@@ -235,6 +235,9 @@ std::string ConnTrackersManager::StatsString() const {
 void ConnTrackersManager::ComputeProtocolStats() {
   absl::flat_hash_map<traffic_protocol_t, int> protocol_count;
   for (const auto* tracker : active_trackers_) {
+    if (tracker->protocol() == kProtocolMux) {
+        LOG(WARNING) << absl::Substitute(DebugString<protocols::mux::ProtocolTraits>(*tracker, "DEBUGGING MUX"));
+    }
     ++protocol_count[tracker->protocol()];
   }
   for (auto protocol : magic_enum::enum_values<traffic_protocol_t>()) {
