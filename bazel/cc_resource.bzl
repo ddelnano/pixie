@@ -31,12 +31,14 @@ def pl_bpf_cc_resource(
         deps = [],
         defines = [],
         **kwargs):
+    runtime_deps = kwargs.pop("runtime_deps", [])
     pl_bpf_preprocess(
         name = name + "_bpf_preprocess",
         src = src,
         deps = deps,
         defines = defines,
-        **kwargs
+        runtime_deps = runtime_deps,
+        **kwargs,
     )
     _pl_cc_resource_with_cc_info(name, ":" + name + "_bpf_preprocess", **kwargs)
 

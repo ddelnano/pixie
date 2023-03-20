@@ -52,11 +52,6 @@ BPF_PERF_OUTPUT(conn_stats_events);
 // This output is used to export notification of processes that have performed an mmap.
 BPF_PERF_OUTPUT(mmap_events);
 
-// Maps used to verify if SSL_write or SSL_read are on the stack during a syscall and
-// pass the fds back to the SSL_write and SSL_read return probes
-BPF_HASH(ssl_userspace_call_map, uint64_t, bool);
-BPF_HASH(ssl_fd_map, uint64_t, int);
-
 // This control_map is a bit-mask that controls which endpoints are traced in a connection.
 // The bits are defined in endpoint_role_t enum, kRoleClient or kRoleServer. kRoleUnknown is not
 // really used, but is defined for completeness.
@@ -897,19 +892,6 @@ static __inline void process_syscall_close(struct pt_regs* ctx, uint64_t id,
   conn_info_map.delete(&tgid_fd);
 }
 
-static __inline bool active_ssl_userspace_call(uint64_t tgid) {
-  return ssl_userspace_call_map.lookup(&tgid) != NULL;
-}
-
-static __inline void propagate_fd_to_ssl_call(uint64_t pid_tgid, int fd) {
-  if (active_ssl_userspace_call(pid_tgid)) {
-    bpf_trace_printk("Setting socket fd (%d) for pid tgid (%d)", fd, pid_tgid);
-    ssl_fd_map.update(&pid_tgid, &fd);
-
-    uint32_t tgid = pid_tgid >> 32;
-    set_conn_as_ssl(tgid, fd);
-  }
-}
 
 /***********************************************************
  * BPF syscall probe function entry-points
@@ -1011,7 +993,7 @@ int syscall__probe_ret_accept4(struct pt_regs* ctx) {
 int syscall__probe_entry_write(struct pt_regs* ctx, int fd, char* buf, size_t count) {
   uint64_t id = bpf_get_current_pid_tgid();
 
-  propagate_fd_to_ssl_call(id, fd);
+  propagate_fd_to_userspace_call(id, fd);
 
   // Stash arguments.
   struct data_args_t write_args = {};
@@ -1041,7 +1023,7 @@ int syscall__probe_ret_write(struct pt_regs* ctx) {
 int syscall__probe_entry_send(struct pt_regs* ctx, int sockfd, char* buf, size_t len) {
   uint64_t id = bpf_get_current_pid_tgid();
 
-  propagate_fd_to_ssl_call(id, sockfd);
+  propagate_fd_to_userspace_call(id, sockfd);
 
   // Stash arguments.
   struct data_args_t write_args = {};
@@ -1071,7 +1053,7 @@ int syscall__probe_ret_send(struct pt_regs* ctx) {
 int syscall__probe_entry_read(struct pt_regs* ctx, int fd, char* buf, size_t count) {
   uint64_t id = bpf_get_current_pid_tgid();
 
-  propagate_fd_to_ssl_call(id, fd);
+  propagate_fd_to_userspace_call(id, fd);
 
   // Stash arguments.
   struct data_args_t read_args = {};
@@ -1101,7 +1083,7 @@ int syscall__probe_ret_read(struct pt_regs* ctx) {
 int syscall__probe_entry_recv(struct pt_regs* ctx, int sockfd, char* buf, size_t len) {
   uint64_t id = bpf_get_current_pid_tgid();
 
-  propagate_fd_to_ssl_call(id, sockfd);
+  propagate_fd_to_userspace_call(id, sockfd);
 
   // Stash arguments.
   struct data_args_t read_args = {};
@@ -1133,7 +1115,7 @@ int syscall__probe_entry_sendto(struct pt_regs* ctx, int sockfd, char* buf, size
                                 const struct sockaddr* dest_addr, socklen_t addrlen) {
   uint64_t id = bpf_get_current_pid_tgid();
 
-  propagate_fd_to_ssl_call(id, sockfd);
+  propagate_fd_to_userspace_call(id, sockfd);
 
   // Stash arguments.
   if (dest_addr != NULL) {
@@ -1194,7 +1176,7 @@ int syscall__probe_entry_recvfrom(struct pt_regs* ctx, int sockfd, char* buf, si
                                   struct sockaddr* src_addr, socklen_t* addrlen) {
   uint64_t id = bpf_get_current_pid_tgid();
 
-  propagate_fd_to_ssl_call(id, sockfd);
+  propagate_fd_to_userspace_call(id, sockfd);
 
   // Stash arguments.
   if (src_addr != NULL) {
@@ -1240,7 +1222,7 @@ int syscall__probe_entry_sendmsg(struct pt_regs* ctx, int sockfd,
                                  const struct user_msghdr* msghdr) {
   uint64_t id = bpf_get_current_pid_tgid();
 
-  propagate_fd_to_ssl_call(id, sockfd);
+  propagate_fd_to_userspace_call(id, sockfd);
 
   if (msghdr != NULL) {
     // Stash arguments.
@@ -1288,7 +1270,7 @@ int syscall__probe_entry_sendmmsg(struct pt_regs* ctx, int sockfd, struct mmsghd
                                   unsigned int vlen) {
   uint64_t id = bpf_get_current_pid_tgid();
 
-  propagate_fd_to_ssl_call(id, sockfd);
+  propagate_fd_to_userspace_call(id, sockfd);
 
   // TODO(oazizi): Right now, we only trace the first message in a sendmmsg() call.
   if (msgvec != NULL && vlen >= 1) {
@@ -1342,7 +1324,7 @@ int syscall__probe_ret_sendmmsg(struct pt_regs* ctx) {
 int syscall__probe_entry_recvmsg(struct pt_regs* ctx, int sockfd, struct user_msghdr* msghdr) {
   uint64_t id = bpf_get_current_pid_tgid();
 
-  propagate_fd_to_ssl_call(id, sockfd);
+  propagate_fd_to_userspace_call(id, sockfd);
 
   if (msghdr != NULL) {
     // Stash arguments.
@@ -1392,7 +1374,7 @@ int syscall__probe_entry_recvmmsg(struct pt_regs* ctx, int sockfd, struct mmsghd
                                   unsigned int vlen) {
   uint64_t id = bpf_get_current_pid_tgid();
 
-  propagate_fd_to_ssl_call(id, sockfd);
+  propagate_fd_to_userspace_call(id, sockfd);
 
   // TODO(oazizi): Right now, we only trace the first message in a recvmmsg() call.
   if (msgvec != NULL && vlen >= 1) {
@@ -1446,7 +1428,7 @@ int syscall__probe_ret_recvmmsg(struct pt_regs* ctx) {
 int syscall__probe_entry_writev(struct pt_regs* ctx, int fd, const struct iovec* iov, int iovlen) {
   uint64_t id = bpf_get_current_pid_tgid();
 
-  propagate_fd_to_ssl_call(id, fd);
+  propagate_fd_to_userspace_call(id, fd);
 
   // Stash arguments.
   struct data_args_t write_args = {};
@@ -1477,7 +1459,7 @@ int syscall__probe_ret_writev(struct pt_regs* ctx) {
 int syscall__probe_entry_readv(struct pt_regs* ctx, int fd, struct iovec* iov, int iovlen) {
   uint64_t id = bpf_get_current_pid_tgid();
 
-  propagate_fd_to_ssl_call(id, fd);
+  propagate_fd_to_userspace_call(id, fd);
 
   // Stash arguments.
   struct data_args_t read_args = {};
@@ -1537,7 +1519,7 @@ int syscall__probe_entry_sendfile(struct pt_regs* ctx, int out_fd, int in_fd, of
   uint64_t id = bpf_get_current_pid_tgid();
 
   // TODO(ddelnano) need to investigate how this would work for out and in fds
-  // propagate_fd_to_ssl_call(id, fd);
+  // propagate_fd_to_userspace_call(id, fd);
 
   // Stash arguments.
   struct sendfile_args_t args;

@@ -44,7 +44,7 @@ def _pl_bpf_preprocess_impl(ctx):
         action_name = "c-preprocess",
     )
 
-    output = ctx.actions.declare_file(ctx.attr.name + ".c")
+    output = ctx.actions.declare_file(ctx.attr.name + ".c.i")
 
     merged_cc_info = cc_common.merge_cc_infos(direct_cc_infos = [dep[CcInfo] for dep in ctx.attr.deps])
     compilation_ctx = merged_cc_info.compilation_context
@@ -75,7 +75,25 @@ def _pl_bpf_preprocess_impl(ctx):
         arguments = [args],
         mnemonic = "CPreprocess",
     )
-    return DefaultInfo(files = depset([output]))
+
+    final_output = ctx.actions.declare_file(ctx.attr.name + ".c")
+    cat_args = ""
+    print(ctx.attr.runtime_deps)
+    if len(ctx.attr.runtime_deps) > 0:
+        for target in ctx.attr.runtime_deps:
+            for f in target[CcInfo].compilation_context.headers.to_list():
+                print(f)
+                cat_args += " " + f.path
+
+    ctx.actions.run_shell(
+        inputs = depset(
+            [output],
+            transitive = [runtime_dep[CcInfo].compilation_context.headers for runtime_dep in ctx.attr.runtime_deps],
+        ),
+        outputs = [final_output],
+        command = "cat " + cat_args + " " + output.path + " > " + final_output.path,
+    )
+    return DefaultInfo(files = depset([final_output]))
 
 pl_bpf_preprocess = rule(
     implementation = _pl_bpf_preprocess_impl,
@@ -87,6 +105,11 @@ pl_bpf_preprocess = rule(
         ),
         deps = attr.label_list(
             doc = "cc dependencies to take headers from",
+            providers = [CcInfo],
+        ),
+        runtime_deps = attr.label_list(
+            allow_files = True,
+            doc = "cc headers which will be concatenated to final output file",
             providers = [CcInfo],
         ),
         defines = attr.string_list(

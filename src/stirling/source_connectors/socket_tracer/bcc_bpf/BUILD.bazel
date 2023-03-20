@@ -28,6 +28,13 @@ load("//bazel:pl_build_system.bzl", "pl_cc_test")
 package(default_visibility = ["//src/stirling:__subpackages__"])
 
 cc_library(
+    name = "socket_tracer_headers",
+    hdrs = [
+        "socket_trace_runtime.h",
+    ],
+)
+
+cc_library(
     name = "headers",
     hdrs = [
         "go_http2_trace.c",
@@ -60,6 +67,9 @@ pl_bpf_cc_resource(
     deps = [
         ":headers",
         "//src/stirling/bpf_tools/bcc_bpf/system-headers",
+    ],
+    runtime_deps = [
+        ":socket_tracer_headers",
     ],
 )
 
