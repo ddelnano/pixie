@@ -71,8 +71,7 @@ static int get_fd_active_syscall(uint64_t id) {
 // so this function may break with OpenSSL updates.
 // To help combat this, the is parameterized with symbol addresses which are set by user-space,
 // base on the OpenSSL version detected.
-static int get_fd_symaddrs(uint64_t id, void* ssl) {
-  uint32_t tgid = id >> 32;
+static int get_fd_symaddrs(uint32_t tgid, void* ssl) {
   struct openssl_symaddrs_t* symaddrs = openssl_symaddrs_map.lookup(&tgid);
   if (symaddrs == NULL) {
     return kInvalidFD;
@@ -90,15 +89,18 @@ static int get_fd_symaddrs(uint64_t id, void* ssl) {
   return rbio_num;
 }
 
-static int get_fd(uint64_t id, void* ssl) {
-  uint32_t tgid = id >> 32;
+static int get_fd(uint32_t tgid, void* ssl) {
   int fd = kInvalidFD;
 
   // OpenSSL is used by nodejs in an asynchronous way, where the SSL_read/SSL_write functions don't
   // immediately relay the traffic to/from the socket. If we notice that this SSL call was made from
   // node, we use the FD that we obtained from a separate nodejs uprobe.
+  fd = get_fd_node(tgid, ssl);
+  if (fd != kInvalidFD && /*not any of the standard fds*/ fd > 2) {
+    return fd;
+  }
 
-  fd = get_fd_active_syscall(id);
+  fd = get_fd_symaddrs(tgid, ssl);
   if (fd != kInvalidFD && /*not any of the standard fds*/ fd > 2) {
     return fd;
   }
@@ -118,11 +120,87 @@ BPF_HASH(active_ssl_write_args_map, uint64_t, struct data_args_t);
 int probe_entry_SSL_write(struct pt_regs* ctx) {
   uint64_t id = bpf_get_current_pid_tgid();
   uint32_t tgid = id >> 32;
-  bool call_happening = true;
-  ssl_userspace_call_map.update(&id, &call_happening);
 
   void* ssl = (void*)PT_REGS_PARM1(ctx);
   update_node_ssl_tls_wrap_map(ssl);
+
+  char* buf = (char*)PT_REGS_PARM2(ctx);
+  int32_t fd = get_fd(tgid, ssl);
+
+  if (fd == kInvalidFD) {
+    return 0;
+  }
+
+  struct data_args_t write_args = {};
+  write_args.source_fn = kSSLWrite;
+  write_args.fd = fd;
+  write_args.buf = buf;
+  active_ssl_write_args_map.update(&id, &write_args);
+
+  // Mark connection as SSL right away, so encrypted traffic does not get traced.
+  set_conn_as_ssl(tgid, write_args.fd);
+
+  return 0;
+}
+
+int probe_ret_SSL_write(struct pt_regs* ctx) {
+  uint64_t id = bpf_get_current_pid_tgid();
+
+  const struct data_args_t* write_args = active_ssl_write_args_map.lookup(&id);
+  if (write_args != NULL) {
+    process_openssl_data(ctx, id, kEgress, write_args);
+  }
+
+  active_ssl_write_args_map.delete(&id);
+  return 0;
+}
+
+// Function signature being probed:
+// int SSL_read(SSL *s, void *buf, int num)
+int probe_entry_SSL_read(struct pt_regs* ctx) {
+  uint64_t id = bpf_get_current_pid_tgid();
+  uint32_t tgid = id >> 32;
+
+  void* ssl = (void*)PT_REGS_PARM1(ctx);
+  update_node_ssl_tls_wrap_map(ssl);
+
+  char* buf = (char*)PT_REGS_PARM2(ctx);
+  int32_t fd = get_fd(tgid, ssl);
+
+  if (fd == kInvalidFD) {
+    return 0;
+  }
+
+  struct data_args_t read_args = {};
+  read_args.source_fn = kSSLRead;
+  read_args.fd = fd;
+  read_args.buf = buf;
+  active_ssl_read_args_map.update(&id, &read_args);
+
+  // Mark connection as SSL right away, so encrypted traffic does not get traced.
+  set_conn_as_ssl(tgid, read_args.fd);
+
+  return 0;
+}
+
+int probe_ret_SSL_read(struct pt_regs* ctx) {
+  uint64_t id = bpf_get_current_pid_tgid();
+
+  const struct data_args_t* read_args = active_ssl_read_args_map.lookup(&id);
+  if (read_args != NULL) {
+    process_openssl_data(ctx, id, kIngress, read_args);
+  }
+
+  active_ssl_read_args_map.delete(&id);
+  return 0;
+}
+
+// Function signature being probed:
+// int SSL_write(SSL *ssl, const void *buf, int num);
+int probe_entry_SSL_write_syscall_fd_access(struct pt_regs* ctx) {
+  uint64_t id = bpf_get_current_pid_tgid();
+  bool call_happening = true;
+  ssl_userspace_call_map.update(&id, &call_happening);
 
   char* buf = (char*)PT_REGS_PARM2(ctx);
 
@@ -134,11 +212,10 @@ int probe_entry_SSL_write(struct pt_regs* ctx) {
   return 0;
 }
 
-int probe_ret_SSL_write(struct pt_regs* ctx) {
+int probe_ret_SSL_write_syscall_fd_access(struct pt_regs* ctx) {
   uint64_t id = bpf_get_current_pid_tgid();
 
-  void* ssl = (void*)PT_REGS_PARM1(ctx);
-  int fd = get_fd(id, ssl);
+  int fd = get_fd_active_syscall(id);
   if (fd == kInvalidFD) {
     return 0;
   }
@@ -157,12 +234,9 @@ int probe_ret_SSL_write(struct pt_regs* ctx) {
 
 // Function signature being probed:
 // int SSL_read(SSL *s, void *buf, int num)
-int probe_entry_SSL_read(struct pt_regs* ctx) {
+int probe_entry_SSL_read_syscall_fd_access(struct pt_regs* ctx) {
   uint64_t id = bpf_get_current_pid_tgid();
-  uint32_t tgid = id >> 32;
 
-  void* ssl = (void*)PT_REGS_PARM1(ctx);
-  update_node_ssl_tls_wrap_map(ssl);
   bool call_happening = true;
   ssl_userspace_call_map.update(&id, &call_happening);
 
@@ -176,11 +250,10 @@ int probe_entry_SSL_read(struct pt_regs* ctx) {
   return 0;
 }
 
-int probe_ret_SSL_read(struct pt_regs* ctx) {
+int probe_ret_SSL_read_syscall_fd_access(struct pt_regs* ctx) {
   uint64_t id = bpf_get_current_pid_tgid();
 
-  void* ssl = (void*)PT_REGS_PARM1(ctx);
-  int fd = get_fd(id, ssl);
+  int fd = get_fd_active_syscall(id);
 
   if (fd == kInvalidFD) {
     return 0;

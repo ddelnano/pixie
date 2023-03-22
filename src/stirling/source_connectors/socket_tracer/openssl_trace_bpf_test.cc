@@ -61,6 +61,12 @@ class NginxOpenSSL_1_1_1_ContainerWrapper
   int32_t PID() const { return NginxWorkerPID(); }
 };
 
+class NginxOpenSSL_3_0_7_ContainerWrapper
+    : public ::px::stirling::testing::NginxOpenSSL_3_0_7_Container {
+ public:
+  int32_t PID() const { return NginxWorkerPID(); }
+};
+
 class Node12_3_1ContainerWrapper : public ::px::stirling::testing::Node12_3_1Container {
  public:
   int32_t PID() const { return process_pid(); }
@@ -187,7 +193,7 @@ http::Record GetExpectedHTTPRecord(std::string req_path) {
   return expected_record;
 }
 
-typedef ::testing::Types<NginxOpenSSL_1_1_1_ContainerWrapper, PythonAsyncioContainerWrapper, PythonBlockingContainerWrapper>
+typedef ::testing::Types<NginxOpenSSL_1_1_1_ContainerWrapper, NginxOpenSSL_3_0_7_ContainerWrapper, PythonAsyncioContainerWrapper, PythonBlockingContainerWrapper>
     OpenSSLServerImplementations;
 
 template <typename T>
