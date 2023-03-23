@@ -41,6 +41,10 @@ def base_images():
         "pixie-oss/pixie-dev-public/docker-deps/library/nginx",
     )
 
+    # This is built from the following Dockerfile:
+    # src/stirling/source_connectors/socket_tracer/testing/containers/locust/Dockerfile.
+    # The upstream locust image can't be easily used since it doesn't include the locust-plugins
+    # pip package
     container_pull(
         name = "locust_load_test",
         digest = "sha256:6da247a384f26fafbf87c07dc0146caa89a5c4f0f228c642141e0eb92c88cddd",
@@ -286,14 +290,6 @@ def stirling_test_images():
         "productcatalogservice_v0_2_0",
         "sha256:1726e4dd813190ad1eae7f3c42483a3a83dd1676832bb7b04256455c8968d82a",
         "google-samples/microservices-demo/productcatalogservice:v0.2.0",
-    )
-
-    # Built and pushed by src/stirling/testing/demo_apps/py_asyncio/update_gcr.sh
-    container_pull(
-        name = "py_asyncio",
-        registry = "index.docker.io",
-        digest = "sha256:3ba53e2d1c159960948dbb144e3f6db2510e9c2354357669f2ed28786b976747",
-        repository = "ddelnano/python-asyncio:latest",
     )
 
     container_pull(

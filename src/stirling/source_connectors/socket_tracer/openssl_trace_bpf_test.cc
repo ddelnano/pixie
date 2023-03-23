@@ -27,7 +27,6 @@
 #include "src/shared/types/column_wrapper.h"
 #include "src/shared/types/types.h"
 #include "src/stirling/source_connectors/socket_tracer/socket_trace_connector.h"
-#include "src/stirling/source_connectors/socket_tracer/protocols/http/parse.h"
 #include "src/stirling/source_connectors/socket_tracer/testing/container_images.h"
 #include "src/stirling/source_connectors/socket_tracer/testing/protocol_checkers.h"
 #include "src/stirling/source_connectors/socket_tracer/testing/socket_trace_bpf_test_fixture.h"
@@ -45,7 +44,6 @@ using ::px::stirling::testing::GetTargetRecords;
 using ::px::stirling::testing::SocketTraceBPFTestFixture;
 using ::px::stirling::testing::ToRecordVector;
 
-using ::testing::Contains;
 using ::testing::StrEq;
 using ::testing::UnorderedElementsAre;
 
@@ -61,12 +59,6 @@ class NginxOpenSSL_1_1_1_ContainerWrapper
   int32_t PID() const { return NginxWorkerPID(); }
 };
 
-class NginxOpenSSL_3_0_7_ContainerWrapper
-    : public ::px::stirling::testing::NginxOpenSSL_3_0_7_Container {
- public:
-  int32_t PID() const { return NginxWorkerPID(); }
-};
-
 class Node12_3_1ContainerWrapper : public ::px::stirling::testing::Node12_3_1Container {
  public:
   int32_t PID() const { return process_pid(); }
@@ -74,18 +66,6 @@ class Node12_3_1ContainerWrapper : public ::px::stirling::testing::Node12_3_1Con
 
 class Node14_18_1AlpineContainerWrapper
     : public ::px::stirling::testing::Node14_18_1AlpineContainer {
- public:
-  int32_t PID() const { return process_pid(); }
-};
-
-class PythonAsyncioContainerWrapper
-    : public ::px::stirling::testing::PythonAsyncioContainer {
- public:
-  int32_t PID() const { return process_pid(); }
-};
-
-class PythonBlockingContainerWrapper
-    : public ::px::stirling::testing::PythonBlockingContainer {
  public:
   int32_t PID() const { return process_pid(); }
 };
@@ -99,10 +79,7 @@ struct TraceRecords {
 
 template <typename TServerContainer, bool TForceFptrs>
 class BaseOpenSSLTraceTest : public SocketTraceBPFTestFixture</* TClientSideTracing */ false> {
-
  protected:
-  std::size_t response_length_ = 5 * 1024;
-
   BaseOpenSSLTraceTest() {
     // Run the nginx HTTPS server.
     // The container runner will make sure it is in the ready state before unblocking.
@@ -116,8 +93,6 @@ class BaseOpenSSLTraceTest : public SocketTraceBPFTestFixture</* TClientSideTrac
 
   void SetUp() override {
     FLAGS_openssl_force_raw_fptrs = force_fptr_;
-    FLAGS_max_body_bytes = response_length_;
-    FLAGS_http_body_limit_bytes = response_length_;
 
     SocketTraceBPFTestFixture::SetUp();
   }
@@ -182,191 +157,109 @@ http::Record GetExpectedHTTPRecord() {
   return expected_record;
 }
 
-http::Record GetExpectedHTTPRecord(std::string req_path) {
-  http::Record expected_record;
-  expected_record.req.minor_version = 1;
-  expected_record.req.req_method = "GET";
-  expected_record.req.req_path = req_path;
-  expected_record.req.body = "";
-  expected_record.resp.resp_status = 200;
-  expected_record.resp.resp_message = "OK";
-  return expected_record;
-}
-
-typedef ::testing::Types<NginxOpenSSL_1_1_1_ContainerWrapper, NginxOpenSSL_3_0_7_ContainerWrapper, PythonAsyncioContainerWrapper, PythonBlockingContainerWrapper>
+typedef ::testing::Types<NginxOpenSSL_1_1_0_ContainerWrapper, NginxOpenSSL_1_1_1_ContainerWrapper,
+                         Node12_3_1ContainerWrapper, Node14_18_1AlpineContainerWrapper>
     OpenSSLServerImplementations;
 
 template <typename T>
-using OpenSSLTraceDlsymTest = BaseOpenSSLTraceTest<T, true>;
+using OpenSSLTraceDlsymTest = BaseOpenSSLTraceTest<T, false>;
+
+template <typename T>
+using OpenSSLTraceRawFptrsTest = BaseOpenSSLTraceTest<T, true>;
 
 #define OPENSSL_TYPED_TEST(TestCase, CodeBlock)            \
   TYPED_TEST(OpenSSLTraceDlsymTest, TestCase)              \
+  CodeBlock TYPED_TEST(OpenSSLTraceRawFptrsTest, TestCase) \
   CodeBlock
 
 TYPED_TEST_SUITE(OpenSSLTraceDlsymTest, OpenSSLServerImplementations);
+TYPED_TEST_SUITE(OpenSSLTraceRawFptrsTest, OpenSSLServerImplementations);
 
-/* OPENSSL_TYPED_TEST(ssl_capture_curl_client, { */
-/*   this->StartTransferDataThread(); */
-
-/*   // Make an SSL request with curl. */
-/*   // Because the server uses a self-signed certificate, curl will normally refuse to connect. */
-/*   // This is similar to the warning pages that Firefox/Chrome would display. */
-/*   // To take an exception and make the SSL connection anyways, we use the --insecure flag. */
-
-/*   // Run the client in the network of the server, so they can connect to each other. */
-/*   ::px::stirling::testing::CurlContainer client; */
-/*   ASSERT_OK(client.Run(std::chrono::seconds{60}, */
-/*                        {absl::Substitute("--network=container:$0", this->server_.container_name())}, */
-/*                        {"--insecure", "-s", "-S", "https://localhost:443/index.html"})); */
-/*   client.Wait(); */
-/*   this->StopTransferDataThread(); */
-
-/*   TraceRecords records = this->GetTraceRecords(this->server_.PID()); */
-/*   http::Record expected_record = GetExpectedHTTPRecord(); */
-
-/*   EXPECT_THAT(records.http_records, UnorderedElementsAre(EqHTTPRecord(expected_record))); */
-/*   EXPECT_THAT(records.remote_address, UnorderedElementsAre(StrEq("127.0.0.1"))); */
-/* }) */
-
-/* OPENSSL_TYPED_TEST(ssl_capture_ruby_client, { */
-/*   this->StartTransferDataThread(); */
-
-/*   // Make multiple requests and make sure we capture all of them. */
-/*   std::string rb_script = R"( */
-/*         require 'net/http' */
-/*         require 'uri' */
-
-/*         $i = 0 */
-/*         while $i < 3 do */
-/*           uri = URI.parse('https://localhost:443/index.html') */
-/*           http = Net::HTTP.new(uri.host, uri.port) */
-/*           http.use_ssl = true */
-/*           http.verify_mode = OpenSSL::SSL::VERIFY_NONE */
-/*           request = Net::HTTP::Get.new(uri.request_uri) */
-/*           response = http.request(request) */
-/*           p response.body */
-
-/*           sleep(1) */
-
-/*           $i += 1 */
-/*         end */
-/*   )"; */
-
-/*   // Make an SSL request with the client. */
-/*   // Run the client in the network of the server, so they can connect to each other. */
-/*   ::px::stirling::testing::RubyContainer client; */
-/*   ASSERT_OK(client.Run(std::chrono::seconds{60}, */
-/*                        {absl::Substitute("--network=container:$0", this->server_.container_name())}, */
-/*                        {"ruby", "-e", rb_script})); */
-/*   client.Wait(); */
-/*   this->StopTransferDataThread(); */
-
-/*   TraceRecords records = this->GetTraceRecords(this->server_.PID()); */
-/*   http::Record expected_record = GetExpectedHTTPRecord(); */
-
-/*   EXPECT_THAT(records.http_records, */
-/*               UnorderedElementsAre(EqHTTPRecord(expected_record), EqHTTPRecord(expected_record), */
-/*                                    EqHTTPRecord(expected_record))); */
-/*   EXPECT_THAT(records.remote_address, */
-/*               UnorderedElementsAre(StrEq("127.0.0.1"), StrEq("127.0.0.1"), StrEq("127.0.0.1"))); */
-/* }) */
-
-/* inline auto RegexEqHTTPResp(const protocols::http::Message& x, std::string s) { */
-/*   using ::testing::Field; */
-
-/*   return Field(&protocols::http::Message::body, ::testing::ContainsRegex(s)); */
-/* } */
-
-inline auto PartialEqHTTPResp(const protocols::http::Message& x) {
-  using ::testing::Field;
-
-  return AllOf(Field(&protocols::http::Message::resp_status, ::testing::Eq(x.resp_status)),
-               Field(&protocols::http::Message::resp_message, ::testing::StrEq(x.resp_message)));
-}
-
-inline auto PartialEqHTTPRecord(const protocols::http::Record& x) {
-  using ::testing::Field;
-
-  return AllOf(Field(&protocols::http::Record::req, testing::EqHTTPReq(x.req)),
-               Field(&protocols::http::Record::resp, PartialEqHTTPResp(x.resp)));
-}
-
-OPENSSL_TYPED_TEST(ssl_capture_locust_load_test, {
-  using ::testing::StrEq;
-  /* FLAGS_stirling_conn_trace_pid = this->server_.PID(); */
-
+OPENSSL_TYPED_TEST(ssl_capture_curl_client, {
   this->StartTransferDataThread();
 
-  auto container_name = this->server_.container_name();
-  auto target_http_records = 100;
-  // Divide total http requests by number of locust containers
-  auto iterations = target_http_records / 2;
-  // This controls the concurrency locust will have. The total number of
-  // http requests will be divided up between these 'workers'.
-  auto users = 5;
+  // Make an SSL request with curl.
+  // Because the server uses a self-signed certificate, curl will normally refuse to connect.
+  // This is similar to the warning pages that Firefox/Chrome would display.
+  // To take an exception and make the SSL connection anyways, we use the --insecure flag.
 
-  std::thread locust_client1([&container_name, &iterations, &users]() {
-      ::px::stirling::testing::LocustContainer client1;
-      ASSERT_OK(client1.Run(std::chrono::seconds{60},
-                           {absl::Substitute("--network=container:$0", container_name)},
-                           {"--loglevel=debug", "--user-agent=1", absl::Substitute("--users=$0", users), absl::Substitute("-i=$0", iterations)}));
-      client1.Wait();
-  });
-  std::thread locust_client2([&container_name, &iterations, &users]() {
-      ::px::stirling::testing::LocustContainer client2;
-      ASSERT_OK(client2.Run(std::chrono::seconds{60},
-                           {absl::Substitute("--network=container:$0", container_name)},
-                           {"--loglevel=debug", "--user-agent=2", absl::Substitute("--users=$0", users), absl::Substitute("-i=$0", iterations)}));
-      client2.Wait();
-  });
-  locust_client1.join();
-  locust_client2.join();
-
+  // Run the client in the network of the server, so they can connect to each other.
+  ::px::stirling::testing::CurlContainer client;
+  ASSERT_OK(client.Run(std::chrono::seconds{60},
+                       {absl::Substitute("--network=container:$0", this->server_.container_name())},
+                       {"--insecure", "-s", "-S", "https://127.0.0.1:443/index.html"}));
+  client.Wait();
   this->StopTransferDataThread();
 
   TraceRecords records = this->GetTraceRecords(this->server_.PID());
+  http::Record expected_record = GetExpectedHTTPRecord();
 
-  http::Record v1 = GetExpectedHTTPRecord("/1");
-  http::Record v2 = GetExpectedHTTPRecord("/2");
-
-  EXPECT_THAT(records.http_records.size(), target_http_records);
-  for (auto& http_record : records.http_records) {
-
-    EXPECT_THAT((std::array{v1, v2}), Contains(PartialEqHTTPRecord(http_record)));
-
-    std::string s = http_record.resp.body;
-    size_t one_count = std::count_if( s.begin(), s.end(), []( char c ){return c =='1';});
-    size_t two_count = std::count_if( s.begin(), s.end(), []( char c ){return c =='2';});
-    LOG(WARNING) << absl::Substitute("Found body with len $0 and chars $1. One and two count: $2 $3\n", s.length(), s.substr(0, 10), one_count, two_count);
-    if (http_record.req.req_path == "/1") {
-        EXPECT_THAT(one_count, this->response_length_);
-        EXPECT_THAT(two_count, 0);
-    } else {
-        EXPECT_THAT(two_count, this->response_length_);
-        EXPECT_THAT(one_count, 0);
-    }
-  }
+  EXPECT_THAT(records.http_records, UnorderedElementsAre(EqHTTPRecord(expected_record)));
+  EXPECT_THAT(records.remote_address, UnorderedElementsAre(StrEq("127.0.0.1")));
 })
 
-/* OPENSSL_TYPED_TEST(ssl_capture_node_client, { */
-/*   this->StartTransferDataThread(); */
+OPENSSL_TYPED_TEST(ssl_capture_ruby_client, {
+  this->StartTransferDataThread();
 
-/*   // Make an SSL request with the client. */
-/*   // Run the client in the network of the server, so they can connect to each other. */
-/*   ::px::stirling::testing::NodeClientContainer client; */
-/*   ASSERT_OK(client.Run(std::chrono::seconds{60}, */
-/*                        {absl::Substitute("--network=container:$0", this->server_.container_name())}, */
-/*                        {"node", "/etc/node/https_client.js"})); */
-/*   client.Wait(); */
-/*   this->StopTransferDataThread(); */
+  // Make multiple requests and make sure we capture all of them.
+  std::string rb_script = R"(
+        require 'net/http'
+        require 'uri'
 
-/*   TraceRecords records = this->GetTraceRecords(this->server_.PID()); */
-/*   http::Record expected_record = GetExpectedHTTPRecord(); */
+        $i = 0
+        while $i < 3 do
+          uri = URI.parse('https://127.0.0.1:443/index.html')
+          http = Net::HTTP.new(uri.host, uri.port)
+          http.use_ssl = true
+          http.verify_mode = OpenSSL::SSL::VERIFY_NONE
+          request = Net::HTTP::Get.new(uri.request_uri)
+          response = http.request(request)
+          p response.body
 
-/*   EXPECT_THAT(records.http_records, UnorderedElementsAre(EqHTTPRecord(expected_record))); */
-/*   EXPECT_THAT(records.remote_address, UnorderedElementsAre(StrEq("127.0.0.1"))); */
-/*   LOG(INFO) << "Trigger tests to see if it reduces flakiness"; */
-/* }) */
+          sleep(1)
+
+          $i += 1
+        end
+  )";
+
+  // Make an SSL request with the client.
+  // Run the client in the network of the server, so they can connect to each other.
+  ::px::stirling::testing::RubyContainer client;
+  ASSERT_OK(client.Run(std::chrono::seconds{60},
+                       {absl::Substitute("--network=container:$0", this->server_.container_name())},
+                       {"ruby", "-e", rb_script}));
+  client.Wait();
+  this->StopTransferDataThread();
+
+  TraceRecords records = this->GetTraceRecords(this->server_.PID());
+  http::Record expected_record = GetExpectedHTTPRecord();
+
+  EXPECT_THAT(records.http_records,
+              UnorderedElementsAre(EqHTTPRecord(expected_record), EqHTTPRecord(expected_record),
+                                   EqHTTPRecord(expected_record)));
+  EXPECT_THAT(records.remote_address,
+              UnorderedElementsAre(StrEq("127.0.0.1"), StrEq("127.0.0.1"), StrEq("127.0.0.1")));
+})
+
+OPENSSL_TYPED_TEST(ssl_capture_node_client, {
+  this->StartTransferDataThread();
+
+  // Make an SSL request with the client.
+  // Run the client in the network of the server, so they can connect to each other.
+  ::px::stirling::testing::NodeClientContainer client;
+  ASSERT_OK(client.Run(std::chrono::seconds{60},
+                       {absl::Substitute("--network=container:$0", this->server_.container_name())},
+                       {"node", "/etc/node/https_client.js"}));
+  client.Wait();
+  this->StopTransferDataThread();
+
+  TraceRecords records = this->GetTraceRecords(this->server_.PID());
+  http::Record expected_record = GetExpectedHTTPRecord();
+
+  EXPECT_THAT(records.http_records, UnorderedElementsAre(EqHTTPRecord(expected_record)));
+  EXPECT_THAT(records.remote_address, UnorderedElementsAre(StrEq("127.0.0.1")));
+  LOG(INFO) << "Trigger tests to see if it reduces flakiness";
+})
 
 }  // namespace stirling
 }  // namespace px

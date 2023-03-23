@@ -67,7 +67,10 @@ container_layer(
 container_layer(
     name = "large_static_files",
     directory = "/usr/share/nginx/html",
-    files = ["1", "2"],
+    files = [
+        "1",
+        "2",
+    ],
 )
 
 pkg_tar(

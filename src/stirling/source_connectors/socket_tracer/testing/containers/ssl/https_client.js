@@ -21,7 +21,7 @@ const https = require('https');
 const options = {
   hostname: 'localhost',
   port: 443,
-  path: '/',
+  path: '/index.html',
   method: 'GET'
 };
 

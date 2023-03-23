@@ -14,10 +14,10 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-load("@io_bazel_rules_docker//container:container.bzl", "container_image", "container_layer")
-load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
-load("@io_bazel_rules_docker//python3:image.bzl", "py3_image", "DEFAULT_BASE")
+load("@io_bazel_rules_docker//container:container.bzl", "container_image")
+load("@io_bazel_rules_docker//python3:image.bzl", "DEFAULT_BASE", "py3_image")
 load("@py_asyncio_deps//:requirements.bzl", "requirement")
+load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
 
 package(default_visibility = ["//src/stirling:__subpackages__"])
 
@@ -66,20 +66,20 @@ container_image(
 
 py3_image(
     name = "tornado_server",
-    base = ":py_asyncio_base",
     srcs = ["main.py"],
+    base = ":py_asyncio_base",
+    main = "main.py",
     deps = [
         requirement("tornado"),
     ],
-    main = "main.py",
 )
 
 py3_image(
     name = "blocking_server",
-    base = ":py_asyncio_base",
     srcs = ["blocking_server.py"],
+    base = ":py_asyncio_base",
+    main = "blocking_server.py",
     deps = [
         requirement("tornado"),
     ],
-    main = "blocking_server.py",
 )

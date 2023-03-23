@@ -451,26 +451,32 @@ class MySQLContainer : public ContainerRunner {
       "'/var/lib/mysql/mysql.sock'  port: 3306";
 };
 
+// Python server image that uses asyncio to serve HTTPS endpoints.
 class PythonAsyncioContainer : public ContainerRunner {
  public:
   PythonAsyncioContainer()
       : ContainerRunner(::px::testing::BazelRunfilePath(kBazelImageTar), kContainerNamePrefix,
                         kReadyMessage) {}
+
  private:
   static constexpr std::string_view kBazelImageTar =
-      "src/stirling/source_connectors/socket_tracer/testing/containers/py_asyncio/tornado_server.tar";
+      "src/stirling/source_connectors/socket_tracer/testing/containers/py_asyncio/"
+      "tornado_server.tar";
   static constexpr std::string_view kContainerNamePrefix = "python_tornado";
   static constexpr std::string_view kReadyMessage = "pid";
 };
 
+// Python server image that uses blocking socket APIs with TLS.
 class PythonBlockingContainer : public ContainerRunner {
  public:
   PythonBlockingContainer()
       : ContainerRunner(::px::testing::BazelRunfilePath(kBazelImageTar), kContainerNamePrefix,
                         kReadyMessage) {}
+
  private:
   static constexpr std::string_view kBazelImageTar =
-      "src/stirling/source_connectors/socket_tracer/testing/containers/py_asyncio/blocking_server.tar";
+      "src/stirling/source_connectors/socket_tracer/testing/containers/py_asyncio/"
+      "blocking_server.tar";
   static constexpr std::string_view kContainerNamePrefix = "python_blocking_server";
   static constexpr std::string_view kReadyMessage = "pid";
 };

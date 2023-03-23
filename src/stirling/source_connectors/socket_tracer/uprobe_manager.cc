@@ -303,9 +303,7 @@ static constexpr const auto kLibSSLMatchers = MakeArray<SSLLibMatcher>({
     },
 });
 
-bool IsAsyncTLSTracingTarget() {
-  return false;
-}
+bool IsAsyncTLSTracingTarget() { return false; }
 
 // Return error if something unexpected occurs.
 // Return 0 if nothing unexpected, but there is nothing to deploy (e.g. no OpenSSL detected).
@@ -342,7 +340,7 @@ StatusOr<int> UProbeManager::AttachOpenSSLUProbesOnDynamicLib(uint32_t pid) {
       return error::Internal("libcrypto not found [path = $0]", container_libcrypto.string());
     }
 
-    if (! FLAGS_access_tls_socket_fd_via_syscall) {
+    if (!FLAGS_access_tls_socket_fd_via_syscall) {
       auto fptr_manager = std::make_unique<obj_tools::RawFptrManager>(container_libcrypto);
 
       PX_RETURN_IF_ERROR(UpdateOpenSSLSymAddrs(fptr_manager.get(), container_libcrypto, pid));
@@ -356,7 +354,7 @@ StatusOr<int> UProbeManager::AttachOpenSSLUProbesOnDynamicLib(uint32_t pid) {
 
     for (auto spec : kOpenSSLUProbes) {
       spec.binary_path = container_libssl.string();
-      if (! IsAsyncTLSTracingTarget() && FLAGS_access_tls_socket_fd_via_syscall) {
+      if (!IsAsyncTLSTracingTarget() && FLAGS_access_tls_socket_fd_via_syscall) {
         spec.probe_fn = absl::Substitute("$0_syscall_fd_access", spec.probe_fn);
       }
 

@@ -52,6 +52,8 @@ Commercial support is available at
 </html>`;
 
 
+// Update the nodejs https server to behave like the python blocking
+// and python aysyncio test images.
 https.createServer(options, function (req, res) {
   if (req.url.includes("index.html")) {
     res.writeHead(200,{"Content-Type":"text/html"});
@@ -71,4 +73,4 @@ https.createServer(options, function (req, res) {
   }
 }).listen(443);
 
-console.log("(new) Nodejs https server started!")
+console.log("Nodejs https server started!")

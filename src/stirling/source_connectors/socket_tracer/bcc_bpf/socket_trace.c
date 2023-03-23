@@ -911,7 +911,6 @@ static __inline void process_syscall_close(struct pt_regs* ctx, uint64_t id,
   conn_info_map.delete(&tgid_fd);
 }
 
-
 /***********************************************************
  * BPF syscall probe function entry-points
  ***********************************************************/
