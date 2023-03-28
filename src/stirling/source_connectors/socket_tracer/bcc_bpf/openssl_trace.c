@@ -33,13 +33,13 @@
 // This means there will be more entries in the map, when different binaries share libssl.so.
 BPF_HASH(openssl_symaddrs_map, uint32_t, struct openssl_symaddrs_t);
 
-// Map that tracks if a tls tracing target is using a native (built-in) BIO
+// Map that is used to verify if a tls tracing target is using a native (built-in) BIO
 // interface. This is to determine if a given process will have its SSL_write
-// and SSL_read functions directly call a socket syscall and will be traced
-// successfully by our tls tracing technique.
-//   Key: PID
-//   Value: Boolean indicating that the given PID is using OpenSSL the way we expect.
-BPF_HASH(openssl_native_bio_map, uint32_t, bool);
+// and SSL_read functions directly call a socket syscall, which is a prerequisite
+// for our tls tracing technique.
+//   Key: SSL object pointer
+//   Value: The file descriptor associated with the SSL object (deteremined by SSL_set_fd probe)
+BPF_HASH(openssl_native_bio_map, void*, int);
 
 /***********************************************************
  * General helpers
@@ -63,6 +63,20 @@ static __inline void process_openssl_data(struct pt_regs* ctx, uint64_t id,
 static int get_fd_active_syscall(uint64_t id) {
   int* fd = ssl_fd_map.lookup(&id);
   if (fd == NULL) {
+    return kInvalidFD;
+  }
+
+  void** ssl = ssl_userspace_call_map.lookup(&id);
+  if (ssl == NULL) {
+    return kInvalidFD;
+  }
+  // This is a consistency check to verify that the socket fd accessed via the underlying syscall
+  // matches the fd provided to SSL_set_fd. This protects against situations where a non socket
+  // syscall occurs before the SSL_write/SSL_read functions return. We are not sure if this can
+  // happen in practice, however, the socket tracer BPF probes do trigger for generic read/write
+  // syscalls (non socket io).
+  int* expected_fd = openssl_native_bio_map.lookup(ssl);
+  if (expected_fd == NULL || *fd != *expected_fd) {
     return kInvalidFD;
   }
 
@@ -208,10 +222,11 @@ int probe_ret_SSL_read(struct pt_regs* ctx) {
 int probe_entry_SSL_write_syscall_fd_access(struct pt_regs* ctx) {
   uint64_t id = bpf_get_current_pid_tgid();
   uint32_t tgid = id >> 32;
-  if (openssl_native_bio_map.lookup(&tgid) == NULL) return 0;
 
-  bool call_happening = true;
-  ssl_userspace_call_map.update(&id, &call_happening);
+  void* ssl = (void*)PT_REGS_PARM1(ctx);
+  if (openssl_native_bio_map.lookup(&ssl) == NULL) return 0;
+
+  ssl_userspace_call_map.update(&id, &ssl);
 
   char* buf = (char*)PT_REGS_PARM2(ctx);
 
@@ -230,6 +245,7 @@ int probe_ret_SSL_write_syscall_fd_access(struct pt_regs* ctx) {
   if (fd == kInvalidFD) {
     return 0;
   }
+
   struct data_args_t* write_args = active_ssl_write_args_map.lookup(&id);
   // Set socket fd
   if (write_args != NULL) {
@@ -249,10 +265,10 @@ int probe_entry_SSL_read_syscall_fd_access(struct pt_regs* ctx) {
   uint64_t id = bpf_get_current_pid_tgid();
   uint32_t tgid = id >> 32;
 
-  if (openssl_native_bio_map.lookup(&tgid) == NULL) return 0;
+  void* ssl = (void*)PT_REGS_PARM1(ctx);
+  if (openssl_native_bio_map.lookup(&ssl) == NULL) return 0;
 
-  bool call_happening = true;
-  ssl_userspace_call_map.update(&id, &call_happening);
+  ssl_userspace_call_map.update(&id, &ssl);
 
   char* buf = (char*)PT_REGS_PARM2(ctx);
 
@@ -268,7 +284,6 @@ int probe_ret_SSL_read_syscall_fd_access(struct pt_regs* ctx) {
   uint64_t id = bpf_get_current_pid_tgid();
 
   int fd = get_fd_active_syscall(id);
-
   if (fd == kInvalidFD) {
     return 0;
   }
@@ -285,12 +300,15 @@ int probe_ret_SSL_read_syscall_fd_access(struct pt_regs* ctx) {
   return 0;
 }
 
+// Function signature being probed:
+// int SSL_set_fd(SSL *ssl, int fd);
 int probe_SSL_set_fd_syscall_fd_access(struct pt_regs* ctx) {
   uint64_t id = bpf_get_current_pid_tgid();
   uint32_t tgid = id >> 32;
 
-  bool compatible = true;
-  openssl_native_bio_map.update(&tgid, &compatible);
+  void* ssl = (void*)PT_REGS_PARM1(ctx);
+  int fd = PT_REGS_PARM2(ctx);
+  openssl_native_bio_map.update(&ssl, &fd);
 
   return 0;
 }

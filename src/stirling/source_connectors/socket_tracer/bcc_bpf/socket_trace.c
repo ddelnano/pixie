@@ -91,9 +91,9 @@ BPF_HASH(active_write_args_map, uint64_t, struct data_args_t);
 // Key is {tgid, pid}.
 BPF_HASH(active_read_args_map, uint64_t, struct data_args_t);
 
-// Maps used to verify if SSL_write or SSL_read are on the stack during a syscall and
-// pass the fds back to the SSL_write and SSL_read return probes
-BPF_HASH(ssl_userspace_call_map, uint64_t, bool);
+// Maps used to verify if SSL_write or SSL_read are on the stack during a syscall in
+// order to propagate the socket fd back to the SSL_write and SSL_read return probes.
+BPF_HASH(ssl_userspace_call_map, uint64_t, void*);
 BPF_HASH(ssl_fd_map, uint64_t, int);
 
 // Map from thread to its ongoing close() syscall's input argument.
