@@ -148,7 +148,7 @@ DEFINE_uint64(max_body_bytes, gflags::Uint64FromEnv("PL_STIRLING_MAX_BODY_BYTES"
               "The maximum number of bytes in the body of protocols like HTTP");
 
 DEFINE_bool(
-    access_tls_socket_fd_via_syscall, false,
+    access_tls_socket_fd_via_syscall, gflags::BoolFromEnv("PL_ACCESS_TLS_SOCKET_FD_VIA_SYSCALL", false),
     "If true, stirling will identify a socket's fd based on the underlying syscall (read, write, "
     "etc) while a user space tls function call occurs. When false, stirling attempts to access the "
     "socket fd by walking user space data structures which may be brittle.");
