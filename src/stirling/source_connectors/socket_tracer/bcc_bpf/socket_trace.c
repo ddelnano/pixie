@@ -91,10 +91,16 @@ BPF_HASH(active_write_args_map, uint64_t, struct data_args_t);
 // Key is {tgid, pid}.
 BPF_HASH(active_read_args_map, uint64_t, struct data_args_t);
 
-// Maps used to verify if SSL_write or SSL_read are on the stack during a syscall in
+struct nested_syscall_fd_t {
+  int fd;
+  bool mismatched_fds;
+};
+
+// Map used to verify if SSL_write or SSL_read are on the stack during a syscall in
 // order to propagate the socket fd back to the SSL_write and SSL_read return probes.
-BPF_HASH(ssl_userspace_call_map, uint64_t, void*);
-BPF_HASH(ssl_fd_map, uint64_t, int);
+// Key is pid tgid.
+// Value is nested_syscall_fd struct.
+BPF_HASH(ssl_user_space_call_map, uint64_t, struct nested_syscall_fd_t);
 
 // Map from thread to its ongoing close() syscall's input argument.
 // Tracks close() call from entry -> exit.
@@ -156,13 +162,20 @@ static __inline void set_conn_as_ssl(uint32_t tgid, int32_t fd) {
   conn_info->ssl = true;
 }
 
-static __inline bool active_ssl_userspace_call(uint64_t pid_tgid) {
-  return ssl_userspace_call_map.lookup(&pid_tgid) != NULL;
-}
+// Writes the syscall fd to a BPF map to be later consumed by the tls tracing probes in
+// addition to ensuring that set_conn_as_ssl is called. The majority of probes should call
+// this on function entry, however, there are certain probes which are not exlusively used
+// for networking and therefore must defer this fd propagation to its ret probe (where it
+// can be validated it is socket related first via sock_event).
+static __inline void propagate_fd_to_user_space_call(uint64_t pid_tgid, int fd) {
+  struct nested_syscall_fd_t* nested_syscall_fd_ptr = ssl_user_space_call_map.lookup(&pid_tgid);
+  if (nested_syscall_fd_ptr != NULL) {
+    int expected_fd = nested_syscall_fd_ptr->fd;
+    if (expected_fd != kInvalidFD && expected_fd != fd) {
+      nested_syscall_fd_ptr->mismatched_fds = true;
+    }
 
-static __inline void propagate_fd_to_userspace_call(uint64_t pid_tgid, int fd) {
-  if (active_ssl_userspace_call(pid_tgid)) {
-    ssl_fd_map.update(&pid_tgid, &fd);
+    nested_syscall_fd_ptr->fd = fd;
 
     uint32_t tgid = pid_tgid >> 32;
     set_conn_as_ssl(tgid, fd);
@@ -1010,10 +1023,6 @@ int syscall__probe_ret_accept4(struct pt_regs* ctx) {
 int syscall__probe_entry_write(struct pt_regs* ctx, int fd, char* buf, size_t count) {
   uint64_t id = bpf_get_current_pid_tgid();
 
-  if (ACCESS_TLS_SK_FD_VIA_ACTIVE_SYSCALL) {
-    propagate_fd_to_userspace_call(id, fd);
-  }
-
   // Stash arguments.
   struct data_args_t write_args = {};
   write_args.source_fn = kSyscallWrite;
@@ -1031,6 +1040,12 @@ int syscall__probe_ret_write(struct pt_regs* ctx) {
   // Unstash arguments, and process syscall.
   struct data_args_t* write_args = active_write_args_map.lookup(&id);
   if (write_args != NULL && write_args->sock_event) {
+    // Syscalls that aren't exclusively used for networking must be
+    // validated to be a sock_event before propagating a socket fd to the
+    // tls tracing probes
+    if (ACCESS_TLS_SK_FD_VIA_ACTIVE_SYSCALL) {
+      propagate_fd_to_user_space_call(id, write_args->fd);
+    }
     process_syscall_data(ctx, id, kEgress, write_args, bytes_count);
   }
 
@@ -1043,7 +1058,7 @@ int syscall__probe_entry_send(struct pt_regs* ctx, int sockfd, char* buf, size_t
   uint64_t id = bpf_get_current_pid_tgid();
 
   if (ACCESS_TLS_SK_FD_VIA_ACTIVE_SYSCALL) {
-    propagate_fd_to_userspace_call(id, sockfd);
+    propagate_fd_to_user_space_call(id, sockfd);
   }
 
   // Stash arguments.
@@ -1074,10 +1089,6 @@ int syscall__probe_ret_send(struct pt_regs* ctx) {
 int syscall__probe_entry_read(struct pt_regs* ctx, int fd, char* buf, size_t count) {
   uint64_t id = bpf_get_current_pid_tgid();
 
-  if (ACCESS_TLS_SK_FD_VIA_ACTIVE_SYSCALL) {
-    propagate_fd_to_userspace_call(id, fd);
-  }
-
   // Stash arguments.
   struct data_args_t read_args = {};
   read_args.source_fn = kSyscallRead;
@@ -1095,6 +1106,12 @@ int syscall__probe_ret_read(struct pt_regs* ctx) {
   // Unstash arguments, and process syscall.
   struct data_args_t* read_args = active_read_args_map.lookup(&id);
   if (read_args != NULL && read_args->sock_event) {
+    // Syscalls that aren't exclusively used for networking must be
+    // validated to be a sock_event before propagating a socket fd to the
+    // tls tracing probes
+    if (ACCESS_TLS_SK_FD_VIA_ACTIVE_SYSCALL) {
+      propagate_fd_to_user_space_call(id, read_args->fd);
+    }
     process_syscall_data(ctx, id, kIngress, read_args, bytes_count);
   }
 
@@ -1107,7 +1124,7 @@ int syscall__probe_entry_recv(struct pt_regs* ctx, int sockfd, char* buf, size_t
   uint64_t id = bpf_get_current_pid_tgid();
 
   if (ACCESS_TLS_SK_FD_VIA_ACTIVE_SYSCALL) {
-    propagate_fd_to_userspace_call(id, sockfd);
+    propagate_fd_to_user_space_call(id, sockfd);
   }
 
   // Stash arguments.
@@ -1141,7 +1158,7 @@ int syscall__probe_entry_sendto(struct pt_regs* ctx, int sockfd, char* buf, size
   uint64_t id = bpf_get_current_pid_tgid();
 
   if (ACCESS_TLS_SK_FD_VIA_ACTIVE_SYSCALL) {
-    propagate_fd_to_userspace_call(id, sockfd);
+    propagate_fd_to_user_space_call(id, sockfd);
   }
 
   // Stash arguments.
@@ -1204,7 +1221,7 @@ int syscall__probe_entry_recvfrom(struct pt_regs* ctx, int sockfd, char* buf, si
   uint64_t id = bpf_get_current_pid_tgid();
 
   if (ACCESS_TLS_SK_FD_VIA_ACTIVE_SYSCALL) {
-    propagate_fd_to_userspace_call(id, sockfd);
+    propagate_fd_to_user_space_call(id, sockfd);
   }
 
   // Stash arguments.
@@ -1252,7 +1269,7 @@ int syscall__probe_entry_sendmsg(struct pt_regs* ctx, int sockfd,
   uint64_t id = bpf_get_current_pid_tgid();
 
   if (ACCESS_TLS_SK_FD_VIA_ACTIVE_SYSCALL) {
-    propagate_fd_to_userspace_call(id, sockfd);
+    propagate_fd_to_user_space_call(id, sockfd);
   }
 
   if (msghdr != NULL) {
@@ -1302,7 +1319,7 @@ int syscall__probe_entry_sendmmsg(struct pt_regs* ctx, int sockfd, struct mmsghd
   uint64_t id = bpf_get_current_pid_tgid();
 
   if (ACCESS_TLS_SK_FD_VIA_ACTIVE_SYSCALL) {
-    propagate_fd_to_userspace_call(id, sockfd);
+    propagate_fd_to_user_space_call(id, sockfd);
   }
 
   // TODO(oazizi): Right now, we only trace the first message in a sendmmsg() call.
@@ -1358,7 +1375,7 @@ int syscall__probe_entry_recvmsg(struct pt_regs* ctx, int sockfd, struct user_ms
   uint64_t id = bpf_get_current_pid_tgid();
 
   if (ACCESS_TLS_SK_FD_VIA_ACTIVE_SYSCALL) {
-    propagate_fd_to_userspace_call(id, sockfd);
+    propagate_fd_to_user_space_call(id, sockfd);
   }
 
   if (msghdr != NULL) {
@@ -1410,7 +1427,7 @@ int syscall__probe_entry_recvmmsg(struct pt_regs* ctx, int sockfd, struct mmsghd
   uint64_t id = bpf_get_current_pid_tgid();
 
   if (ACCESS_TLS_SK_FD_VIA_ACTIVE_SYSCALL) {
-    propagate_fd_to_userspace_call(id, sockfd);
+    propagate_fd_to_user_space_call(id, sockfd);
   }
 
   // TODO(oazizi): Right now, we only trace the first message in a recvmmsg() call.
@@ -1465,10 +1482,6 @@ int syscall__probe_ret_recvmmsg(struct pt_regs* ctx) {
 int syscall__probe_entry_writev(struct pt_regs* ctx, int fd, const struct iovec* iov, int iovlen) {
   uint64_t id = bpf_get_current_pid_tgid();
 
-  if (ACCESS_TLS_SK_FD_VIA_ACTIVE_SYSCALL) {
-    propagate_fd_to_userspace_call(id, fd);
-  }
-
   // Stash arguments.
   struct data_args_t write_args = {};
   write_args.source_fn = kSyscallWriteV;
@@ -1487,6 +1500,12 @@ int syscall__probe_ret_writev(struct pt_regs* ctx) {
   // Unstash arguments, and process syscall.
   struct data_args_t* write_args = active_write_args_map.lookup(&id);
   if (write_args != NULL && write_args->sock_event) {
+    // Syscalls that aren't exclusively used for networking must be
+    // validated to be a sock_event before propagating a socket fd to the
+    // tls tracing probes
+    if (ACCESS_TLS_SK_FD_VIA_ACTIVE_SYSCALL) {
+      propagate_fd_to_user_space_call(id, write_args->fd);
+    }
     process_syscall_data_vecs(ctx, id, kEgress, write_args, bytes_count);
   }
 
@@ -1497,10 +1516,6 @@ int syscall__probe_ret_writev(struct pt_regs* ctx) {
 // ssize_t readv(int fd, const struct iovec *iov, int iovcnt);
 int syscall__probe_entry_readv(struct pt_regs* ctx, int fd, struct iovec* iov, int iovlen) {
   uint64_t id = bpf_get_current_pid_tgid();
-
-  if (ACCESS_TLS_SK_FD_VIA_ACTIVE_SYSCALL) {
-    propagate_fd_to_userspace_call(id, fd);
-  }
 
   // Stash arguments.
   struct data_args_t read_args = {};
@@ -1520,6 +1535,12 @@ int syscall__probe_ret_readv(struct pt_regs* ctx) {
   // Unstash arguments, and process syscall.
   struct data_args_t* read_args = active_read_args_map.lookup(&id);
   if (read_args != NULL && read_args->sock_event) {
+    // Syscalls that aren't exclusively used for networking must be
+    // validated to be a sock_event before propagating a socket fd to the
+    // tls tracing probes
+    if (ACCESS_TLS_SK_FD_VIA_ACTIVE_SYSCALL) {
+      propagate_fd_to_user_space_call(id, read_args->fd);
+    }
     process_syscall_data_vecs(ctx, id, kIngress, read_args, bytes_count);
   }
 
