@@ -171,12 +171,14 @@ static __inline void set_conn_as_ssl(uint32_t tgid, int32_t fd) {
 static __inline void propagate_fd_to_user_space_call(uint64_t pid_tgid, int fd) {
   struct nested_syscall_fd_t* nested_syscall_fd_ptr = ssl_user_space_call_map.lookup(&pid_tgid);
   if (nested_syscall_fd_ptr != NULL) {
-    int expected_fd = nested_syscall_fd_ptr->fd;
-    if (expected_fd != kInvalidFD && expected_fd != fd) {
+    int current_fd = nested_syscall_fd_ptr->fd;
+    if (current_fd == kInvalidFD) {
+      nested_syscall_fd_ptr->fd = fd;
+    } else if (current_fd != fd) {
+      // Found two different fds during a single SSL_write/SSL_read call. This invalidates
+      // our tls tracing assumptions and must be recorded.
       nested_syscall_fd_ptr->mismatched_fds = true;
     }
-
-    nested_syscall_fd_ptr->fd = fd;
 
     uint32_t tgid = pid_tgid >> 32;
     set_conn_as_ssl(tgid, fd);
