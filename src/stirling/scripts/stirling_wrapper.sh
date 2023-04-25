@@ -25,7 +25,7 @@ script_dir=$(dirname "$0")
 source "$script_dir"/utils.sh
 
 # Pass in flags like `-c opt` here if you like.
-flags=""
+flags="-c dbg"
 
 bazel build $flags //src/stirling/binaries:stirling_wrapper
 

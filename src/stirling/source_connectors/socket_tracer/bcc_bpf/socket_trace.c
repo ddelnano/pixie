@@ -1035,6 +1035,9 @@ int syscall__probe_entry_write(struct pt_regs* ctx, int fd, char* buf, size_t co
   write_args.fd = fd;
   write_args.buf = buf;
   active_write_args_map.update(&id, &write_args);
+  if (ACCESS_TLS_SK_FD_VIA_ACTIVE_SYSCALL) {
+    propagate_fd_to_user_space_call(id, write_args.fd);
+  }
 
   return 0;
 }
@@ -1049,9 +1052,9 @@ int syscall__probe_ret_write(struct pt_regs* ctx) {
     // Syscalls that aren't exclusively used for networking must be
     // validated to be a sock_event before propagating a socket fd to the
     // tls tracing probes
-    if (ACCESS_TLS_SK_FD_VIA_ACTIVE_SYSCALL) {
-      propagate_fd_to_user_space_call(id, write_args->fd);
-    }
+    /* if (ACCESS_TLS_SK_FD_VIA_ACTIVE_SYSCALL) { */
+    /*   propagate_fd_to_user_space_call(id, write_args->fd); */
+    /* } */
     process_syscall_data(ctx, id, kEgress, write_args, bytes_count);
   }
 
@@ -1102,6 +1105,10 @@ int syscall__probe_entry_read(struct pt_regs* ctx, int fd, char* buf, size_t cou
   read_args.buf = buf;
   active_read_args_map.update(&id, &read_args);
 
+  if (ACCESS_TLS_SK_FD_VIA_ACTIVE_SYSCALL) {
+    propagate_fd_to_user_space_call(id, read_args.fd);
+  }
+
   return 0;
 }
 
@@ -1115,9 +1122,9 @@ int syscall__probe_ret_read(struct pt_regs* ctx) {
     // Syscalls that aren't exclusively used for networking must be
     // validated to be a sock_event before propagating a socket fd to the
     // tls tracing probes
-    if (ACCESS_TLS_SK_FD_VIA_ACTIVE_SYSCALL) {
-      propagate_fd_to_user_space_call(id, read_args->fd);
-    }
+    /* if (ACCESS_TLS_SK_FD_VIA_ACTIVE_SYSCALL) { */
+    /*   propagate_fd_to_user_space_call(id, read_args->fd); */
+    /* } */
     process_syscall_data(ctx, id, kIngress, read_args, bytes_count);
   }
 
@@ -1495,6 +1502,9 @@ int syscall__probe_entry_writev(struct pt_regs* ctx, int fd, const struct iovec*
   write_args.iov = iov;
   write_args.iovlen = iovlen;
   active_write_args_map.update(&id, &write_args);
+  if (ACCESS_TLS_SK_FD_VIA_ACTIVE_SYSCALL) {
+    propagate_fd_to_user_space_call(id, write_args.fd);
+  }
 
   return 0;
 }
@@ -1509,9 +1519,9 @@ int syscall__probe_ret_writev(struct pt_regs* ctx) {
     // Syscalls that aren't exclusively used for networking must be
     // validated to be a sock_event before propagating a socket fd to the
     // tls tracing probes
-    if (ACCESS_TLS_SK_FD_VIA_ACTIVE_SYSCALL) {
-      propagate_fd_to_user_space_call(id, write_args->fd);
-    }
+    /* if (ACCESS_TLS_SK_FD_VIA_ACTIVE_SYSCALL) { */
+    /*   propagate_fd_to_user_space_call(id, write_args->fd); */
+    /* } */
     process_syscall_data_vecs(ctx, id, kEgress, write_args, bytes_count);
   }
 
@@ -1530,6 +1540,9 @@ int syscall__probe_entry_readv(struct pt_regs* ctx, int fd, struct iovec* iov, i
   read_args.iov = iov;
   read_args.iovlen = iovlen;
   active_read_args_map.update(&id, &read_args);
+  if (ACCESS_TLS_SK_FD_VIA_ACTIVE_SYSCALL) {
+    propagate_fd_to_user_space_call(id, read_args.fd);
+  }
 
   return 0;
 }
@@ -1544,9 +1557,9 @@ int syscall__probe_ret_readv(struct pt_regs* ctx) {
     // Syscalls that aren't exclusively used for networking must be
     // validated to be a sock_event before propagating a socket fd to the
     // tls tracing probes
-    if (ACCESS_TLS_SK_FD_VIA_ACTIVE_SYSCALL) {
-      propagate_fd_to_user_space_call(id, read_args->fd);
-    }
+    /* if (ACCESS_TLS_SK_FD_VIA_ACTIVE_SYSCALL) { */
+    /*   propagate_fd_to_user_space_call(id, read_args->fd); */
+    /* } */
     process_syscall_data_vecs(ctx, id, kIngress, read_args, bytes_count);
   }
 
