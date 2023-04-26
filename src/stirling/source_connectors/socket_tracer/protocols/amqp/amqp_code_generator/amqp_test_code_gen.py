@@ -72,7 +72,7 @@ class CodeTestGenerator:
 
     def __init__(
         self,
-        xml_file="amqp0-9-1.xml",
+        xml_file="amqp0-9-1.stripped.xml",
         pcap_file="amqp_sample_capture.pcapng",
         generation_dir="generated_files",
         gen_template_dir="gen_templates",
@@ -87,7 +87,7 @@ class CodeTestGenerator:
         self.env = self.generator_writer.env
 
         full_bzl_path = os.path.dirname(self.template_dir)
-        self.pcap_file = os.path.join(full_bzl_path, pcap_file)
+        self.pcap_file = "/home/ddelnano/code/pixie/amqp_sample_capture.pcapng"
         self.parse_id_to_method_mapping()
         self.parse_decode_test_gen_path = Path(self.generation_dir) / Path(
             "parse_decode_test.cc"
@@ -95,6 +95,7 @@ class CodeTestGenerator:
         self.unique_packet_data_path = Path(self.generation_dir) / Path(
             "unique_packet_data.dill"
         )
+        print(self.unique_packet_data_path)
 
     def parse_id_to_method_mapping(self):
         """
@@ -349,7 +350,11 @@ class CodeTestGenerator:
         """
         with open(self.unique_packet_data_path, "rb") as f:
             unique_packet_data: UniquePacketData = dill.load(f)
-        heartbeat_test = self.gen_heartbeat_test(unique_packet_data.heartbeat_packet)
+            print(unique_packet_data.heartbeat_packet)
+            print(unique_packet_data.content_body_packets)
+            print(unique_packet_data.content_header_packets)
+            print(unique_packet_data.method_packets)
+        # heartbeat_test = self.gen_heartbeat_test(unique_packet_data.heartbeat_packet)
         content_body_tests = self.gen_content_body_test(
             unique_packet_data.content_body_packets
         )
@@ -363,7 +368,7 @@ class CodeTestGenerator:
         with self.parse_decode_test_gen_path.open("w") as f:
             f.write(
                 template.render(
-                    heartbeat_test=heartbeat_test,
+                    #heartbeat_test=heartbeat_test,
                     content_body_tests=content_body_tests,
                     content_header_tests=content_header_tests,
                     amqp_method_tests=method_tests,

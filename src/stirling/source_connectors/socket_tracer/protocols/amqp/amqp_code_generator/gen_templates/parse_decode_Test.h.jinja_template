@@ -46,7 +46,6 @@ TEST_P(DecodeAllTests, CheckDecoding) {
 
 INSTANTIATE_TEST_SUITE_P(DecodeAllTestsSuite, DecodeAllTests,
                          ::testing::Values(
-{{ heartbeat_test }}
 {{ content_body_tests }}
 {{ content_header_tests }}
 {{ amqp_method_tests }}

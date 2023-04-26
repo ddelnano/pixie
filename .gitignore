@@ -76,3 +76,6 @@ Vagrantfile
 # Ignore symlink to bazel_output_base/external
 external
 !bazel/external
+
+src/stirling/source_connectors/socket_tracer/protocols/amqp/amqp_code_generator/amqp_sample_capture.pcapng
+src/stirling/source_connectors/socket_tracer/protocols/amqp/amqp_code_generator/gen_templates/amqp_sample_capture.pcapng

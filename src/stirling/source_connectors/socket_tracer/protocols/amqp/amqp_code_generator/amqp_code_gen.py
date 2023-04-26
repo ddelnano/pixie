@@ -811,7 +811,7 @@ class CodeGeneratorWriter:
         generation_dir="generated_files",
         gen_template_dir="gen_templates",
     ):
-        bzl_base_path = "px/src/stirling/source_connectors/socket_tracer/protocols/amqp/amqp_code_generator/"
+        bzl_base_path = "/home/ddelnano/code/pixie/src/stirling/source_connectors/socket_tracer/protocols/amqp/amqp_code_generator/"
         r = runfiles.Create()
         xml_file = r.Rlocation(bzl_base_path + xml_file)
         full_base_path = os.path.dirname(xml_file)
