@@ -27,6 +27,23 @@ logging.basicConfig(
 pid = os.getpid()
 logging.info(f"pid={pid}")
 
+SHORTER_PAYLOAD = '''<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+    body {
+        width: 35em;
+        margin: 0 auto;
+        font-family: Tahoma, Verdana, Arial, sans-serif;
+    }
+</style>
+</head>
+<body>
+</body>
+</html>
+'''
+
 PAYLOAD = '''<!DOCTYPE html>
 <html>
 <head>
@@ -57,8 +74,9 @@ class MyRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.send_header("Content-type", "text/html")
+        self.send_header("Content-length", len(SHORTER_PAYLOAD))
         self.end_headers()
-        self.wfile.write(bytes(PAYLOAD, 'utf-8'))
+        self.wfile.write(bytes(SHORTER_PAYLOAD, 'utf-8'))
 
 
 httpd = HTTPServer(('localhost', 443), MyRequestHandler)

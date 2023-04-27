@@ -155,6 +155,7 @@ static __inline struct conn_info_t* get_or_create_conn_info(uint32_t tgid, int32
 }
 
 static __inline void set_conn_as_ssl(uint32_t tgid, int32_t fd) {
+  bpf_trace_printk("Setting conn as ssl for tgid: %d and fd: %d", tgid, fd);
   struct conn_info_t* conn_info = get_or_create_conn_info(tgid, fd);
   if (conn_info == NULL) {
     return;
@@ -306,6 +307,7 @@ static __inline void update_traffic_class(struct conn_info_t* conn_info,
 
   // Update protocol if not set.
   if (conn_info->protocol == kProtocolUnknown) {
+    bpf_trace_printk("Setting protocol to %d", inferred_protocol.protocol);
     conn_info->protocol = inferred_protocol.protocol;
   }
 

@@ -734,6 +734,12 @@ static __inline struct protocol_message_t infer_protocol(const char* buf, size_t
     inferred_message.protocol = kProtocolNATS;
   }
 
+  char comm[32];
+  bpf_get_current_comm(&comm, sizeof(comm));
+  if (comm[0] == 'p' && comm[1] == 'y' && comm[2] == 't') {
+    bpf_trace_printk("Inferring protocol %d for buffer: %s and size: %d", inferred_message.protocol, buf, count);
+  }
+
   conn_info->prev_count = count;
   if (count == 4) {
     conn_info->prev_buf[0] = buf[0];
