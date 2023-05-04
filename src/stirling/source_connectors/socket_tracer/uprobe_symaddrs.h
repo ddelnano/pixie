@@ -30,6 +30,9 @@
 DECLARE_bool(openssl_force_raw_fptrs);
 DECLARE_bool(openssl_raw_fptrs_enabled);
 
+using px::stirling::obj_tools::DwarfReader;
+using px::stirling::obj_tools::ElfReader;
+
 namespace px {
 namespace stirling {
 
@@ -71,6 +74,9 @@ StatusOr<struct openssl_symaddrs_t> OpenSSLSymAddrs(obj_tools::RawFptrManager* f
  */
 StatusOr<struct node_tlswrap_symaddrs_t> NodeTLSWrapSymAddrs(const std::filesystem::path& node_exe,
                                                              const SemVer& ver);
+
+px::Status PopulateGoTLSDebugSymbols(ElfReader* elf_reader, DwarfReader* dwarf_reader,
+                                     struct go_tls_symaddrs_t* symaddrs);
 
 }  // namespace stirling
 }  // namespace px
