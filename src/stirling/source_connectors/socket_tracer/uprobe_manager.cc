@@ -441,6 +441,7 @@ StatusOr<int> UProbeManager::AttachGoTLSUProbes(const std::string& binary,
     // Doesn't appear to be a binary with the mandatory symbols.
     // Might not even be a golang binary.
     // Either way, not of interest to probe.
+    LOG(WARNING) << absl::Substitute("Failed to update go tls sym addrs with error: $0", s.msg());
     return 0;
   }
 

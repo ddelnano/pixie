@@ -88,6 +88,7 @@ TYPED_TEST_SUITE(GoTLSTraceTest, GoVersions);
 //-----------------------------------------------------------------------------
 
 TYPED_TEST(GoTLSTraceTest, BasicHTTP) {
+  FLAGS_stirling_conn_trace_pid = this->server_.process_pid();
   this->StartTransferDataThread();
 
   // Run the client in the network of the server, so they can connect to each other.

@@ -52,6 +52,7 @@ BPF_HASH(active_tls_conn_op_map, struct tgid_goid_t, struct go_tls_conn_args);
 // Symbol:
 //   crypto/tls.(*Conn).Write
 int probe_entry_tls_conn_write(struct pt_regs* ctx) {
+  bpf_trace_printk("Entering probe_entry_tls_conn_write");
   uint64_t id = bpf_get_current_pid_tgid();
   uint32_t tgid = id >> 32;
   uint32_t pid = id;
@@ -179,6 +180,7 @@ int probe_return_tls_conn_write(struct pt_regs* ctx) {
 // Symbol:
 //   crypto/tls.(*Conn).Read
 int probe_entry_tls_conn_read(struct pt_regs* ctx) {
+  bpf_trace_printk("Entering probe_entry_tls_conn_read");
   uint64_t id = bpf_get_current_pid_tgid();
   uint32_t tgid = id >> 32;
   uint32_t pid = id;
@@ -196,6 +198,7 @@ int probe_entry_tls_conn_read(struct pt_regs* ctx) {
     return 0;
   }
 
+  bpf_trace_printk("Found go_tls_symaddrs_map");
   // Required argument offsets.
   REQUIRE_LOCATION(symaddrs->Read_c_loc, 0);
   REQUIRE_LOCATION(symaddrs->Read_b_loc, 0);
@@ -209,6 +212,7 @@ int probe_entry_tls_conn_read(struct pt_regs* ctx) {
   if (regs == NULL) {
     return 0;
   }
+  bpf_trace_printk("Found symaddrs location and go regabi");
 
   struct go_tls_conn_args args = {};
   assign_arg(&args.conn_ptr, sizeof(args.conn_ptr), symaddrs->Read_c_loc, sp, regs);
