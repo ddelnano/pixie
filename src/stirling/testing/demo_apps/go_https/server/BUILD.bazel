@@ -55,6 +55,27 @@ pl_go_binary(
     embed = [":server_lib"],
 )
 
+pl_go_binary(
+    name = "386_server",
+    goarch = "386",
+    goos = "linux",
+    embed = [":server_lib"],
+)
+
+container_image(
+    name = "golang_386_https_server",
+    base = "//:pl_go_base_image",
+    entrypoint = [
+        "./386_server",
+        "--cert=server.crt",
+        "--key=server.key",
+    ],
+    files = [
+        "386_server",
+        ":server_certs",
+    ],
+)
+
 [
     go_cross_binary(
         name = "golang_%s_server_binary" % sdk_version.replace(".", "_"),
@@ -81,3 +102,17 @@ pl_go_binary(
     )
     for sdk_version in pl_supported_go_sdk_versions
 ]
+
+container_image(
+    name = "goarch_i386_golang_%s_https_server" % pl_supported_go_sdk_versions[0].replace(".", "_"),
+    base = "//:pl_go_base_image",
+    entrypoint = [
+        "./golang_%s_server_binary" % pl_supported_go_sdk_versions[0].replace(".", "_"),
+        "--cert=server.crt",
+        "--key=server.key",
+    ],
+    files = [
+        ":golang_%s_server_binary" % pl_supported_go_sdk_versions[0].replace(".", "_"),
+        ":server_certs",
+    ],
+)

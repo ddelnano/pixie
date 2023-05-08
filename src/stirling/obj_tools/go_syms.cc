@@ -47,18 +47,20 @@ StatusOr<std::string> ReadBuildVersion(ElfReader* elf_reader) {
   PX_ASSIGN_OR_RETURN(ElfReader::SymbolInfo symbol,
                       elf_reader->SearchTheOnlySymbol(kGoBuildVersionSymbol));
 
+  LOG(WARNING) << absl::Substitute("The elf symbol is size $0 and gostring is $1", symbol.size, sizeof(gostring));
   // The address of this symbol points to a Golang string object.
   // But the size is for the symbol table entry, not this string object.
-  symbol.size = sizeof(gostring);
+  /* symbol.size = sizeof(gostring); */
   PX_ASSIGN_OR_RETURN(utils::u8string version_code, elf_reader->SymbolByteCode(".data", symbol));
 
+  LOG(WARNING) << absl::Substitute("Did not crash here");
   // We can't guarantee the alignment on version_string so we make a copy into an aligned address.
-  gostring version_string;
-  std::memcpy(&version_string, version_code.data(), sizeof(version_string));
+  auto version_string = version_code.c_str();
+  /* std::memcpy(&version_string, version_code.data(), sizeof(version_code)); */
 
   ElfReader::SymbolInfo version_symbol;
-  version_symbol.address = reinterpret_cast<uint64_t>(version_string.ptr);
-  version_symbol.size = version_string.len;
+  version_symbol.address = reinterpret_cast<uint64_t>(version_string);
+  version_symbol.size = version_code.length();
 
   PX_ASSIGN_OR_RETURN(utils::u8string str, elf_reader->SymbolByteCode(".data", version_symbol));
   return std::string(reinterpret_cast<const char*>(str.data()), str.size());

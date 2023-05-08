@@ -120,6 +120,7 @@ pl_cc_test(
     srcs = ["go_syms_test.cc"],
     data = [
         "//src/stirling/obj_tools/testdata/go:test_go_1_19_binary",
+        "//src/stirling/obj_tools/testdata/go:test_386_go_binary",
     ],
     deps = [
         ":cc_library",

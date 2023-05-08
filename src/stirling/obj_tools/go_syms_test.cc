@@ -32,8 +32,18 @@ using ::testing::StrEq;
 constexpr std::string_view kTestGoBinaryPath =
     "src/stirling/obj_tools/testdata/go/test_go_1_19_binary";
 
+constexpr std::string_view kTest386GoBinaryPath =
+    "src/stirling/obj_tools/testdata/go/test_386_go_binary_/test_386_go_binary";
+
 TEST(ReadBuildVersionTest, WorkingOnBasicGoBinary) {
   const std::string kPath = px::testing::BazelRunfilePath(kTestGoBinaryPath);
+  ASSERT_OK_AND_ASSIGN(std::unique_ptr<ElfReader> elf_reader, ElfReader::Create(kPath));
+  ASSERT_OK_AND_ASSIGN(std::string version, ReadBuildVersion(elf_reader.get()));
+  EXPECT_THAT(version, StrEq("go1.19.7"));
+}
+
+TEST(ReadBuildVersionTest, 386GoBinary) {
+  const std::string kPath = px::testing::BazelRunfilePath(kTest386GoBinaryPath);
   ASSERT_OK_AND_ASSIGN(std::unique_ptr<ElfReader> elf_reader, ElfReader::Create(kPath));
   ASSERT_OK_AND_ASSIGN(std::string version, ReadBuildVersion(elf_reader.get()));
   EXPECT_THAT(version, StrEq("go1.19.7"));

@@ -262,6 +262,19 @@ class Go1_20_TLSServerContainer : public ContainerRunner {
   static constexpr std::string_view kReadyMessage = "Starting HTTPS service";
 };
 
+class Go_386_TLSServerContainer : public ContainerRunner {
+ public:
+  Go_386_TLSServerContainer()
+      : ContainerRunner(::px::testing::BazelRunfilePath(kBazelImageTar), kContainerNamePrefix,
+                        kReadyMessage) {}
+
+ private:
+  static constexpr std::string_view kBazelImageTar =
+      "src/stirling/testing/demo_apps/go_https/server/golang_386_https_server.tar";
+  static constexpr std::string_view kContainerNamePrefix = "https_server";
+  static constexpr std::string_view kReadyMessage = "Starting HTTPS service";
+};
+
 class Go1_20_TLSClientContainer : public ContainerRunner {
  public:
   Go1_20_TLSClientContainer()

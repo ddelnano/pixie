@@ -64,7 +64,7 @@ constexpr int kGoArrayLenOffset = 8;
 
 // The functions in this section populate structs that contain locations of necessary symbols,
 // which are then passed through a BPF map to the uprobe.
-// For example, locations of required struct members are communicated through this fasion.
+// For example, locations of required struct members are communicated through this fashion.
 
 // The following is a helper macro that is useful during debug.
 // By changing VLOG to LOG, all assignments that use this macro are logged.

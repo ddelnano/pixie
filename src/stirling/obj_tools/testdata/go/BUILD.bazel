@@ -37,6 +37,13 @@ pl_go_binary(
     }),
 )
 
+pl_go_binary(
+    name = "test_386_go_binary",
+    srcs = ["test_go_binary.go"],
+    goarch = "386",
+    goos = "linux",
+)
+
 [
     go_cross_binary(
         name = "test_go_%s_binary" % sdk_version.replace(".", "_"),
