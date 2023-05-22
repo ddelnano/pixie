@@ -104,6 +104,13 @@ struct Frame : public FrameBase {
   bool consumed = false;
 
   size_t ByteSize() const override { return sizeof(Frame) + msg.size(); }
+
+  std::string ToString() const override {
+    return absl::Substitute(
+        "Frame version=$0 flags=$1 stream=$2 opcode=$3 length=$4 msg=$5 consumed=$6", hdr.version,
+        hdr.flags, hdr.stream, magic_enum::enum_name(hdr.opcode), hdr.length,
+        BytesToString<bytes_format::HexAsciiMix>(msg), consumed);
+  }
 };
 
 constexpr int kFrameHeaderLength = 9;

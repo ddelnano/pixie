@@ -75,6 +75,7 @@ void DataStream::ProcessBytesToFrames(message_type_t type, TStateType* state) {
 
   // TODO(oazizi): Convert to ECHECK once we have more confidence.
   LOG_IF(WARNING, IsEOS()) << "DataStream reaches EOS, no more data to process.";
+  VLOG(2) << "DataStream buffer content before ParseFrames\n" << data_buffer_.DebugInfo();
 
   const size_t orig_pos = data_buffer_.position();
 
