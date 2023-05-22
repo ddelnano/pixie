@@ -410,7 +410,8 @@ std::string AlwaysContiguousDataStreamBufferImpl::DebugInfo() const {
   for (const auto& [pos, timestamp] : timestamps_) {
     absl::StrAppend(&s, absl::Substitute("  position:$0 timestamp:$1\n", pos, timestamp));
   }
-  absl::StrAppend(&s, absl::Substitute("Buffer: $0\n", buffer_));
+  absl::StrAppend(
+      &s, absl::Substitute("Buffer: $0\n", BytesToString<bytes_format::HexAsciiMix>(buffer_)));
 
   return s;
 }

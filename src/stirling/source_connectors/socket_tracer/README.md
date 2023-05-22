@@ -26,7 +26,7 @@ The first step is to verify that the raw data events were captured by `eBPF` pro
   sudo strace -f -v -s 100 -e write -p PID 2>&1 | grep PATTERN
   ```
 
-You should confirm that all of the expected syscalls were called, and the data matches the protocol.
+You should confirm that all of the expected syscalls were called, and the data matches the protocol. In addition to this, it's important to understand a few differences between how certain syscalls are processed. Syscalls like writev and readev must loop to process their inputs and have a predetermined loop limit to avoid BPF instruction limits. If an application's syscall usage results in large vectors, it can cause the data to be partially submitted to the underlying perf buffer.
 
 If `strace` did not observe the expected data, `tshark`/`wireshark` can be used to verify network
 traffic. Here the goal is to verify the network traffic matches the protocol.
@@ -51,12 +51,18 @@ After `strace` and `tshark`/`wireshark`, you need to verify the data events were
 eBPF to userspace, and processed correctly to data records, by turning on the CONN_TRACE
 debug logging for the interested process and file descriptor.
 
-You could do this by specifying target PID and FD to `stirling_wrapper` flags:
-
+This is possible through two mechanisms:
+- stirling command line flags
 ```cpp
 --stirling_conn_trace_pid=<target_pid>
 --stirling_conn_trace_fd=<target_fd>
 ```
+- sending a signal to a PEM process
+```bash
+```
+
+You could do this by specifying target PID and FD to `stirling_wrapper` flags:
+
 
 These flag automatically set debug trace logging level to `2`. The debug level `1` is usually for
 specific events that affect the ConnTracker's state, for instance, being disabled; level `2` is for

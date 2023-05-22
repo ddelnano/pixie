@@ -386,7 +386,8 @@ RecordsWithErrorCount<Record> StitchFrames(std::deque<Frame>* req_frames,
       if (record_status.ok()) {
         entries.push_back(record_status.ConsumeValueOrDie());
       } else {
-        VLOG(1) << record_status.msg();
+        VLOG(1) << absl::Substitute("Failed to process soliarty response status=$0",
+                                    record_status.msg());
         ++error_count;
       }
       continue;
@@ -394,15 +395,16 @@ RecordsWithErrorCount<Record> StitchFrames(std::deque<Frame>* req_frames,
 
     // Search for matching req frame
     for (auto& req_frame : *req_frames) {
+      VLOG(2) << absl::Substitute(
+          "Attemping to match the following request and response:\nreq=`$0`\nresp=`$1`",
+          req_frame.ToString(), resp_frame.ToString());
       if (resp_frame.hdr.stream == req_frame.hdr.stream) {
-        VLOG(2) << absl::Substitute("req_op=$0 msg=$1", magic_enum::enum_name(req_frame.hdr.opcode),
-                                    req_frame.msg);
-
         StatusOr<Record> record_status = ProcessReqRespPair(&req_frame, &resp_frame);
         if (record_status.ok()) {
           entries.push_back(record_status.ConsumeValueOrDie());
         } else {
-          VLOG(1) << record_status.ToString();
+          VLOG(1) << absl::Substitute("Failed to match req and resp pair status=$0",
+                                      record_status.ToString());
           ++error_count;
         }
 
