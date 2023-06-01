@@ -256,6 +256,39 @@ TEST(CassStitcherTest, MissingRequest) {
   EXPECT_EQ(result.records.size(), 1);
 }
 
+TEST(CassStitcherTest, MissingResponse) {
+  std::deque<Frame> req_frames;
+  std::deque<Frame> resp_frames;
+  RecordsWithErrorCount<Record> result;
+
+  int t = 0;
+  Frame req1_frame = CreateFrame(0, Opcode::kQuery, kBadQueryReq, ++t);
+  Frame req2_frame = CreateFrame(0, Opcode::kQuery, kBadQueryReq, ++t);
+  Frame req3_frame = CreateFrame(0, Opcode::kQuery, kBadQueryReq, ++t);
+  Frame req4_frame = CreateFrame(0, Opcode::kQuery, kBadQueryReq, ++t);
+  Frame req5_frame = CreateFrame(0, Opcode::kPrepare, kPrepareReq, ++t);
+  Frame resp1_frame = CreateFrame(0, Opcode::kError, kBadQueryErrorResp, ++t);
+
+  req_frames.push_back(req1_frame);
+  req_frames.push_back(req2_frame);
+  req_frames.push_back(req3_frame);
+  req_frames.push_back(req4_frame);
+  req_frames.push_back(req5_frame);
+  resp_frames.push_back(resp1_frame);
+
+  result = StitchFrames(&req_frames, &resp_frames);
+  EXPECT_TRUE(resp_frames.empty());
+  EXPECT_EQ(req_frames.size(), 4);
+  EXPECT_EQ(result.error_count, 2);
+  EXPECT_EQ(result.records.size(), 1);
+
+  resp_frames.push_back(resp1_frame);
+  result = StitchFrames(&req_frames, &resp_frames);
+  EXPECT_EQ(req_frames.size(), 1);
+  EXPECT_EQ(result.error_count, 0);
+  EXPECT_EQ(result.records.size(), 1);
+}
+
 // To test that mis-classified frames are caught by stitcher.
 TEST(CassStitcherTest, NonCQLFrames) {
   std::deque<Frame> req_frames;

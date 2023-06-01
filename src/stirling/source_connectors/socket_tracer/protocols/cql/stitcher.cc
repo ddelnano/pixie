@@ -392,8 +392,19 @@ RecordsWithErrorCount<Record> StitchFrames(std::deque<Frame>* req_frames,
       continue;
     }
 
-    // Search for matching req frame
+    // Search for matching req frame.
+    std::unordered_map<uint32_t, int> stream_histo;
+
     for (auto& req_frame : *req_frames) {
+      uint32_t key = (req_frame.hdr.stream << 8) | static_cast<uint8_t>(req_frame.hdr.opcode);
+      stream_histo[key] += 1;
+
+      // Breaking out of this loop early allows for stale requests to accumulate. Continue
+      // looping so that these stale requests can be identified and pruned.
+      if (found_match || req_frame.consumed) {
+        continue;
+      }
+
       if (resp_frame.hdr.stream == req_frame.hdr.stream) {
         VLOG(2) << absl::Substitute("req_op=$0 msg=$1", magic_enum::enum_name(req_frame.hdr.opcode),
                                     req_frame.msg);
@@ -414,7 +425,6 @@ RecordsWithErrorCount<Record> StitchFrames(std::deque<Frame>* req_frames,
         // Note that responses are always head-processed, so they don't require this optimization.
         found_match = true;
         req_frame.consumed = true;
-        break;
       }
     }
 
@@ -428,17 +438,24 @@ RecordsWithErrorCount<Record> StitchFrames(std::deque<Frame>* req_frames,
     // Do this inside the resp loop to aggressively clean-out req_frames whenever a frame consumed.
     // Should speed up the req_frames search for the next iteration.
     auto it = req_frames->begin();
+    auto erase_it = req_frames->end();
     while (it != req_frames->end()) {
-      if (!(*it).consumed) {
-        break;
+      auto& req_frame = *it;
+      uint32_t key = (req_frame.hdr.stream << 8) | static_cast<uint8_t>(req_frame.hdr.opcode);
+      if (!req_frame.consumed) {
+        if (erase_it == req_frames->end()) {
+          erase_it = it;
+        }
+
+        if (stream_histo[key] > 1) {
+          req_frame.consumed = true;
+          error_count++;
+        }
       }
+      stream_histo[key] -= 1;
       it++;
     }
-    req_frames->erase(req_frames->begin(), it);
-
-    // TODO(oazizi): Consider removing requests that are too old, otherwise a lost response can mean
-    // the are never processed. This would result in a memory leak until the more drastic connection
-    // tracker clean-up mechanisms kick in.
+    req_frames->erase(req_frames->begin(), erase_it);
   }
 
   resp_frames->clear();
