@@ -184,7 +184,7 @@ void SocketTraceConnector::InitProtocolTransferSpecs() {
 
   // PROTOCOL_LIST: Requires update on new protocols.
 
-  // We popluate transfer_specs_by_protocol so that we guarantee the protocol_transfer_specs_
+  // We populate transfer_specs_by_protocol so that we guarantee the protocol_transfer_specs_
   // is stuffed in the *correct* order.
   // Also, this will fail fast (when we stuff the vector) if we forget a protocol.
   absl::flat_hash_map<traffic_protocol_t, TransferSpec> transfer_specs_by_protocol = {
