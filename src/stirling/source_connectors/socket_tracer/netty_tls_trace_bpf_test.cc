@@ -91,16 +91,6 @@ class BaseOpenSSLTraceTest : public SocketTraceBPFTestFixture</* TClientSideTrac
         "server_image.classpath";
     std::string thriftmux_client_output = "StringString";
 
-    // The thriftmux container uses a CA created by
-    // src/common/testing/test_utils/cert_generator:cert_generator.
-    // This command adds this CA to java's keystore so ssl
-    // verification works as expected.
-    std::string keytool_cmd = absl::Substitute(
-        "podman exec $0 /usr/lib/jvm/java-11-openjdk-amd64/bin/keytool -importcert -keystore "
-        "/etc/ssl/certs/java/cacerts -file /etc/ssl/ca.crt -noprompt -storepass changeit",
-        server_.container_name());
-    px::Exec(keytool_cmd);
-
     // Runs the Client entrypoint inside the server container
     // capturing the Client process's pid for easier debugging.
     std::string cmd = absl::Substitute(
