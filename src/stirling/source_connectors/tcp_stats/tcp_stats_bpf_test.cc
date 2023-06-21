@@ -85,7 +85,7 @@ TEST_F(TcpTraceTest, Capture) {
   SubProcess server_proc;
   std::thread server_thread([&] {
     std::vector<std::string> args = {
-        "nc", "-l", "-p", "12345", "-s", "127.0.0.1", "-v",
+        "nc", "-l", "-p", "12345", "-s", "169.254.169.169", "-v",
     };
     ASSERT_OK(server_proc.Start(args, /* stderr_to_stdout */ true));
   });
@@ -93,17 +93,20 @@ TEST_F(TcpTraceTest, Capture) {
 
   StartTransferDataThread();
 
-  // Send "hello" to 127.0.0.1, total 6 bytes of data
-  std::string cmd1 = "echo \"hello\" | nc -w1 127.0.0.1 12345 -v";
+  // Send "hello" to 169.254.169.169, total 6 bytes of data
+  std::string cmd1 = "echo \"hello\" | nc -w1 169.254.169.169 12345 -v";
   ASSERT_OK(px::Exec(cmd1));
 
   StopTransferDataThread();
+
+  auto out = px::Exec("/sbin/tc -s qdisc show");
+  LOG(WARNING) << out.ConsumeValueOrDie();
 
   std::vector<TcpStatsRecord> expected = {
       {
           .local_addr = "",
           .local_port = 0,
-          .remote_addr = "127.0.0.1",
+          .remote_addr = "169.254.169.169",
           .remote_port = 12345,
           .tx = 6,
           .rx = 0,

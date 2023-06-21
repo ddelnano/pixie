@@ -180,6 +180,7 @@ int probe_entry_tcp_cleanup_rbuf(struct pt_regs* ctx, struct sock* sk, int copie
 
 int probe_entry_tcp_retransmit_skb(struct pt_regs* ctx, struct sock* skp, struct sk_buff* skb,
                                    int type) {
+  bpf_trace_printk("probe_entry_tcp_retransmit_skb happening!");
   if (skp == NULL) {
     return 0;
   }
