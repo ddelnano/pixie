@@ -34,6 +34,8 @@
 #include "src/stirling/bpf_tools/task_struct_resolver.h"
 #include "src/stirling/utils/linux_headers.h"
 
+DECLARE_string(pprof_pb_file);
+
 namespace px {
 namespace stirling {
 namespace bpf_tools {
@@ -391,7 +393,7 @@ void BCCWrapper::SetReplayingMode() {
   LOG(WARNING) << "BCCWrapper::SetReplayingMode()";
   replaying_ = true;
 
-  char const* const pb_file_path = "/home/jps/src/pixielabs.ai/rra-pixie/bpf_events.pb";
+  char const* const pb_file_path = FLAGS_pprof_pb_file.c_str();
   std::fstream input(pb_file_path, std::ios::in | std::ios::binary);
   if (!input) {
     ECHECK(false) << "Could not open file: " << pb_file_path << ".";

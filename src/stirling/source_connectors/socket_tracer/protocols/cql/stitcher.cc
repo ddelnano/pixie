@@ -94,7 +94,7 @@ Status ProcessQueryReq(Frame* req_frame, Request* req) {
 
   // For now, just tag the parameter values to the end.
   if (!hex_values.empty()) {
-    absl::StrAppend(&req->msg, ", ");
+    absl::StrAppend(&req->msg, "\n");
     absl::StrAppend(&req->msg, ToJSONString(hex_values));
   }
 
@@ -231,9 +231,9 @@ Status ProcessResultResp(Frame* resp_frame, Response* resp) {
         names.push_back(std::move(c.name));
       }
 
-      resp->msg = absl::StrCat("Response type = ROWS, ",
-                               "Number of columns = ", r_resp.metadata.columns_count, ", ",
-                               ToJSONString(names), ", ", "Number of rows = ", r_resp.rows_count);
+      resp->msg = absl::StrCat("Response type = ROWS\n",
+                               "Number of columns = ", r_resp.metadata.columns_count, "\n",
+                               ToJSONString(names), "\n", "Number of rows = ", r_resp.rows_count);
       // TODO(oazizi): Consider which other parts of metadata would be interesting to record into
       // resp.
       break;
@@ -241,7 +241,7 @@ Status ProcessResultResp(Frame* resp_frame, Response* resp) {
     case ResultRespKind::kSetKeyspace: {
       const auto& r_resp = std::get<ResultSetKeyspaceResp>(r.resp);
       resp->msg =
-          absl::StrCat("Response type = SET_KEYSPACE, ", "Keyspace = ", r_resp.keyspace_name);
+          absl::StrCat("Response type = SET_KEYSPACE\n", "Keyspace = ", r_resp.keyspace_name);
       break;
     }
     case ResultRespKind::kPrepared: {
@@ -335,6 +335,9 @@ Status ProcessResp(Frame* resp_frame, Response* resp) {
 
 StatusOr<Record> ProcessReqRespPair(Frame* req_frame, Frame* resp_frame) {
   ECHECK_LT(req_frame->timestamp_ns, resp_frame->timestamp_ns);
+  if (req_frame->timestamp_ns >= resp_frame->timestamp_ns) {
+    LOG(WARNING) << "This should not happen";
+  }
 
   Record r;
   PX_RETURN_IF_ERROR(ProcessReq(req_frame, &r.req));
@@ -377,6 +380,12 @@ RecordsWithErrorCount<Record> StitchFrames(std::deque<Frame>* req_frames,
   std::vector<Record> entries;
   int error_count = 0;
 
+  std::unordered_map<uint32_t, std::vector<uint64_t>> stream_timestamps;
+  for (auto& req_frame : *req_frames) {
+    uint32_t key = (req_frame.hdr.stream << 8) | static_cast<uint8_t>(req_frame.hdr.opcode);
+    stream_timestamps[key].push_back(req_frame.timestamp_ns);
+  }
+
   for (auto& resp_frame : *resp_frames) {
     bool found_match = false;
 
@@ -392,20 +401,18 @@ RecordsWithErrorCount<Record> StitchFrames(std::deque<Frame>* req_frames,
       continue;
     }
 
-    // Search for matching req frame.
-    std::unordered_map<uint32_t, int> stream_histo;
-
     for (auto& req_frame : *req_frames) {
-      uint32_t key = (req_frame.hdr.stream << 8) | static_cast<uint8_t>(req_frame.hdr.opcode);
-      stream_histo[key] += 1;
-
       // Breaking out of this loop early allows for stale requests to accumulate. Continue
       // looping so that these stale requests can be identified and pruned.
       if (found_match || req_frame.consumed) {
         continue;
       }
 
-      if (resp_frame.hdr.stream == req_frame.hdr.stream) {
+
+      uint32_t key = (req_frame.hdr.stream << 8) | static_cast<uint8_t>(req_frame.hdr.opcode);
+      auto stream_vec = stream_timestamps[key];
+      auto it = std::upper_bound(stream_vec.begin(), stream_vec.end(), resp_frame.timestamp_ns) - 1;
+      if (resp_frame.hdr.stream == req_frame.hdr.stream && *it == req_frame.timestamp_ns) {
         VLOG(2) << absl::Substitute("req_op=$0 msg=$1", magic_enum::enum_name(req_frame.hdr.opcode),
                                     req_frame.msg);
 
@@ -434,29 +441,36 @@ RecordsWithErrorCount<Record> StitchFrames(std::deque<Frame>* req_frames,
       ++error_count;
     }
 
+  }
     // Clean-up consumed frames at the head.
     // Do this inside the resp loop to aggressively clean-out req_frames whenever a frame consumed.
     // Should speed up the req_frames search for the next iteration.
     auto it = req_frames->begin();
-    auto erase_it = req_frames->end();
+    std::vector<std::pair<uint64_t, uint64_t>> v;
     while (it != req_frames->end()) {
-      auto& req_frame = *it;
-      uint32_t key = (req_frame.hdr.stream << 8) | static_cast<uint8_t>(req_frame.hdr.opcode);
-      if (!req_frame.consumed) {
-        if (erase_it == req_frames->end()) {
-          erase_it = it;
-        }
-
-        if (stream_histo[key] > 1) {
-          req_frame.consumed = true;
-          error_count++;
-        }
+      if (!(*it).consumed) {
+        error_count++;
+        v.push_back(std::make_pair(it - req_frames->begin(), it->timestamp_ns));
       }
-      stream_histo[key] -= 1;
       it++;
     }
-    req_frames->erase(req_frames->begin(), erase_it);
-  }
+    auto rit = req_frames->rbegin();
+    while (rit.base() != req_frames->begin()) {
+      if ((*rit).consumed) {
+        break;
+      }
+      rit++;
+    }
+    error_count -= std::distance(rit.base(), req_frames->end());
+    req_frames->erase(req_frames->begin(), rit.base());
+    LOG(WARNING) << absl::Substitute("Found a total of $0 stale requests", v.size());
+    if (v.size() > 2) {
+      LOG(WARNING) << "Found the following stale indices: ";
+      for (auto i : v) {
+        LOG(WARNING) << "index: " << i.first << " timestamp: " << i.second << " ";
+      }
+    }
+  /* } */
 
   resp_frames->clear();
 

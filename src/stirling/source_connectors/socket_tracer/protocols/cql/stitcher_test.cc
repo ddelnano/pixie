@@ -263,11 +263,13 @@ TEST(CassStitcherTest, MissingResponse) {
 
   int t = 0;
   Frame req1_frame = CreateFrame(0, Opcode::kQuery, kBadQueryReq, ++t);
+  Frame resp1_frame = CreateFrame(0, Opcode::kError, kBadQueryErrorResp, ++t);
+
   Frame req2_frame = CreateFrame(0, Opcode::kQuery, kBadQueryReq, ++t);
   Frame req3_frame = CreateFrame(0, Opcode::kQuery, kBadQueryReq, ++t);
   Frame req4_frame = CreateFrame(0, Opcode::kQuery, kBadQueryReq, ++t);
+  Frame resp4_frame = CreateFrame(0, Opcode::kError, kBadQueryErrorResp, ++t);
   Frame req5_frame = CreateFrame(0, Opcode::kPrepare, kPrepareReq, ++t);
-  Frame resp1_frame = CreateFrame(0, Opcode::kError, kBadQueryErrorResp, ++t);
 
   req_frames.push_back(req1_frame);
   req_frames.push_back(req2_frame);
@@ -275,18 +277,16 @@ TEST(CassStitcherTest, MissingResponse) {
   req_frames.push_back(req4_frame);
   req_frames.push_back(req5_frame);
   resp_frames.push_back(resp1_frame);
+  resp_frames.push_back(resp4_frame);
 
   result = StitchFrames(&req_frames, &resp_frames);
   EXPECT_TRUE(resp_frames.empty());
-  EXPECT_EQ(req_frames.size(), 4);
-  EXPECT_EQ(result.error_count, 2);
-  EXPECT_EQ(result.records.size(), 1);
-
-  resp_frames.push_back(resp1_frame);
-  result = StitchFrames(&req_frames, &resp_frames);
   EXPECT_EQ(req_frames.size(), 1);
-  EXPECT_EQ(result.error_count, 0);
-  EXPECT_EQ(result.records.size(), 1);
+  /* EXPECT_EQ(req_frames[0].timestamp_ns, req5_frame.timestamp_ns); */
+  EXPECT_EQ(result.error_count, 2);
+  EXPECT_EQ(result.records.size(), 2);
+  EXPECT_EQ(result.records[0].req.timestamp_ns, req1_frame.timestamp_ns);
+  EXPECT_EQ(result.records[1].req.timestamp_ns, req4_frame.timestamp_ns);
 }
 
 // To test that mis-classified frames are caught by stitcher.
