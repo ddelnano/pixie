@@ -180,12 +180,26 @@ TEST(CassStitcherTest, OutOfOrderMatching) {
 
   int t = 0;
 
-  Frame req0_frame = CreateFrame(0, Opcode::kQuery, kBadQueryReq, ++t);
-  Frame resp0_frame = CreateFrame(0, Opcode::kError, kBadQueryErrorResp, ++t);
-  Frame req1_frame = CreateFrame(1, Opcode::kQuery, kBadQueryReq, ++t);
-  Frame resp1_frame = CreateFrame(1, Opcode::kError, kBadQueryErrorResp, ++t);
-  Frame req2_frame = CreateFrame(2, Opcode::kQuery, kBadQueryReq, ++t);
-  Frame resp2_frame = CreateFrame(2, Opcode::kError, kBadQueryErrorResp, ++t);
+  Frame req0_s0_frame = CreateFrame(0, Opcode::kQuery, kBadQueryReq, ++t);
+  Frame resp0_s0_frame = CreateFrame(0, Opcode::kError, kBadQueryErrorResp, ++t);
+
+  Frame req0_s1_frame = CreateFrame(1, Opcode::kQuery, kBadQueryReq, ++t);
+  Frame resp0_s1_frame = CreateFrame(1, Opcode::kError, kBadQueryErrorResp, ++t);
+  Frame req0_s2_frame = CreateFrame(2, Opcode::kQuery, kBadQueryReq, ++t);
+  Frame resp0_s2_frame = CreateFrame(2, Opcode::kError, kBadQueryErrorResp, ++t);
+
+  Frame req1_s0_frame = CreateFrame(0, Opcode::kQuery, kBadQueryReq, ++t);
+  Frame req1_s1_frame = CreateFrame(1, Opcode::kQuery, kBadQueryReq, ++t);
+  Frame req1_s2_frame = CreateFrame(2, Opcode::kQuery, kBadQueryReq, ++t);
+
+  Frame req2_s0_frame = CreateFrame(0, Opcode::kQuery, kBadQueryReq, ++t);
+  Frame resp2_s0_frame = CreateFrame(0, Opcode::kError, kBadQueryErrorResp, ++t);
+
+  Frame req3_s0_frame = CreateFrame(0, Opcode::kQuery, kBadQueryReq, ++t);
+  Frame req4_s0_frame = CreateFrame(0, Opcode::kQuery, kBadQueryReq, ++t);
+
+  Frame req5_s0_frame = CreateFrame(0, Opcode::kQuery, kBadQueryReq, ++t);
+  Frame resp5_s0_frame = CreateFrame(0, Opcode::kError, kBadQueryErrorResp, ++t);
 
   result = StitchFrames(&req_frames, &resp_frames);
   EXPECT_TRUE(resp_frames.empty());
@@ -193,45 +207,37 @@ TEST(CassStitcherTest, OutOfOrderMatching) {
   EXPECT_EQ(result.error_count, 0);
   EXPECT_EQ(result.records.size(), 0);
 
-  req_frames.push_back(req0_frame);
-  req_frames.push_back(req1_frame);
+  req_frames.push_back(req0_s0_frame);
+  req_frames.push_back(req0_s1_frame);
+  req_frames.push_back(req0_s2_frame);
+
+  result = StitchFrames(&req_frames, &resp_frames);
+  EXPECT_TRUE(resp_frames.empty());
+  EXPECT_EQ(req_frames.size(), 3);
+  EXPECT_EQ(result.error_count, 0);
+  EXPECT_EQ(result.records.size(), 0);
+
+  req_frames.push_back(req1_s0_frame);
+  req_frames.push_back(req1_s1_frame);
+  req_frames.push_back(req1_s2_frame);
+  req_frames.push_back(req2_s0_frame);
+  req_frames.push_back(req3_s0_frame);
+  req_frames.push_back(req4_s0_frame);
+  req_frames.push_back(req5_s0_frame);
+
+  resp_frames.push_back(resp0_s0_frame);
+  resp_frames.push_back(resp0_s1_frame);
+  resp_frames.push_back(resp0_s2_frame);
+  resp_frames.push_back(resp2_s0_frame);
+  resp_frames.push_back(resp5_s0_frame);
 
   result = StitchFrames(&req_frames, &resp_frames);
   EXPECT_TRUE(resp_frames.empty());
   EXPECT_EQ(req_frames.size(), 2);
-  EXPECT_EQ(result.error_count, 0);
-  EXPECT_EQ(result.records.size(), 0);
-
-  resp_frames.push_back(resp1_frame);
-
-  result = StitchFrames(&req_frames, &resp_frames);
-  EXPECT_TRUE(resp_frames.empty());
-  EXPECT_EQ(req_frames.size(), 2);
-  EXPECT_EQ(result.error_count, 0);
-  EXPECT_EQ(result.records.size(), 1);
-
-  req_frames.push_back(req2_frame);
-  resp_frames.push_back(resp0_frame);
-
-  result = StitchFrames(&req_frames, &resp_frames);
-  EXPECT_TRUE(resp_frames.empty());
-  EXPECT_EQ(req_frames.size(), 1);
-  EXPECT_EQ(result.error_count, 0);
-  EXPECT_EQ(result.records.size(), 1);
-
-  resp_frames.push_back(resp2_frame);
-
-  result = StitchFrames(&req_frames, &resp_frames);
-  EXPECT_TRUE(resp_frames.empty());
-  EXPECT_EQ(resp_frames.size(), 0);
-  EXPECT_EQ(result.error_count, 0);
-  EXPECT_EQ(result.records.size(), 1);
-
-  result = StitchFrames(&req_frames, &resp_frames);
-  EXPECT_TRUE(resp_frames.empty());
-  EXPECT_EQ(resp_frames.size(), 0);
-  EXPECT_EQ(result.error_count, 0);
-  EXPECT_EQ(result.records.size(), 0);
+  EXPECT_EQ(req_frames[0].timestamp_ns, req1_s1_frame.timestamp_ns);
+  EXPECT_EQ(req_frames[1].timestamp_ns, req1_s2_frame.timestamp_ns);
+  EXPECT_EQ(result.error_count, 3);
+  EXPECT_EQ(result.records.size(), 5);
 }
 
 // To test that, if a request of a response is missing, then the response is popped off.

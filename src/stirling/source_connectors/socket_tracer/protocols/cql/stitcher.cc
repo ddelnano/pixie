@@ -335,9 +335,6 @@ Status ProcessResp(Frame* resp_frame, Response* resp) {
 
 StatusOr<Record> ProcessReqRespPair(Frame* req_frame, Frame* resp_frame) {
   ECHECK_LT(req_frame->timestamp_ns, resp_frame->timestamp_ns);
-  if (req_frame->timestamp_ns >= resp_frame->timestamp_ns) {
-    LOG(WARNING) << "This should not happen";
-  }
 
   Record r;
   PX_RETURN_IF_ERROR(ProcessReq(req_frame, &r.req));
@@ -380,14 +377,21 @@ RecordsWithErrorCount<Record> StitchFrames(std::deque<Frame>* req_frames,
   std::vector<Record> entries;
   int error_count = 0;
 
-  std::unordered_map<uint32_t, std::vector<uint64_t>> stream_timestamps;
+  std::unordered_map<uint16_t, std::vector<uint64_t>> req_stream_timestamps;
   for (auto& req_frame : *req_frames) {
-    uint32_t key = (req_frame.hdr.stream << 8) | static_cast<uint8_t>(req_frame.hdr.opcode);
-    stream_timestamps[key].push_back(req_frame.timestamp_ns);
+    req_stream_timestamps[req_frame.hdr.stream].push_back(req_frame.timestamp_ns);
   }
+
+  std::unordered_map<uint16_t, uint64_t> latest_resp_by_stream;
+  std::vector<std::tuple<size_t, size_t>> deletion_intervals{{0, 0}};
 
   for (auto& resp_frame : *resp_frames) {
     bool found_match = false;
+
+    // Update tracking of the latest response by stream ID
+    if (latest_resp_by_stream.count(resp_frame.hdr.stream) == 0 || latest_resp_by_stream[resp_frame.hdr.stream] < resp_frame.timestamp_ns) {
+      latest_resp_by_stream[resp_frame.hdr.stream] = resp_frame.timestamp_ns;
+    }
 
     // Event responses are special: they have no request.
     if (resp_frame.hdr.opcode == Opcode::kEvent) {
@@ -401,18 +405,14 @@ RecordsWithErrorCount<Record> StitchFrames(std::deque<Frame>* req_frames,
       continue;
     }
 
-    for (auto& req_frame : *req_frames) {
-      // Breaking out of this loop early allows for stale requests to accumulate. Continue
-      // looping so that these stale requests can be identified and pruned.
-      if (found_match || req_frame.consumed) {
-        continue;
-      }
+    auto it = req_frames->begin();
+    while (it != req_frames->end()) {
+      auto& req_frame = *it;
 
-
-      uint32_t key = (req_frame.hdr.stream << 8) | static_cast<uint8_t>(req_frame.hdr.opcode);
-      auto stream_vec = stream_timestamps[key];
-      auto it = std::upper_bound(stream_vec.begin(), stream_vec.end(), resp_frame.timestamp_ns) - 1;
-      if (resp_frame.hdr.stream == req_frame.hdr.stream && *it == req_frame.timestamp_ns) {
+      auto stream_vec = req_stream_timestamps[req_frame.hdr.stream];
+      // TODO(ddelnano): Verify if the subtraction needs to be removed if the element is the first
+      auto stream_it = std::upper_bound(stream_vec.begin(), stream_vec.end(), resp_frame.timestamp_ns) - 1;
+      if (resp_frame.hdr.stream == req_frame.hdr.stream && *stream_it == req_frame.timestamp_ns) {
         VLOG(2) << absl::Substitute("req_op=$0 msg=$1", magic_enum::enum_name(req_frame.hdr.opcode),
                                     req_frame.msg);
 
@@ -424,15 +424,27 @@ RecordsWithErrorCount<Record> StitchFrames(std::deque<Frame>* req_frames,
           ++error_count;
         }
 
-        // Found a match, so remove both request and response.
-        // We don't remove request frames on the fly, however,
-        // because it could otherwise cause unnecessary churn/copying in the deque.
-        // This is due to the fact that responses can come out-of-order.
-        // Just mark the request as consumed, and clean-up when they reach the head of the queue.
-        // Note that responses are always head-processed, so they don't require this optimization.
+        // Record that the req and response pair are consumed and update the interval
+        // accounting to ease deletion logic.
         found_match = true;
         req_frame.consumed = true;
+
+        auto& interval = deletion_intervals.back();
+        auto pos = std::distance(req_frames->begin(), it);
+        auto& interval_end = std::get<1>(interval);
+
+        // If iterator is one past the current open interval, extend it
+        if (pos - interval_end == 1) {
+          LOG(WARNING) << "Extending interval by 1 prev: " << interval_end;
+          interval_end++;
+          LOG(WARNING) << "new: " << interval_end;
+        } else {
+          deletion_intervals.push_back({pos, pos});
+          LOG(WARNING) << "Adding new interval: " << pos;
+        }
+        break;
       }
+      it++;
     }
 
     if (!found_match) {
@@ -440,37 +452,65 @@ RecordsWithErrorCount<Record> StitchFrames(std::deque<Frame>* req_frames,
                                   resp_frame.hdr.stream);
       ++error_count;
     }
-
   }
     // Clean-up consumed frames at the head.
     // Do this inside the resp loop to aggressively clean-out req_frames whenever a frame consumed.
     // Should speed up the req_frames search for the next iteration.
     auto it = req_frames->begin();
-    std::vector<std::pair<uint64_t, uint64_t>> v;
+    std::vector<uint64_t> v;
     while (it != req_frames->end()) {
-      if (!(*it).consumed) {
+      auto& frame = *it;
+      if (!frame.consumed && frame.timestamp_ns < latest_resp_by_stream[frame.hdr.stream]) {
         error_count++;
-        v.push_back(std::make_pair(it - req_frames->begin(), it->timestamp_ns));
+        auto pos = it - req_frames->begin();
+        v.push_back(pos);
+
+        /* auto interval_it = req_frames->begin(); */
+        /* while (interval_it != req_frames->end()) { */
+        /*   auto& curr_interval = *interval_it; */
+        /*   auto& next_interval = *(interval_it + 1); */
+        /*   if (next_interval == req_frames.end()) { */
+
+        /*   } */
+        /*   auto curr_interval_end = std::get<1>(curr_interval); */
+        /*   auto curr_interval_match = curr_interval_end == pos - 1; */
+        /*   if (! curr_interval_match) { */
+
+        /*   } */
+        /*   auto& interval = deletion_intervals.back(); */
+        /*   auto pos = std::distance(req_frames->begin(), it); */
+        /*   auto& interval_end = std::get<1>(interval); */
+        /*   // If iterator is one past the current open interval, extend it */
+        /*   if (pos - interval_end == 1) { */
+        /*     LOG(WARNING) << "Extending interval by 1 prev: " << interval_end; */
+        /*     interval_end++; */
+        /*     LOG(WARNING) << "new: " << interval_end; */
+        /*   } else { */
+        /*     deletion_intervals.push_back({pos, pos}); */
+        /*     LOG(WARNING) << "Adding new interval: " << pos; */
+        /*   } */
+        /* } */
       }
       it++;
     }
-    auto rit = req_frames->rbegin();
-    while (rit.base() != req_frames->begin()) {
-      if ((*rit).consumed) {
-        break;
-      }
-      rit++;
+
+    auto deletion_count = 0;
+    for (auto i : v) {
+        auto idx = req_frames->begin() + (i - deletion_count);
+        LOG(WARNING) << "Deleting index " << (i - deletion_count);
+        req_frames->erase(idx);
+        ++deletion_count;
     }
-    error_count -= std::distance(rit.base(), req_frames->end());
-    req_frames->erase(req_frames->begin(), rit.base());
-    LOG(WARNING) << absl::Substitute("Found a total of $0 stale requests", v.size());
-    if (v.size() > 2) {
-      LOG(WARNING) << "Found the following stale indices: ";
-      for (auto i : v) {
-        LOG(WARNING) << "index: " << i.first << " timestamp: " << i.second << " ";
+    auto i = req_frames->begin();
+    while (i != req_frames->end()) {
+      auto& frame = *i;
+      if (frame.consumed) {
+        req_frames->erase(i);
+        i = req_frames->begin();
+        continue;
       }
+      i++;
     }
-  /* } */
 
   resp_frames->clear();
 
