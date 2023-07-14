@@ -56,10 +56,11 @@ def base_images():
         digest = "sha256:8267a5d9fa15a538227a8850e81cf6c548a78de73458e99a67e8799bbffb1ba0",
     )
 
-    _container_image(
+    container_pull(
         name = "base_image_debug",
-        repository = "distroless/base",
-        digest = "sha256:c59a1e5509d1b2586e28b899667774e599b79d7289a6bb893766a0cbbce7384b",
+        repository = "ubuntu",
+        registry = "docker.io/library",
+        digest = "sha256:965fbcae990b0467ed5657caceaec165018ef44a4d2d46c7cdea80a9dff0d1ea",
     )
 
 def stirling_test_jdk_images():

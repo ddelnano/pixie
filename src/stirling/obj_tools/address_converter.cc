@@ -27,6 +27,7 @@ namespace stirling {
 namespace obj_tools {
 
 uint64_t ElfAddressConverter::VirtualAddrToBinaryAddr(uint64_t virtual_addr) const {
+  LOG(WARNING) << absl::Substitute("Adding virtual binary addr offset of $0 to $1", virtual_to_binary_addr_offset_, virtual_addr);
   return virtual_addr + virtual_to_binary_addr_offset_;
 }
 
@@ -65,15 +66,30 @@ StatusOr<std::unique_ptr<ElfAddressConverter>> ElfAddressConverter::Create(ElfRe
   system::ProcParser parser;
   std::vector<system::ProcParser::ProcessSMaps> map_entries;
   // This is a little inefficient as we only need the first entry.
+  auto proc_path = elf_reader->binary_path_;
   PX_RETURN_IF_ERROR(parser.ParseProcPIDMaps(pid, &map_entries));
   if (map_entries.size() < 1) {
     return Status(
         statuspb::INTERNAL,
         absl::Substitute("ElfAddressConverter::Create: Failed to parse /proc/$0/maps", pid));
   }
-  const auto mapped_virt_addr = map_entries[0].vmem_start;
+  system::ProcParser::ProcessSMaps map_entry;
+  LOG(WARNING) << "Searching for process path: " << proc_path;
+  for (auto& entry : map_entries) {
+    LOG(WARNING) << "Attemping to match against: " << entry.Debug();
+    if (entry.pathname == proc_path) {
+      LOG(WARNING) << "Found match: " << entry.Debug();
+      map_entry = entry;
+      break;
+    }
+  }
+  if (map_entry.pathname == "") {
+    LOG(WARNING) << "Failed to find match. Defaulting to first entry";
+    map_entry = map_entries[0];
+  }
+  const auto mapped_virt_addr = map_entry.vmem_start;
   uint64_t mapped_offset;
-  if (!absl::SimpleHexAtoi(map_entries[0].offset, &mapped_offset)) {
+  if (!absl::SimpleHexAtoi(map_entry.offset, &mapped_offset)) {
     return Status(statuspb::INTERNAL,
                   absl::Substitute(
                       "ElfAddressConverter::Create: Failed to parse offset in /proc/$0/maps", pid));

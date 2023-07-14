@@ -53,6 +53,8 @@ class ElfReader {
       const std::string& binary_path,
       const std::filesystem::path& debug_file_dir = "/usr/lib/debug");
 
+  std::string binary_path_;
+
   std::filesystem::path& debug_symbols_path() { return debug_symbols_path_; }
 
   struct SymbolInfo {
@@ -212,8 +214,6 @@ class ElfReader {
    * Returns the byte code of the function specified by the symbol.
    */
   StatusOr<px::utils::u8string> FuncByteCode(const SymbolInfo& func_symbol);
-
-  std::string binary_path_;
 
   std::filesystem::path debug_symbols_path_;
 

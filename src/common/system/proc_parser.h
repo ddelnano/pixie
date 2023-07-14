@@ -170,6 +170,10 @@ class ProcParser {
       return absl::Substitute("$0-$1", absl::Hex(this->vmem_start), absl::Hex(this->vmem_end));
     }
 
+    std::string Debug() {
+      return absl::Substitute("$0-$1 perms=$2 path=$3 offset=$4 size=$5", absl::Hex(this->vmem_start), absl::Hex(this->vmem_end), this->permissions, this->pathname, this->offset, this->size_bytes);
+    }
+
     bool operator==(const ProcParser::ProcessSMaps& rhs) const {
       return this->vmem_start == rhs.vmem_start && this->vmem_end == rhs.vmem_end &&
              this->permissions.compare(permissions) == 0 && this->pathname == rhs.pathname;
