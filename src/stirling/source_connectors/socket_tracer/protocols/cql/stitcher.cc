@@ -383,13 +383,13 @@ RecordsWithErrorCount<Record> StitchFrames(std::deque<Frame>* req_frames,
   }
 
   std::unordered_map<uint16_t, uint64_t> latest_resp_by_stream;
-  std::vector<std::tuple<size_t, size_t>> deletion_intervals{{0, 0}};
 
   for (auto& resp_frame : *resp_frames) {
     bool found_match = false;
 
     // Update tracking of the latest response by stream ID
-    if (latest_resp_by_stream.count(resp_frame.hdr.stream) == 0 || latest_resp_by_stream[resp_frame.hdr.stream] < resp_frame.timestamp_ns) {
+    if (latest_resp_by_stream.count(resp_frame.hdr.stream) == 0 ||
+        latest_resp_by_stream[resp_frame.hdr.stream] < resp_frame.timestamp_ns) {
       latest_resp_by_stream[resp_frame.hdr.stream] = resp_frame.timestamp_ns;
     }
 
@@ -410,8 +410,15 @@ RecordsWithErrorCount<Record> StitchFrames(std::deque<Frame>* req_frames,
       auto& req_frame = *it;
 
       auto stream_vec = req_stream_timestamps[req_frame.hdr.stream];
-      // TODO(ddelnano): Verify if the subtraction needs to be removed if the element is the first
-      auto stream_it = std::upper_bound(stream_vec.begin(), stream_vec.end(), resp_frame.timestamp_ns) - 1;
+      auto stream_it =
+          std::upper_bound(stream_vec.begin(), stream_vec.end(), resp_frame.timestamp_ns) - 1;
+      // Responses should always have a more recent timestamp than the first request. If this
+      // condition is triggered we should not attempt to match this frame. Since responses are
+      // cleared during StitchFrames this will get cleaned up during the current iteration.
+      if (stream_it + 1 == stream_vec.begin()) {
+        DCHECK(false) << "Unable to find request that is earlier than response: " << resp_frame.ToString();
+        continue;
+      }
       if (resp_frame.hdr.stream == req_frame.hdr.stream && *stream_it == req_frame.timestamp_ns) {
         VLOG(2) << absl::Substitute("req_op=$0 msg=$1", magic_enum::enum_name(req_frame.hdr.opcode),
                                     req_frame.msg);
@@ -428,20 +435,6 @@ RecordsWithErrorCount<Record> StitchFrames(std::deque<Frame>* req_frames,
         // accounting to ease deletion logic.
         found_match = true;
         req_frame.consumed = true;
-
-        auto& interval = deletion_intervals.back();
-        auto pos = std::distance(req_frames->begin(), it);
-        auto& interval_end = std::get<1>(interval);
-
-        // If iterator is one past the current open interval, extend it
-        if (pos - interval_end == 1) {
-          LOG(WARNING) << "Extending interval by 1 prev: " << interval_end;
-          interval_end++;
-          LOG(WARNING) << "new: " << interval_end;
-        } else {
-          deletion_intervals.push_back({pos, pos});
-          LOG(WARNING) << "Adding new interval: " << pos;
-        }
         break;
       }
       it++;
@@ -453,65 +446,38 @@ RecordsWithErrorCount<Record> StitchFrames(std::deque<Frame>* req_frames,
       ++error_count;
     }
   }
-    // Clean-up consumed frames at the head.
-    // Do this inside the resp loop to aggressively clean-out req_frames whenever a frame consumed.
-    // Should speed up the req_frames search for the next iteration.
-    auto it = req_frames->begin();
-    std::vector<uint64_t> v;
+  auto it = req_frames->begin();
+  auto delete_pos = req_frames->begin();
+
+  while (it != req_frames->end()) {
+    auto& frame = *it;
+    if (frame.consumed) {
+    } else if (!frame.consumed &&
+               (frame.discarded || frame.timestamp_ns < latest_resp_by_stream[frame.hdr.stream])) {
+      error_count++;
+    } else {
+      delete_pos = it;
+      break;
+    }
+    it++;
+  }
+
+  // Mark requests as discarded that will never match. These frames will be deleted in future
+  // StitchFrames iterations once they bubble up to the front of the deque and form a contiguous
+  // range with the consumed frames. This is done to avoid the bookeeping necessary to delete multiple
+  // ranges of indices in the deque (which occur when responses are lost).
+  if (it != req_frames->end()) {
     while (it != req_frames->end()) {
       auto& frame = *it;
       if (!frame.consumed && frame.timestamp_ns < latest_resp_by_stream[frame.hdr.stream]) {
-        error_count++;
-        auto pos = it - req_frames->begin();
-        v.push_back(pos);
-
-        /* auto interval_it = req_frames->begin(); */
-        /* while (interval_it != req_frames->end()) { */
-        /*   auto& curr_interval = *interval_it; */
-        /*   auto& next_interval = *(interval_it + 1); */
-        /*   if (next_interval == req_frames.end()) { */
-
-        /*   } */
-        /*   auto curr_interval_end = std::get<1>(curr_interval); */
-        /*   auto curr_interval_match = curr_interval_end == pos - 1; */
-        /*   if (! curr_interval_match) { */
-
-        /*   } */
-        /*   auto& interval = deletion_intervals.back(); */
-        /*   auto pos = std::distance(req_frames->begin(), it); */
-        /*   auto& interval_end = std::get<1>(interval); */
-        /*   // If iterator is one past the current open interval, extend it */
-        /*   if (pos - interval_end == 1) { */
-        /*     LOG(WARNING) << "Extending interval by 1 prev: " << interval_end; */
-        /*     interval_end++; */
-        /*     LOG(WARNING) << "new: " << interval_end; */
-        /*   } else { */
-        /*     deletion_intervals.push_back({pos, pos}); */
-        /*     LOG(WARNING) << "Adding new interval: " << pos; */
-        /*   } */
-        /* } */
+        frame.discarded = true;
       }
       it++;
     }
-
-    auto deletion_count = 0;
-    for (auto i : v) {
-        auto idx = req_frames->begin() + (i - deletion_count);
-        LOG(WARNING) << "Deleting index " << (i - deletion_count);
-        req_frames->erase(idx);
-        ++deletion_count;
-    }
-    auto i = req_frames->begin();
-    while (i != req_frames->end()) {
-      auto& frame = *i;
-      if (frame.consumed) {
-        req_frames->erase(i);
-        i = req_frames->begin();
-        continue;
-      }
-      i++;
-    }
-
+  } else {
+    delete_pos = req_frames->end();
+  }
+  req_frames->erase(req_frames->begin(), delete_pos);
   resp_frames->clear();
 
   return {entries, error_count};

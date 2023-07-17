@@ -173,7 +173,7 @@ constexpr uint8_t kEventResp[] = {0x00, 0x0d, 0x53, 0x43, 0x48, 0x45, 0x4d, 0x41
 // Test Cases
 //-----------------------------------------------------------------------------
 
-TEST(CassStitcherTest, OutOfOrderMatching) {
+TEST(CassStitcherTest, OutOfOrderMatchingWithMissingResponses) {
   std::deque<Frame> req_frames;
   std::deque<Frame> resp_frames;
   RecordsWithErrorCount<Record> result;
@@ -191,6 +191,8 @@ TEST(CassStitcherTest, OutOfOrderMatching) {
   Frame req1_s0_frame = CreateFrame(0, Opcode::kQuery, kBadQueryReq, ++t);
   Frame req1_s1_frame = CreateFrame(1, Opcode::kQuery, kBadQueryReq, ++t);
   Frame req1_s2_frame = CreateFrame(2, Opcode::kQuery, kBadQueryReq, ++t);
+  Frame resp1_s1_frame = CreateFrame(1, Opcode::kError, kBadQueryErrorResp, ++t);
+  Frame resp1_s2_frame = CreateFrame(2, Opcode::kError, kBadQueryErrorResp, ++t);
 
   Frame req2_s0_frame = CreateFrame(0, Opcode::kQuery, kBadQueryReq, ++t);
   Frame resp2_s0_frame = CreateFrame(0, Opcode::kError, kBadQueryErrorResp, ++t);
@@ -233,11 +235,30 @@ TEST(CassStitcherTest, OutOfOrderMatching) {
 
   result = StitchFrames(&req_frames, &resp_frames);
   EXPECT_TRUE(resp_frames.empty());
-  EXPECT_EQ(req_frames.size(), 2);
+  EXPECT_EQ(req_frames.size(), 6);
   EXPECT_EQ(req_frames[0].timestamp_ns, req1_s1_frame.timestamp_ns);
   EXPECT_EQ(req_frames[1].timestamp_ns, req1_s2_frame.timestamp_ns);
-  EXPECT_EQ(result.error_count, 3);
+  EXPECT_EQ(result.error_count, 1);
   EXPECT_EQ(result.records.size(), 5);
+
+  // No requests or responses should be deleted when streams of
+  // the head of requests are inactive
+  result = StitchFrames(&req_frames, &resp_frames);
+  EXPECT_TRUE(resp_frames.empty());
+  EXPECT_EQ(req_frames.size(), 6);
+  EXPECT_EQ(req_frames[0].timestamp_ns, req1_s1_frame.timestamp_ns);
+  EXPECT_EQ(req_frames[1].timestamp_ns, req1_s2_frame.timestamp_ns);
+  EXPECT_EQ(result.error_count, 0);
+  EXPECT_EQ(result.records.size(), 0);
+
+  resp_frames.push_back(resp1_s1_frame);
+  resp_frames.push_back(resp1_s2_frame);
+
+  result = StitchFrames(&req_frames, &resp_frames);
+  EXPECT_TRUE(resp_frames.empty());
+  EXPECT_EQ(req_frames.size(), 0);
+  EXPECT_EQ(result.error_count, 2);
+  EXPECT_EQ(result.records.size(), 2);
 }
 
 // To test that, if a request of a response is missing, then the response is popped off.
@@ -260,39 +281,6 @@ TEST(CassStitcherTest, MissingRequest) {
   EXPECT_EQ(req_frames.size(), 0);
   EXPECT_EQ(result.error_count, 1);
   EXPECT_EQ(result.records.size(), 1);
-}
-
-TEST(CassStitcherTest, MissingResponse) {
-  std::deque<Frame> req_frames;
-  std::deque<Frame> resp_frames;
-  RecordsWithErrorCount<Record> result;
-
-  int t = 0;
-  Frame req1_frame = CreateFrame(0, Opcode::kQuery, kBadQueryReq, ++t);
-  Frame resp1_frame = CreateFrame(0, Opcode::kError, kBadQueryErrorResp, ++t);
-
-  Frame req2_frame = CreateFrame(0, Opcode::kQuery, kBadQueryReq, ++t);
-  Frame req3_frame = CreateFrame(0, Opcode::kQuery, kBadQueryReq, ++t);
-  Frame req4_frame = CreateFrame(0, Opcode::kQuery, kBadQueryReq, ++t);
-  Frame resp4_frame = CreateFrame(0, Opcode::kError, kBadQueryErrorResp, ++t);
-  Frame req5_frame = CreateFrame(0, Opcode::kPrepare, kPrepareReq, ++t);
-
-  req_frames.push_back(req1_frame);
-  req_frames.push_back(req2_frame);
-  req_frames.push_back(req3_frame);
-  req_frames.push_back(req4_frame);
-  req_frames.push_back(req5_frame);
-  resp_frames.push_back(resp1_frame);
-  resp_frames.push_back(resp4_frame);
-
-  result = StitchFrames(&req_frames, &resp_frames);
-  EXPECT_TRUE(resp_frames.empty());
-  EXPECT_EQ(req_frames.size(), 1);
-  /* EXPECT_EQ(req_frames[0].timestamp_ns, req5_frame.timestamp_ns); */
-  EXPECT_EQ(result.error_count, 2);
-  EXPECT_EQ(result.records.size(), 2);
-  EXPECT_EQ(result.records[0].req.timestamp_ns, req1_frame.timestamp_ns);
-  EXPECT_EQ(result.records[1].req.timestamp_ns, req4_frame.timestamp_ns);
 }
 
 // To test that mis-classified frames are caught by stitcher.
