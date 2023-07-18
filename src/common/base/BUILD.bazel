@@ -42,6 +42,12 @@ pl_cc_library_internal(
 )
 
 pl_cc_test(
+    name = "die_tree_test",
+    srcs = ["die_tree_test.cc"],
+    deps = [":cc_library"],
+)
+
+pl_cc_test(
     name = "env_test",
     srcs = ["env_test.cc"],
     deps = [":cc_library"],
