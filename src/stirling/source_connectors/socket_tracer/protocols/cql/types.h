@@ -102,6 +102,7 @@ struct Frame : public FrameBase {
   FrameHeader hdr;
   std::string msg;
   bool consumed = false;
+  bool discarded = false;
 
   size_t ByteSize() const override { return sizeof(Frame) + msg.size(); }
 };

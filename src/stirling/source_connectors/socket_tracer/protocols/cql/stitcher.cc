@@ -377,8 +377,21 @@ RecordsWithErrorCount<Record> StitchFrames(std::deque<Frame>* req_frames,
   std::vector<Record> entries;
   int error_count = 0;
 
+  std::unordered_map<uint16_t, std::vector<uint64_t>> req_stream_timestamps;
+  for (auto& req_frame : *req_frames) {
+    req_stream_timestamps[req_frame.hdr.stream].push_back(req_frame.timestamp_ns);
+  }
+
+  std::unordered_map<uint16_t, uint64_t> latest_resp_by_stream;
+
   for (auto& resp_frame : *resp_frames) {
     bool found_match = false;
+
+    // Update tracking of the latest response by stream ID
+    if (latest_resp_by_stream.count(resp_frame.hdr.stream) == 0 ||
+        latest_resp_by_stream[resp_frame.hdr.stream] < resp_frame.timestamp_ns) {
+      latest_resp_by_stream[resp_frame.hdr.stream] = resp_frame.timestamp_ns;
+    }
 
     // Event responses are special: they have no request.
     if (resp_frame.hdr.opcode == Opcode::kEvent) {
@@ -392,9 +405,21 @@ RecordsWithErrorCount<Record> StitchFrames(std::deque<Frame>* req_frames,
       continue;
     }
 
-    // Search for matching req frame
-    for (auto& req_frame : *req_frames) {
-      if (resp_frame.hdr.stream == req_frame.hdr.stream) {
+    auto it = req_frames->begin();
+    while (it != req_frames->end()) {
+      auto& req_frame = *it;
+
+      auto stream_vec = req_stream_timestamps[req_frame.hdr.stream];
+      auto stream_it =
+          std::upper_bound(stream_vec.begin(), stream_vec.end(), resp_frame.timestamp_ns) - 1;
+      // Responses should always have a more recent timestamp than the first request. If this
+      // condition is triggered we should not attempt to match this frame. Since responses are
+      // cleared during StitchFrames this will get cleaned up during the current iteration.
+      if (stream_it + 1 == stream_vec.begin()) {
+        DCHECK(false) << "Unable to find request that is earlier than response: " << resp_frame.ToString();
+        continue;
+      }
+      if (resp_frame.hdr.stream == req_frame.hdr.stream && *stream_it == req_frame.timestamp_ns) {
         VLOG(2) << absl::Substitute("req_op=$0 msg=$1", magic_enum::enum_name(req_frame.hdr.opcode),
                                     req_frame.msg);
 
@@ -406,16 +431,13 @@ RecordsWithErrorCount<Record> StitchFrames(std::deque<Frame>* req_frames,
           ++error_count;
         }
 
-        // Found a match, so remove both request and response.
-        // We don't remove request frames on the fly, however,
-        // because it could otherwise cause unnecessary churn/copying in the deque.
-        // This is due to the fact that responses can come out-of-order.
-        // Just mark the request as consumed, and clean-up when they reach the head of the queue.
-        // Note that responses are always head-processed, so they don't require this optimization.
+        // Record that the req and response pair are consumed and update the interval
+        // accounting to ease deletion logic.
         found_match = true;
         req_frame.consumed = true;
         break;
       }
+      it++;
     }
 
     if (!found_match) {
@@ -423,24 +445,39 @@ RecordsWithErrorCount<Record> StitchFrames(std::deque<Frame>* req_frames,
                                   resp_frame.hdr.stream);
       ++error_count;
     }
+  }
+  auto it = req_frames->begin();
+  auto delete_pos = req_frames->begin();
 
-    // Clean-up consumed frames at the head.
-    // Do this inside the resp loop to aggressively clean-out req_frames whenever a frame consumed.
-    // Should speed up the req_frames search for the next iteration.
-    auto it = req_frames->begin();
+  while (it != req_frames->end()) {
+    auto& frame = *it;
+    if (frame.consumed) {
+    } else if (!frame.consumed &&
+               (frame.discarded || frame.timestamp_ns < latest_resp_by_stream[frame.hdr.stream])) {
+      error_count++;
+    } else {
+      delete_pos = it;
+      break;
+    }
+    it++;
+  }
+
+  // Mark requests as discarded that will never match. These frames will be deleted in future
+  // StitchFrames iterations once they bubble up to the front of the deque and form a contiguous
+  // range with the consumed frames. This is done to avoid the bookeeping necessary to delete multiple
+  // ranges of indices in the deque (which occur when responses are lost).
+  if (it != req_frames->end()) {
     while (it != req_frames->end()) {
-      if (!(*it).consumed) {
-        break;
+      auto& frame = *it;
+      if (!frame.consumed && frame.timestamp_ns < latest_resp_by_stream[frame.hdr.stream]) {
+        frame.discarded = true;
       }
       it++;
     }
-    req_frames->erase(req_frames->begin(), it);
-
-    // TODO(oazizi): Consider removing requests that are too old, otherwise a lost response can mean
-    // the are never processed. This would result in a memory leak until the more drastic connection
-    // tracker clean-up mechanisms kick in.
+  } else {
+    delete_pos = req_frames->end();
   }
-
+  req_frames->erase(req_frames->begin(), delete_pos);
   resp_frames->clear();
 
   return {entries, error_count};
