@@ -155,7 +155,7 @@ Status ElfReader::LocateDebugSymbols(const std::filesystem::path& debug_file_dir
     }
   }
 
-  return error::Internal("Could not find debug symbols for $0", binary_path_);
+  return error::Internal("Could not find debug symbols for $0", binary_path_.string());
 }
 
 // TODO(oazizi): Consider changing binary_path to std::filesystem::path.
@@ -165,7 +165,7 @@ StatusOr<std::unique_ptr<ElfReader>> ElfReader::Create(
                               debug_file_dir.string());
   auto elf_reader = std::unique_ptr<ElfReader>(new ElfReader);
 
-  elf_reader->binary_path_ = binary_path;
+  PX_ASSIGN_OR_RETURN(elf_reader->binary_path_, fs::Canonical(binary_path));
 
   if (!elf_reader->elf_reader_.load_header_and_sections(binary_path)) {
     return error::Internal("Can't find or process ELF file $0", binary_path);
@@ -208,7 +208,7 @@ StatusOr<ELFIO::section*> ElfReader::SymtabSection() {
     }
   }
   if (symtab_section == nullptr) {
-    return error::NotFound("Could not find symtab section in binary=$0", binary_path_);
+    return error::NotFound("Could not find symtab section in binary=$0", binary_path_.string());
   }
 
   return symtab_section;
@@ -602,7 +602,7 @@ StatusOr<ELFIO::section*> ElfReader::SectionWithName(std::string_view section_na
       return psec;
     }
   }
-  return error::NotFound("Could not find section=$0 in binary=$1", section_name, binary_path_);
+  return error::NotFound("Could not find section=$0 in binary=$1", section_name, binary_path_.string());
 }
 
 StatusOr<utils::u8string> ElfReader::SymbolByteCode(std::string_view section,
@@ -612,7 +612,7 @@ StatusOr<utils::u8string> ElfReader::SymbolByteCode(std::string_view section,
 
   std::ifstream ifs(binary_path_, std::ios::binary);
   if (!ifs.seekg(offset)) {
-    return error::Internal("Failed to seek position=$0 in binary=$1", offset, binary_path_);
+    return error::Internal("Failed to seek position=$0 in binary=$1", offset, binary_path_.string());
   }
   // To protect against our ELF parsing logic locating bogus memory, set a bound on
   // how large of a string we will allocate. SymbolByteCode's main use case is to determine
@@ -630,11 +630,11 @@ StatusOr<utils::u8string> ElfReader::SymbolByteCode(std::string_view section,
   auto* buf = reinterpret_cast<char*>(byte_code.data());
   if (!ifs.read(buf, symbol.size)) {
     return error::Internal("Failed to read size=$0 bytes from offset=$1 in binary=$2", symbol.size,
-                           offset, binary_path_);
+                           offset, binary_path_.string());
   }
   if (ifs.gcount() != static_cast<int64_t>(symbol.size)) {
     return error::Internal("Only read size=$0 bytes from offset=$1 in binary=$2, expect $3 bytes",
-                           symbol.size, offset, binary_path_, ifs.gcount());
+                           symbol.size, offset, binary_path_.string(), ifs.gcount());
   }
   return byte_code;
 }

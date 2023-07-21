@@ -53,8 +53,6 @@ class ElfReader {
       const std::string& binary_path,
       const std::filesystem::path& debug_file_dir = "/usr/lib/debug");
 
-  std::string binary_path_;
-
   std::filesystem::path& debug_symbols_path() { return debug_symbols_path_; }
 
   struct SymbolInfo {
@@ -185,15 +183,19 @@ class ElfReader {
   StatusOr<std::basic_string<TCharType>> BinaryByteCode(size_t offset, size_t length) {
     std::ifstream ifs(binary_path_, std::ios::binary);
     if (!ifs.seekg(offset)) {
-      return error::Internal("Failed to seek position=$0 in binary=$1", offset, binary_path_);
+      return error::Internal("Failed to seek position=$0 in binary=$1", offset, binary_path_.string());
     }
     std::basic_string<TCharType> byte_code(length, '\0');
     auto* buf = reinterpret_cast<char*>(byte_code.data());
     if (!ifs.read(buf, length)) {
       return error::Internal("Failed to read size=$0 bytes from offset=$1 in binary=$2", length,
-                             offset, binary_path_);
+                             offset, binary_path_.string());
     }
     return byte_code;
+  }
+
+  std::string GetBinaryPath() {
+    return binary_path_.string();
   }
 
  private:
@@ -214,6 +216,8 @@ class ElfReader {
    * Returns the byte code of the function specified by the symbol.
    */
   StatusOr<px::utils::u8string> FuncByteCode(const SymbolInfo& func_symbol);
+
+  std::filesystem::path binary_path_;
 
   std::filesystem::path debug_symbols_path_;
 
