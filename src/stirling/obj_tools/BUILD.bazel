@@ -74,12 +74,8 @@ pl_cc_test(
     srcs = ["address_converter_test.cc"],
     deps = [
         ":cc_library",
-        "//src/common/testing/test_utils:cc_library",
         "//src/stirling/testing:cc_library",
-        "//src/stirling/obj_tools/testdata/cc:test_exe_fixture",
         "//src/stirling/obj_tools/testdata/containers:address_converter_exe_container",
-        "//src/stirling/bpf_tools:cc_library",
-        "//src/stirling/utils:cc_library",
     ],
 )
 

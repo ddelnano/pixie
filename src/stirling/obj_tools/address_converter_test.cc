@@ -17,11 +17,9 @@
  */
 
 #include "src/stirling/obj_tools/address_converter.h"
-#include "src/stirling/obj_tools/testdata/cc/test_exe_fixture.h"
 
 #include "src/common/testing/test_environment.h"
 #include "src/common/testing/testing.h"
-#include "src/stirling/bpf_tools/macros.h"
 #include "src/stirling/obj_tools/testdata/containers/address_converter_container.h"
 #include "src/stirling/testing/common.h"
 #include "src/stirling/utils/proc_path_tools.h"
