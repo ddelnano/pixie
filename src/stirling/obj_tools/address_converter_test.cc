@@ -22,64 +22,38 @@
 #include "src/common/testing/test_environment.h"
 #include "src/common/testing/testing.h"
 #include "src/stirling/bpf_tools/macros.h"
+#include "src/stirling/obj_tools/testdata/containers/address_converter_container.h"
+#include "src/stirling/testing/common.h"
 #include "src/stirling/utils/proc_path_tools.h"
-#include <sys/resource.h>
 
 namespace px {
 namespace stirling {
 namespace obj_tools {
 
-extern "C" {
-NO_OPT_ATTR void test_func() { }
-}
-
-void FindAddressForSelfFunc() {
-  std::filesystem::path self_path = GetSelfPath().ValueOrDie();
-  ASSERT_OK_AND_ASSIGN(auto elf_reader, ElfReader::Create(self_path.string()));
-  ASSERT_OK_AND_ASSIGN(std::vector<ElfReader::SymbolInfo> syms, elf_reader->ListFuncSymbols("test_func", SymbolMatchType::kSubstr));
-  EXPECT_EQ(1, syms.size());
-  LOG(WARNING) << absl::Substitute("Found addr=$0 and name=$1", syms[0].address, syms[0].name);
-
-  ASSERT_OK_AND_ASSIGN(auto converter, ElfAddressConverter::Create(elf_reader.get(), getpid()));
-
-  auto symbol_addr =
-      converter->VirtualAddrToBinaryAddr(reinterpret_cast<uint64_t>(&test_func));
-  LOG(WARNING) << "Found symbol: " << symbol_addr;
-  EXPECT_EQ(syms[0].address, symbol_addr);
-}
-
 TEST(ElfAddressConverterTest, VirtualAddrToBinaryAddr) {
-  FindAddressForSelfFunc();
+  AddressConverterContainer container;
+  ASSERT_OK(container.Run());
+
+  int status = -1;
+  testing::Timeout t(std::chrono::minutes{1});
+  while (status == -1 && !t.TimedOut()) {
+    status = container.GetStatus();
+    std::this_thread::sleep_for(std::chrono::milliseconds{200});
+  }
+  EXPECT_EQ(0, status);
 }
 
 TEST(ElfAddressConverterTest, VirtualAddrToBinaryAddrWithUnlimitedStackUlimit) {
-  system::ProcParser parser;
-  std::vector<system::ProcParser::ProcessSMaps> pre_fork_map_entries;
-  ASSERT_OK(parser.ParseProcPIDMaps(getpid(), &pre_fork_map_entries));
-  for (auto& map : pre_fork_map_entries) {
-    LOG(WARNING) << "VMA path=" << map.pathname;
-  }
+  AddressConverterContainer container;
+  ASSERT_OK(container.Run(std::chrono::seconds{5}, {"--ulimit=stack=-1"}));
 
-  struct rlimit stack_limit = {
-    .rlim_cur = RLIM_INFINITY,
-    .rlim_max = RLIM_INFINITY,
-  };
-  auto rv = setrlimit(RLIMIT_STACK, &stack_limit);
-  if (rv != 0) {
-    LOG(WARNING) << "Failed to set ulimit";
+  int status = -1;
+  testing::Timeout t(std::chrono::minutes{1});
+  while (status == -1 && !t.TimedOut()) {
+    status = container.GetStatus();
+    std::this_thread::sleep_for(std::chrono::milliseconds{200});
   }
-  pid_t child_pid = fork();
-  if (child_pid != 0) {
-    // Parent process: Wait for results from child.
-    sleep(5);
-   } else {
-
-      std::vector<system::ProcParser::ProcessSMaps> post_fork_map_entries;
-      ASSERT_OK(parser.ParseProcPIDMaps(getpid(), &post_fork_map_entries));
-      for (auto& map : post_fork_map_entries) {
-        LOG(WARNING) << "VMA path=" << map.pathname;
-      }
-   }
+  EXPECT_EQ(0, status);
 }
 
 }  // namespace obj_tools

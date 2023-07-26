@@ -33,41 +33,31 @@
 
 // Using extern C to avoid name mangling (which just keeps the test a bit more readable).
 extern "C" {
-NO_OPT_ATTR void TestFunc() { }
-NO_OPT_ATTR void TestFunc2() { }
+NO_OPT_ATTR void TestFunc() {}
 
 }  // extern "C"
 
-using px::stirling::obj_tools::ElfReader;
-using px::stirling::obj_tools::ElfAddressConverter;
-using px::stirling::obj_tools::SymbolMatchType;
-using px::system::ProcParser;
 using px::stirling::GetSelfPath;
+using px::stirling::obj_tools::ElfAddressConverter;
+using px::stirling::obj_tools::ElfReader;
+using px::stirling::obj_tools::SymbolMatchType;
 
 int main() {
-  ProcParser parser;
-  std::vector<ProcParser::ProcessSMaps> pre_fork_map_entries;
-  auto s = parser.ParseProcPIDMaps(getpid(), &pre_fork_map_entries);
-  if (!s.ok()) {
-     LOG(WARNING) << "Failed to get proc pid maps " << s.msg();
-     return -1;
-  }
-  for (auto& map : pre_fork_map_entries) {
-    LOG(WARNING) << "VMA path=" << map.pathname;
-  }
+  LOG(INFO) << "Running";
 
   std::filesystem::path self_path = GetSelfPath().ValueOrDie();
   PX_ASSIGN_OR(auto elf_reader, ElfReader::Create(self_path.string()), return -1);
-  PX_ASSIGN_OR(std::vector<ElfReader::SymbolInfo> syms, elf_reader->ListFuncSymbols("TestFunc", SymbolMatchType::kSubstr));
-  LOG(WARNING) << absl::Substitute("Found addr=$0 and name=$1", syms[0].address, syms[0].name);
+  PX_ASSIGN_OR(std::vector<ElfReader::SymbolInfo> syms,
+               elf_reader->ListFuncSymbols("TestFunc", SymbolMatchType::kSubstr));
 
   PX_ASSIGN_OR(auto converter, ElfAddressConverter::Create(elf_reader.get(), getpid()), return -1);
+  auto symbol_addr = converter->VirtualAddrToBinaryAddr(reinterpret_cast<uint64_t>(&TestFunc));
 
-  auto symbol_addr =
-      converter->VirtualAddrToBinaryAddr(reinterpret_cast<uint64_t>(&TestFunc));
-
-  if (symbol_addr != syms[0].address) {
-    LOG(ERROR) << absl::Substitute("Expected ElfAddressConverter address=$0 to match binary address=$1", symbol_addr, syms[0].address);
+  auto expected_addr = syms[0].address;
+  if (symbol_addr != expected_addr) {
+    LOG(ERROR) << absl::Substitute(
+        "Expected ElfAddressConverter address=$0 to match binary address=$1", symbol_addr,
+        expected_addr);
     return -1;
   }
   return 0;

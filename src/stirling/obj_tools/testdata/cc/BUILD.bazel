@@ -55,7 +55,7 @@ pl_cc_library(
     name = "test_exe_container_lib",
     hdrs = ["test_container.h"],
     data = [
-        ":test_exe_container_image.tar"
+        ":test_exe_container_image.tar",
     ],
     tags = ["requires_docker"],
 )
@@ -122,8 +122,8 @@ container_layer(
     name = "vaddr_to_baddr_tool_layer",
     directory = "/usr/local/bin",
     files = [
-        "//src/stirling/obj_tools:vaddr_to_baddr_tool",
         ":test_exe",
+        "//src/stirling/obj_tools:vaddr_to_baddr_tool",
     ],
 )
 

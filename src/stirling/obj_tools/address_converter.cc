@@ -82,7 +82,8 @@ StatusOr<std::unique_ptr<ElfAddressConverter>> ElfAddressConverter::Create(ElfRe
     }
   }
   if (map_entry.pathname == "") {
-    LOG(WARNING) << absl::Substitute("Failed to find match for $0 in /proc/$1/maps. Defaulting to first entry", proc_path, pid);
+    LOG(WARNING) << absl::Substitute(
+        "Failed to find match for $0 in /proc/$1/maps. Defaulting to first entry", proc_path, pid);
     map_entry = map_entries[0];
   }
   const auto mapped_virt_addr = map_entry.vmem_start;
