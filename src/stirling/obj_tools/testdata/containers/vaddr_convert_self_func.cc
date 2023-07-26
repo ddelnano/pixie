@@ -33,8 +33,9 @@ using px::stirling::obj_tools::SymbolMatchType;
 
 // This utility performs an assertion that the ElfAddressConverter::VirtualAddrToBinaryAddr function
 // returns the correct (consistent with ElfReader and `nm` cli output) binary address for a given
-// function. This is used to within a container to verify that when a process's virtual memory mappings
-// differ that VirtualAddrToBinaryAddr finds the correct offset.
+// function. This is used to test our address conversion logic when a PIE binary is memory mapped
+// differently from the common scenario (where the process's ELF segments are mapped at the
+// lowest VMA), such as when an unlimited stack size ulimit is set on a process.
 int main() {
   LOG(INFO) << "Running";
 

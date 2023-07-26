@@ -74,8 +74,8 @@ pl_cc_test(
     srcs = ["address_converter_test.cc"],
     deps = [
         ":cc_library",
-        "//src/stirling/testing:cc_library",
         "//src/stirling/obj_tools/testdata/containers:vaddr_convert_self_func_container",
+        "//src/stirling/testing:cc_library",
     ],
 )
 
@@ -157,6 +157,7 @@ pl_cc_binary(
         ":cc_library",
     ],
 )
+
 pl_cc_binary(
     name = "vaddr_to_baddr_tool",
     srcs = ["vaddr_to_baddr_tool.cc"],

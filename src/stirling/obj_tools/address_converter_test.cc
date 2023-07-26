@@ -18,11 +18,8 @@
 
 #include "src/stirling/obj_tools/address_converter.h"
 
-#include "src/common/testing/test_environment.h"
-#include "src/common/testing/testing.h"
 #include "src/stirling/obj_tools/testdata/containers/vaddr_convert_self_func_container.h"
 #include "src/stirling/testing/common.h"
-#include "src/stirling/utils/proc_path_tools.h"
 
 namespace px {
 namespace stirling {
@@ -43,7 +40,7 @@ TEST(ElfAddressConverterTest, VirtualAddrToBinaryAddr) {
 
 TEST(ElfAddressConverterTest, VirtualAddrToBinaryAddrForReorderedVirtualMemoryMappings) {
   // Setting an unlimited stack size ulimit causes the VMAs of a process to be reordered and
-  // results in a crash (as described in https://github.com/pixie-io/pixie/issues/1630).
+  // caused a previous crash (as described in https://github.com/pixie-io/pixie/issues/1630).
   VaddrConvertSelfFuncContainer container;
   ASSERT_OK(container.Run(std::chrono::seconds{5}, {"--ulimit=stack=-1"}));
 

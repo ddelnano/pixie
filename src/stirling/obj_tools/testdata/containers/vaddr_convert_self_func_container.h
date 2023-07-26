@@ -16,6 +16,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#pragma once
+
 #include "src/common/base/base.h"
 #include "src/common/testing/test_environment.h"
 #include "src/common/testing/test_utils/container_runner.h"
