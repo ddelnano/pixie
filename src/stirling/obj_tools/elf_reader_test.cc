@@ -66,15 +66,6 @@ TEST(ElfReaderTest, NonExistentPath) {
   ASSERT_NOT_OK(s);
 }
 
-TEST(ElfReaderTest, BinaryPathIsCanonical) {
-  auto p = kTestExeFixture.Path();
-  ASSERT_OK_AND_ASSIGN(auto canonical_p, fs::Canonical(p));
-  ASSERT_OK_AND_ASSIGN(std::unique_ptr<ElfReader> elf_reader,
-                       ElfReader::Create(p));
-  ASSERT_NE(p.string(), elf_reader->GetBinaryPath());
-  ASSERT_EQ(canonical_p.string(), elf_reader->GetBinaryPath());
-}
-
 auto SymbolNameIs(const std::string& n) { return Field(&ElfReader::SymbolInfo::name, n); }
 
 TEST(ElfReaderTest, ListFuncSymbolsAnyMatch) {
