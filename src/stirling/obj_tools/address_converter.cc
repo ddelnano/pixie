@@ -63,7 +63,6 @@ StatusOr<std::unique_ptr<ElfAddressConverter>> ElfAddressConverter::Create(ElfRe
   }
   system::ProcParser parser;
   std::vector<system::ProcParser::ProcessSMaps> map_entries;
-  // This is a little inefficient as we only need the first entry.
   auto proc_path = elf_reader->GetBinaryPath();
   DCHECK(fs::Canonical(proc_path).ok());
   PX_RETURN_IF_ERROR(parser.ParseProcPIDMaps(pid, &map_entries));

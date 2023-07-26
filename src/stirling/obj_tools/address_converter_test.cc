@@ -20,7 +20,7 @@
 
 #include "src/common/testing/test_environment.h"
 #include "src/common/testing/testing.h"
-#include "src/stirling/obj_tools/testdata/containers/address_converter_container.h"
+#include "src/stirling/obj_tools/testdata/containers/vaddr_convert_self_func_container.h"
 #include "src/stirling/testing/common.h"
 #include "src/stirling/utils/proc_path_tools.h"
 
@@ -29,7 +29,7 @@ namespace stirling {
 namespace obj_tools {
 
 TEST(ElfAddressConverterTest, VirtualAddrToBinaryAddr) {
-  AddressConverterContainer container;
+  VaddrConvertSelfFuncContainer container;
   ASSERT_OK(container.Run());
 
   int status = -1;
@@ -41,11 +41,10 @@ TEST(ElfAddressConverterTest, VirtualAddrToBinaryAddr) {
   EXPECT_EQ(0, status);
 }
 
-// This covers the situation discovered in https://github.com/pixie-io/pixie/issues/1630.
-// Setting an unlimited stack size ulimit causes the VMAs of a process to be reordered and
-// caused stirling to fail to start.
-TEST(ElfAddressConverterTest, VirtualAddrToBinaryAddrWithUnlimitedStackUlimit) {
-  AddressConverterContainer container;
+TEST(ElfAddressConverterTest, VirtualAddrToBinaryAddrForReorderedVirtualMemoryMappings) {
+  // Setting an unlimited stack size ulimit causes the VMAs of a process to be reordered and
+  // results in a crash (as described in https://github.com/pixie-io/pixie/issues/1630).
+  VaddrConvertSelfFuncContainer container;
   ASSERT_OK(container.Run(std::chrono::seconds{5}, {"--ulimit=stack=-1"}));
 
   int status = -1;

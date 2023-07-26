@@ -31,6 +31,10 @@ using px::stirling::obj_tools::ElfAddressConverter;
 using px::stirling::obj_tools::ElfReader;
 using px::stirling::obj_tools::SymbolMatchType;
 
+// This utility performs an assertion that the ElfAddressConverter::VirtualAddrToBinaryAddr function
+// returns the correct (consistent with ElfReader and `nm` cli output) binary address for a given
+// function. This is used to within a container to verify that when a process's virtual memory mappings
+// differ that VirtualAddrToBinaryAddr finds the correct offset.
 int main() {
   LOG(INFO) << "Running";
 

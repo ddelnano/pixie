@@ -75,7 +75,7 @@ pl_cc_test(
     deps = [
         ":cc_library",
         "//src/stirling/testing:cc_library",
-        "//src/stirling/obj_tools/testdata/containers:address_converter_exe_container",
+        "//src/stirling/obj_tools/testdata/containers:vaddr_convert_self_func_container",
     ],
 )
 

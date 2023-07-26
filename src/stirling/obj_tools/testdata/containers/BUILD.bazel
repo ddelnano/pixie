@@ -15,25 +15,25 @@ load("//bazel:pl_build_system.bzl", "pl_cc_binary", "pl_cc_test_library")
 package(default_visibility = ["//src/stirling:__subpackages__"])
 
 pl_cc_binary(
-    name = "address_converter_exe",
-    srcs = ["address_converter_exe.cc"],
+    name = "vaddr_convert_self_func",
+    srcs = ["vaddr_convert_self_func.cc"],
     deps = [
         "//src/stirling/obj_tools:cc_library",
     ],
 )
 
 cc_image(
-    name = "address_converter_exe_image",
+    name = "vaddr_convert_self_func_image",
     base = "//:pl_cc_base_debug_image",
-    binary = ":address_converter_exe",
+    binary = ":vaddr_convert_self_func",
 )
 
 pl_cc_test_library(
-    name = "address_converter_exe_container",
+    name = "vaddr_convert_self_func_container",
     srcs = glob(
         ["*.cc"],
         exclude = [
-            "address_converter_exe.cc",
+            "vaddr_convert_self_func.cc",
         ],
     ),
     hdrs = glob(
@@ -42,7 +42,7 @@ pl_cc_test_library(
         ],
     ),
     data = [
-        ":address_converter_exe_image.tar",
+        ":vaddr_convert_self_func_image.tar",
     ],
     deps = ["//src/common/testing/test_utils:cc_library"],
 )

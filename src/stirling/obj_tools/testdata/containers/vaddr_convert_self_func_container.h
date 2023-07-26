@@ -22,15 +22,15 @@
 
 using px::ContainerRunner;
 
-class AddressConverterContainer : public ContainerRunner {
+class VaddrConvertSelfFuncContainer : public ContainerRunner {
  public:
-  AddressConverterContainer()
+  VaddrConvertSelfFuncContainer()
       : ContainerRunner(px::testing::BazelRunfilePath(kBazelImageTar), kInstanceNamePrefix,
                         kReadyMessage) {}
 
  private:
   static constexpr std::string_view kBazelImageTar =
-      "src/stirling/obj_tools/testdata/containers/address_converter_exe_image.tar";
-  static constexpr std::string_view kInstanceNamePrefix = "address_converter_container";
+      "src/stirling/obj_tools/testdata/containers/vaddr_convert_self_func_image.tar";
+  static constexpr std::string_view kInstanceNamePrefix = "vaddr_convert_self_func_container";
   static constexpr std::string_view kReadyMessage = "Running";
 };
