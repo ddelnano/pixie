@@ -14,6 +14,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+load("@io_bazel_rules_docker//cc:image.bzl", "cc_image")
 load("//bazel:pl_build_system.bzl", "pl_cc_binary", "pl_cc_bpf_test", "pl_cc_library", "pl_cc_test")
 
 package(default_visibility = ["//src/stirling:__subpackages__"])
@@ -25,6 +26,7 @@ pl_cc_library(
         exclude = [
             "**/*_test.cc",
             "**/*_tool.cc",
+            "address_converter_exe.cc",
             "**/*_benchmark.cc",
         ],
     ),
@@ -78,6 +80,8 @@ pl_cc_test(
     deps = [
         ":cc_library",
         "//src/stirling/obj_tools/testdata/cc:test_exe_fixture",
+        "//src/stirling/bpf_tools:cc_library",
+        "//src/stirling/utils:cc_library",
     ],
 )
 
@@ -161,6 +165,14 @@ pl_cc_binary(
 )
 
 pl_cc_binary(
+    name = "address_converter_exe",
+    srcs = ["address_converter_exe.cc"],
+    deps = [
+        ":cc_library",
+    ],
+)
+
+pl_cc_binary(
     name = "vaddr_to_baddr_tool",
     srcs = ["vaddr_to_baddr_tool.cc"],
     deps = [
@@ -187,4 +199,10 @@ pl_cc_binary(
         "//src/common/testing:cc_library",
         "@com_google_benchmark//:benchmark_main",
     ],
+)
+
+cc_image(
+    name = "address_converter_exe_image",
+    base = "//:pl_cc_base_debug_image",
+    binary = ":address_converter_exe",
 )
