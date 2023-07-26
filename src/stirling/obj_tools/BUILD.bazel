@@ -72,15 +72,12 @@ pl_cc_test(
 pl_cc_test(
     name = "address_converter_test",
     srcs = ["address_converter_test.cc"],
-    data = [
-        "//src/stirling/obj_tools/testdata/containers:address_converter_exe_container_image",
-    ],
     deps = [
         ":cc_library",
         "//src/common/testing/test_utils:cc_library",
         "//src/stirling/testing:cc_library",
         "//src/stirling/obj_tools/testdata/cc:test_exe_fixture",
-        "//src/stirling/obj_tools/testdata/containers:address_converter_exe_container_image",
+        "//src/stirling/obj_tools/testdata/containers:address_converter_exe_container",
         "//src/stirling/bpf_tools:cc_library",
         "//src/stirling/utils:cc_library",
     ],

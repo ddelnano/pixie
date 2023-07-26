@@ -10,7 +10,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 load("@io_bazel_rules_docker//cc:image.bzl", "cc_image")
-load("//bazel:pl_build_system.bzl", "pl_cc_binary", "pl_cc_library")
+load("//bazel:pl_build_system.bzl", "pl_cc_binary", "pl_cc_test_library")
 
 package(default_visibility = ["//src/stirling:__subpackages__"])
 
@@ -28,8 +28,8 @@ cc_image(
     binary = ":address_converter_exe",
 )
 
-pl_cc_library(
-    name = "address_converter_exe_container_image",
+pl_cc_test_library(
+    name = "address_converter_exe_container",
     srcs = glob(
         ["*.cc"],
         exclude = [

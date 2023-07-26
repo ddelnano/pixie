@@ -16,24 +16,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// This executable is only for testing purposes.
-// We use it to see if we can find the function symbols and debug information.
-
-#include <unistd.h>
-#include <iostream>
 #include "src/stirling/obj_tools/address_converter.h"
-
 #include "src/stirling/utils/proc_path_tools.h"
 
-#if defined(__clang__)
-#define NO_OPT_ATTR __attribute__((noinline, optnone))
-#elif defined(__GNUC__) || defined(__GNUG__)
-#define NO_OPT_ATTR __attribute__((noinline, optimize("O0")))
-#endif
-
-// Using extern C to avoid name mangling (which just keeps the test a bit more readable).
+// Using extern C to avoid name mangling since ElfReader must be able to address this
+// by its symbol name.
 extern "C" {
-NO_OPT_ATTR void TestFunc() {}
+void TestFunc() {}
 
 }  // extern "C"
 

@@ -46,11 +46,9 @@ uint64_t ElfAddressConverter::BinaryAddrToVirtualAddr(uint64_t binary_addr) cons
  * For non-PIE executables, this conversion is trivial as the virtual addresses in the ELF file are
  * used directly when loading.
  *
- * However, for PIE, the loaded virtual address can be whatever. So to calculate the offset we look
- * at the first loadable segment in the ELF file and compare it to the first entry in the
- *  /proc/PID/maps file to see how the loader changed the virtual address. This works because the
- * loader guarantees that the relative offsets of the different segments remain the same, regardless
- * of where in virtual address space it ends up putting the segment.
+ * However, for PIE, the loaded virtual address can be whatever. To calculate the offset we must
+ * find the /proc/PID/maps entry that corresponds to the given process's executable (entry that
+ * matches /proc/$pid/cmdline) and use that entry's virtual memory offset to find the binary address.
  *
  **/
 StatusOr<std::unique_ptr<ElfAddressConverter>> ElfAddressConverter::Create(ElfReader* elf_reader,

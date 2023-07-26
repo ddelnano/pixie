@@ -14,10 +14,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-load("@io_bazel_rules_docker//container:container.bzl", "container_image", "container_layer")
-load("@io_bazel_rules_docker//cc:image.bzl", "cc_image")
 load("@rules_cc//cc:defs.bzl", "cc_library")
-load("//bazel:pl_build_system.bzl", "pl_cc_library")
 load("//bazel:toolchain_transitions.bzl", "cc_clang_binary")
 
 package(default_visibility = ["//src/stirling:__subpackages__"])
@@ -49,15 +46,6 @@ cc_library(
     hdrs = ["test_exe_fixture.h"],
     data = [":test_exe"],
     deps = ["//src/common/exec:cc_library"],
-)
-
-pl_cc_library(
-    name = "test_exe_container_lib",
-    hdrs = ["test_container.h"],
-    data = [
-        ":test_exe_container_image.tar",
-    ],
-    tags = ["requires_docker"],
 )
 
 filegroup(
@@ -116,21 +104,4 @@ genrule(
 filegroup(
     name = "lib_foo",
     srcs = ["lib_foo_so"],
-)
-
-container_layer(
-    name = "vaddr_to_baddr_tool_layer",
-    directory = "/usr/local/bin",
-    files = [
-        ":test_exe",
-        "//src/stirling/obj_tools:vaddr_to_baddr_tool",
-    ],
-)
-
-container_image(
-    name = "test_exe_container_image",
-    base = "//:pl_cc_base_debug_image",
-    layers = [
-        ":vaddr_to_baddr_tool_layer",
-    ],
 )

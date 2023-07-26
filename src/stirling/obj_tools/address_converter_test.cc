@@ -43,6 +43,9 @@ TEST(ElfAddressConverterTest, VirtualAddrToBinaryAddr) {
   EXPECT_EQ(0, status);
 }
 
+// This covers the situation discovered in https://github.com/pixie-io/pixie/issues/1630.
+// Setting an unlimited stack size ulimit causes the VMAs of a process to be reordered and
+// caused stirling to fail to start.
 TEST(ElfAddressConverterTest, VirtualAddrToBinaryAddrWithUnlimitedStackUlimit) {
   AddressConverterContainer container;
   ASSERT_OK(container.Run(std::chrono::seconds{5}, {"--ulimit=stack=-1"}));
