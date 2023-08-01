@@ -15,14 +15,14 @@ image: start-minikube Dockerfile ${SRCS} ${BASH}
 	eval $$(minikube docker-env); docker build -t mock-go-server:latest .
 	touch $@
 
-deploy-pixie: image
+deploy-pixie: start-minikube
 	px deploy -y
 	touch $@
 
-short-example: kube/short-request-manifest.yaml deploy-pixie
+short-example: kube/short-request-manifest.yaml deploy-pixie image
 	kubectl apply -f $<
 
-long-example: kube/long-request-manifest.yaml deploy-pixie
+long-example: kube/long-request-manifest.yaml deploy-pixie image
 	kubectl apply -f $<
 
 clean:
