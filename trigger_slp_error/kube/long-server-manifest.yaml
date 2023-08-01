@@ -1,0 +1,22 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: long-request
+spec:
+  template:
+    metadata:
+      name: long-request
+    spec:
+      hostPID: true
+      restartPolicy: Never
+      containers:
+        - image: mock-go-server:latest
+          name: long-request
+          imagePullPolicy: Never
+          command: ["/bin/bash", "/bash/long-server.bash"]
+          resources:
+            requests:
+              memory: "0.5Gi"
+            limits:
+              memory: "0.5Gi"

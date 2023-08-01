@@ -1,0 +1,22 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: short-request
+spec:
+  template:
+    metadata:
+      name: short-request
+    spec:
+      hostPID: true
+      restartPolicy: Never
+      containers:
+        - image: mock-go-server:latest
+          name: short-request
+          imagePullPolicy: Never
+          command: ["/bin/bash", "/bash/short-request.bash"]
+          resources:
+            requests:
+              memory: "0.5Gi"
+            limits:
+              memory: "0.5Gi"
