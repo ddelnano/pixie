@@ -359,7 +359,10 @@ std::string ProbeFuncForSocketAccessMethod(std::string_view probe_fn,
 
 // Return error if something unexpected occurs.
 // Return 0 if nothing unexpected, but there is nothing to deploy (e.g. no OpenSSL detected).
+// Dynamic libraries have all public symbols. Therefore all of these uprobes are expected to successfully
+// attach or fail to attach.
 StatusOr<int> UProbeManager::AttachOpenSSLUProbesOnDynamicLib(uint32_t pid) {
+  auto uprobe_count = 0;
   for (auto ssl_library_match : kLibSSLMatchers) {
     const auto libssl = ssl_library_match.libssl;
     const auto libcrypto = ssl_library_match.libcrypto;
@@ -405,20 +408,17 @@ StatusOr<int> UProbeManager::AttachOpenSSLUProbesOnDynamicLib(uint32_t pid) {
     }
 
     auto ssl_source = SSLSourceFromLib(libssl);
-    // Optimisitcally update the SSL lib source since the probes can trigger
-    // before the BPF map is updated. This value is cleaned up when the upid is
-    // terminated, so if attachment fails it will be deleted prior to the pid being
-    // reused.
-    PX_UNUSED(openssl_source_map_->SetValue(pid, ssl_source));
     for (auto spec : kOpenSSLUProbes) {
       spec.binary_path = container_libssl.string();
       spec.probe_fn =
           ProbeFuncForSocketAccessMethod(spec.probe_fn, ssl_library_match.socket_fd_access);
 
       PX_RETURN_IF_ERROR(LogAndAttachUProbe(spec));
+      uprobe_count++;
     }
+    PX_UNUSED(openssl_source_map_->SetValue(pid, ssl_source));
   }
-  return kOpenSSLUProbes.size();
+  return uprobe_count;
 }
 
 namespace {
@@ -463,12 +463,24 @@ StatusOr<int> UProbeManager::AttachOpenSSLUProbesOnStaticBinary(const uint32_t p
   }
   PX_RETURN_IF_ERROR(statusor);
 
+  auto uprobe_count = 0;
   for (auto spec : kOpenSSLUProbes) {
     spec.binary_path = host_proc_exe.string();
     spec.probe_fn = absl::StrCat(spec.probe_fn, "_syscall_fd_access");
-    PX_RETURN_IF_ERROR(LogAndAttachUProbe(spec));
+
+    const auto statusor = LogAndAttachUProbe(spec);
+
+    // Statically linked binaries have no guarantees for what symbols will exist. Therefore
+    // it is not an error if BCC was unable to find a symbol for the UProbe spec.
+    if (!statusor.ok() && statusor.code() == statuspb::NOT_FOUND) {
+      LOG(WARNING) << absl::Substitute("Unable to attach uprobe $0 for binary $1", spec.probe_fn, spec.binary_path.string());
+    } else if (!statusor.ok()) {
+      return statusor;
+    } else {
+      uprobe_count++;
+    }
   }
-  return kOpenSSLUProbes.size();
+  return uprobe_count;
 }
 
 StatusOr<int> UProbeManager::AttachNodeJsOpenSSLUprobes(const uint32_t pid) {
@@ -489,25 +501,25 @@ StatusOr<int> UProbeManager::AttachNodeJsOpenSSLUprobes(const uint32_t pid) {
   PX_ASSIGN_OR_RETURN(const SemVer ver, GetNodeVersion(pid, proc_exe));
   PX_RETURN_IF_ERROR(UpdateNodeTLSWrapSymAddrs(pid, host_proc_exe, ver));
 
-  // Optimisitcally update the SSL lib source since the probes can trigger
-  // before the BPF map is updated. This value is cleaned up when the upid is
-  // terminated, so if attachment fails it will be deleted prior to the pid being
-  // reused.
-  PX_UNUSED(openssl_source_map_->SetValue(pid, kNodeJSSource));
 
-  // These probes are attached on OpenSSL dynamic library (if present) as well.
-  // Here they are attached on statically linked OpenSSL library (eg. for node).
   for (auto spec : kOpenSSLUProbes) {
     spec.binary_path = host_proc_exe.string();
     PX_RETURN_IF_ERROR(LogAndAttachUProbe(spec));
   }
+  // Attach the SSL_new, node specific uprobe. It is specified differently than the uprobes
+  // that are node version specific (attached in GetNodeOpensslUProbeTmpls) and is therefore
+  // done separately.
+  auto ssl_new_probe = kNodeSSLNewUProbe;
+  ssl_new_probe.binary_path = host_proc_exe.string();
+  PX_RETURN_IF_ERROR(LogAndAttachUProbe(ssl_new_probe));
 
   // These are node-specific probes.
   PX_ASSIGN_OR_RETURN(auto uprobe_tmpls, GetNodeOpensslUProbeTmpls(ver));
   PX_ASSIGN_OR_RETURN(auto elf_reader, ElfReader::Create(host_proc_exe));
   PX_ASSIGN_OR_RETURN(int count, AttachUProbeTmpl(uprobe_tmpls, host_proc_exe, elf_reader.get()));
+  PX_UNUSED(openssl_source_map_->SetValue(pid, kNodeJSSource));
 
-  return kOpenSSLUProbes.size() + count;
+  return kOpenSSLUProbes.size() + 1 + count;
 }
 
 StatusOr<int> UProbeManager::AttachGoTLSUProbes(const std::string& binary,
@@ -643,25 +655,21 @@ int UProbeManager::DeployOpenSSLUProbes(const absl::flat_hash_set<md::UPID>& pid
     }
 
     // Attach uprobes to statically linked applications only if no other probes have been attached.
-    if (FLAGS_stirling_trace_static_tls_binaries && (!count_or.ok() || count_or.ValueOrDie() == 0)) {
-      // Optimisitcally update the SSL lib source since the probes can trigger
-      // before the BPF map is updated. This value is cleaned up when the upid is
-      // terminated, so if attachment fails it will be deleted prior to the pid being
-      // reused.
+    if (FLAGS_stirling_trace_static_tls_binaries && count_or.ok() && count_or.ValueOrDie() == 0) {
       const auto static_count_or = AttachOpenSSLUProbesOnStaticBinary(pid.pid());
 
       if (static_count_or.ok() && static_count_or.ValueOrDie() > 0) {
-        uprobe_count += static_count_or.ValueOrDie();
         PX_UNUSED(openssl_source_map_->SetValue(pid.pid(), kStaticallyLinkedSource));
+        uprobe_count += static_count_or.ValueOrDie();
 
-        VLOG(1) << absl::Substitute(
+        LOG(WARNING) << absl::Substitute(
             "Attaching OpenSSL uprobes on executable statically linked OpenSSL library"
             "succeeded for PID $0: $1 probes",
             pid.pid(), static_count_or.ValueOrDie());
       } else {
         monitor_.AppendSourceStatusRecord("socket_tracer", static_count_or.status(),
                                           "AttachOpenSSLUprobesStaticBinary");
-        VLOG(1) << absl::Substitute(
+        LOG(WARNING) << absl::Substitute(
             "Attaching OpenSSL uprobes on executable statically linked OpenSSL library failed"
             "for PID $0: $1",
             pid.pid(), static_count_or.ToString());

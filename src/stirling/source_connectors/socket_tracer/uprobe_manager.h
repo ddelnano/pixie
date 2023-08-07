@@ -203,9 +203,13 @@ class UProbeManager {
       },
   });
 
-  // TODO(yzhao): Regroups OpenSSL uprobes into 3 groups: 1) OpenSSL dynamic library; 2) OpenSSL
-  // static library (no known cases other than nodejs today, but should support for future-proof);
-  // 3) NodeJS specific uprobes.
+  // Used by node tracing to record the mapping from SSL object to TLSWrap object.
+  inline static const auto kNodeSSLNewUProbe = bpf_tools::UProbeSpec{
+     .binary_path = "/usr/lib/x86_64-linux-gnu/libssl.so.1.1",
+     .symbol = "SSL_new",
+     .attach_type = bpf_tools::BPFProbeAttachType::kReturn,
+     .probe_fn = "probe_ret_SSL_new",
+   };
 
   // Probes on node' C++ functions for obtaining the file descriptor from TLSWrap object.
   // The match type is kPrefix to (hopefully) tolerate potential changes in argument
@@ -393,6 +397,10 @@ class UProbeManager {
   static StatusOr<std::array<UProbeTmpl, 6>> GetNodeOpensslUProbeTmpls(const SemVer& ver);
 
   // Probes for OpenSSL tracing.
+  // TODO(ddelnano): For statically linked use cases, there is no guarantee that any number
+  // of these functions will exist. For dynamically linked applications, the functions are public
+  // so they must exist. For NodeJS, even though it's statically linked it should have stronger
+  // guarantees for having the functions exist.
   inline static const auto kOpenSSLUProbes = MakeArray<bpf_tools::UProbeSpec>({
       bpf_tools::UProbeSpec{
           .binary_path = "/usr/lib/x86_64-linux-gnu/libssl.so.1.1",
@@ -448,14 +456,6 @@ class UProbeManager {
           .attach_type = bpf_tools::BPFProbeAttachType::kReturn,
           .probe_fn = "probe_ret_SSL_read_ex",
           .is_optional = true,
-      },
-      // Used by node tracing to record the mapping from SSL object to TLSWrap object.
-      // TODO(yzhao): Move this to a separate list for node application only.
-      bpf_tools::UProbeSpec{
-          .binary_path = "/usr/lib/x86_64-linux-gnu/libssl.so.1.1",
-          .symbol = "SSL_new",
-          .attach_type = bpf_tools::BPFProbeAttachType::kReturn,
-          .probe_fn = "probe_ret_SSL_new",
       },
   });
 

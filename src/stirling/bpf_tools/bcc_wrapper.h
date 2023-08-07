@@ -50,6 +50,9 @@
 #include "src/stirling/obj_tools/elf_reader.h"
 
 namespace px {
+
+constexpr std::string_view kUProbeSymbolNotFoundStrPrefix = "Unable to find offset for binary";
+
 /*
  * Status adapter for ebpf::StatusTuple.
  */
@@ -57,6 +60,8 @@ template <>
 inline Status StatusAdapter<ebpf::StatusTuple>(const ebpf::StatusTuple& s) noexcept {
   if (s.ok()) {
     return Status::OK();
+  } else if (absl::StartsWith(s.msg(), kUProbeSymbolNotFoundStrPrefix)) {
+    return Status(statuspb::NOT_FOUND, s.msg());
   }
   return Status(statuspb::INTERNAL, s.msg());
 }
