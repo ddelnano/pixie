@@ -34,6 +34,8 @@
 #include "src/stirling/source_connectors/socket_tracer/uprobe_symaddrs.h"
 #include "src/stirling/testing/common.h"
 
+#include <prometheus/text_serializer.h>
+
 namespace px {
 namespace stirling {
 
@@ -123,6 +125,10 @@ TYPED_TEST(BoringSSLTraceTest, ssl_capture_curl_client) {
 
   EXPECT_EQ(records.http_records.size(), 1);
   EXPECT_EQ(records.http_records[0].req.req_path, "/");
+  auto& registry = GetMetricsRegistry();
+  auto metrics = registry.Collect();
+  auto metrics_text = prometheus::TextSerializer().Serialize(metrics);
+  LOG(WARNING) << absl::Substitute("with metric text: $0", metrics_text);
 }
 
 }  // namespace stirling

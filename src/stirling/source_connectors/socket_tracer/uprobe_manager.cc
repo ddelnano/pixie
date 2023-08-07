@@ -612,7 +612,7 @@ int UProbeManager::DeployOpenSSLUProbes(const absl::flat_hash_set<md::UPID>& pid
       continue;
     }
 
-    auto count_or = AttachOpenSSLUProbesOnDynamicLib(pid.pid());
+    const auto count_or = AttachOpenSSLUProbesOnDynamicLib(pid.pid());
     if (count_or.ok()) {
       uprobe_count += count_or.ValueOrDie();
       VLOG(1) << absl::Substitute(
@@ -626,45 +626,45 @@ int UProbeManager::DeployOpenSSLUProbes(const absl::flat_hash_set<md::UPID>& pid
           count_or.ToString());
     }
 
-    count_or = AttachNodeJsOpenSSLUprobes(pid.pid());
-    if (count_or.ok()) {
-      uprobe_count += count_or.ValueOrDie();
+    const auto node_count_or = AttachNodeJsOpenSSLUprobes(pid.pid());
+    if (node_count_or.ok()) {
+      uprobe_count += node_count_or.ValueOrDie();
       VLOG(1) << absl::Substitute(
           "Attaching OpenSSL uprobes on NodeJS (statically linked OpenSSL) succeeded for "
           "PID $0: $1 probes",
-          pid.pid(), count_or.ValueOrDie());
+          pid.pid(), node_count_or.ValueOrDie());
     } else {
-      monitor_.AppendSourceStatusRecord("socket_tracer", count_or.status(),
+      monitor_.AppendSourceStatusRecord("socket_tracer", node_count_or.status(),
                                         "AttachNodeJsOpenSSLUprobes");
       VLOG(1) << absl::Substitute(
           "Attaching OpenSSL uprobes on NodeJS (statically linked OpenSSL) failed for "
           "PID $0: $1",
-          pid.pid(), count_or.ToString());
+          pid.pid(), node_count_or.ToString());
     }
 
     // Attach uprobes to statically linked applications only if no other probes have been attached.
-    if (FLAGS_stirling_trace_static_tls_binaries && count_or.ok() && count_or.ValueOrDie() == 0) {
+    if (FLAGS_stirling_trace_static_tls_binaries && (!count_or.ok() || count_or.ValueOrDie() == 0)) {
       // Optimisitcally update the SSL lib source since the probes can trigger
       // before the BPF map is updated. This value is cleaned up when the upid is
       // terminated, so if attachment fails it will be deleted prior to the pid being
       // reused.
-      count_or = AttachOpenSSLUProbesOnStaticBinary(pid.pid());
+      const auto static_count_or = AttachOpenSSLUProbesOnStaticBinary(pid.pid());
 
-      if (count_or.ok() && count_or.ValueOrDie() > 0) {
-        uprobe_count += count_or.ValueOrDie();
+      if (static_count_or.ok() && static_count_or.ValueOrDie() > 0) {
+        uprobe_count += static_count_or.ValueOrDie();
         PX_UNUSED(openssl_source_map_->SetValue(pid.pid(), kStaticallyLinkedSource));
 
         VLOG(1) << absl::Substitute(
             "Attaching OpenSSL uprobes on executable statically linked OpenSSL library"
             "succeeded for PID $0: $1 probes",
-            pid.pid(), count_or.ValueOrDie());
+            pid.pid(), static_count_or.ValueOrDie());
       } else {
-        monitor_.AppendSourceStatusRecord("socket_tracer", count_or.status(),
+        monitor_.AppendSourceStatusRecord("socket_tracer", static_count_or.status(),
                                           "AttachOpenSSLUprobesStaticBinary");
         VLOG(1) << absl::Substitute(
             "Attaching OpenSSL uprobes on executable statically linked OpenSSL library failed"
             "for PID $0: $1",
-            pid.pid(), count_or.ToString());
+            pid.pid(), static_count_or.ToString());
       }
     }
   }
