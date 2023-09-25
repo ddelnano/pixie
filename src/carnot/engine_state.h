@@ -124,11 +124,17 @@ class EngineState : public NotCopyable {
     auto rel_map = table_store_->GetRelationMap();
     // Use an empty string for query result address, because the local execution mode should use
     // the Local GRPC result server to send results to.
+    auto end = ::px::CurrentTimeNS();
+    auto start = end - 300000000000;
+    auto endpoint_config = std::make_unique<planpb::OTelEndpointConfig>();
+    endpoint_config->set_url(("localhost:4317"));
+    endpoint_config->set_timeout(6);
+    endpoint_config->set_insecure(true);
     return std::make_unique<planner::CompilerState>(
         std::move(rel_map), planner::SensitiveColumnMap{}, registry_info_.get(), time_now,
         /* max_output_rows_per_table */ 0,
         /* result address */ "",
-        /* ssl target name override*/ "", planner::RedactionOptions{}, nullptr, nullptr,
+        /* ssl target name override*/ "", planner::RedactionOptions{}, std::move(endpoint_config), std::unique_ptr<planner::PluginConfig>(new planner::PluginConfig{start, end}),
         planner::DebugInfo{});
   }
 

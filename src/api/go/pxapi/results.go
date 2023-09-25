@@ -138,6 +138,8 @@ func (s *ScriptResults) handleGRPCMsg(ctx context.Context, resp *vizierpb.Execut
 				return s.handleStats(ctx, v.Data.ExecutionStats)
 			}
 		}
+	default:
+		fmt.Printf("Received type %v %t\n", v, v)
 	}
 
 	return errdefs.ErrInternalUnImplementedType

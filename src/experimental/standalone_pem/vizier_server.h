@@ -63,7 +63,7 @@ class VizierServer final : public api::vizierpb::VizierService::Service {
     LOG(INFO) << "Executing Script";
 
     auto query_id = sole::uuid4();
-    auto compiler_state = engine_state_->CreateLocalExecutionCompilerState(0);
+    auto compiler_state = engine_state_->CreateLocalExecutionCompilerState(::px::CurrentTimeNS());
 
     // Handle mutations.
     if (reader->mutation()) {
