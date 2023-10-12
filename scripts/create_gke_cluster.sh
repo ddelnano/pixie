@@ -25,6 +25,7 @@
 set_default_values() {
   CLUSTER_NAME="dev-cluster-${USER}"
   AUTOSCALING=true
+  CUSTOM_DNS=false
   DYNAMIC_SUBNET=false
   NUM_NODES=2
   MIN_NODES=1
@@ -93,7 +94,7 @@ parse_args() {
 
   local OPTIND
   # Process the command line arguments.
-  while getopts "pfSc:n:m:i:d:z:" opt; do
+  while getopts "pfSDc:n:m:i:d:z:" opt; do
     case ${opt} in
       p)
         set_prod_cluster_config
@@ -120,6 +121,9 @@ parse_args() {
         ;;
       d)
         DISK_SIZE=$OPTARG
+        ;;
+      D)
+        CUSTOM_DNS=true
         ;;
       z)
         ZONE=$OPTARG
@@ -148,6 +152,11 @@ if [[ $AUTOSCALING == true ]]; then
   AUTOSCALING_ARGS=(--enable-autoscaling --min-nodes "${MIN_NODES}" --max-nodes "${MAX_NODES}")
 fi
 
+DNS_CONFIG_ARGS=()
+if [[ $CUSTOM_DNS == true ]]; then
+  DNS_CONFIG_ARGS=(--cluster-dns=clouddns --cluster-dns-domain=local.pixielabs --cluster-dns-scope=cluster)
+fi
+
 print_config
 
 ##################
@@ -166,6 +175,7 @@ gcloud beta container --project "${PROJECT}" clusters create "${CLUSTER_NAME}" \
  --scopes gke-default,compute-rw \
  --num-nodes ${NUM_NODES} \
  "${AUTOSCALING_ARGS[@]}" \
+ "${DNS_CONFIG_ARGS[@]}" \
  --enable-ip-alias \
  --network "${NETWORK}" \
  "${SUBNETWORK_ARGS[@]}" \
