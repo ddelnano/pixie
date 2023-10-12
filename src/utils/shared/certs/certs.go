@@ -115,14 +115,14 @@ func (cg *certGenerator) signCertAndKey(cert *x509.Certificate, privateKey *rsa.
 	return certData, keyData, nil
 }
 
-func getVizierDNSNamesForNamespace(namespace string) []string {
+func getVizierDNSNamesForNamespace(namespace, clusterDomain string) []string {
 	// Localhost must be here because etcd relies on it.
 	return []string{
 		fmt.Sprintf("*.%s.svc", namespace),
-		fmt.Sprintf("*.%s.svc.cluster.local", namespace),
-		fmt.Sprintf("*.%s.pod.cluster.local", namespace),
+		fmt.Sprintf("*.%s.svc.%s", namespace, clusterDomain),
+		fmt.Sprintf("*.%s.pod.%s", namespace, clusterDomain),
 		fmt.Sprintf("*.pl-etcd.%s.svc", namespace),
-		fmt.Sprintf("*.pl-etcd.%s.svc.cluster.local", namespace),
+		fmt.Sprintf("*.pl-etcd.%s.svc.%s", namespace, clusterDomain),
 		"pl-nats",
 		"pl-etcd",
 		"localhost",
@@ -187,11 +187,11 @@ func GenerateVizierCertYAMLs(namespace string) (string, error) {
 		return "", err
 	}
 
-	clientCert, clientKey, err := cg.generateSignedCertAndKey(getVizierDNSNamesForNamespace(namespace))
+	clientCert, clientKey, err := cg.generateSignedCertAndKey(getVizierDNSNamesForNamespace(namespace, "local.pixielabs"))
 	if err != nil {
 		return "", err
 	}
-	serverCert, serverKey, err := cg.generateSignedCertAndKey(getVizierDNSNamesForNamespace(namespace))
+	serverCert, serverKey, err := cg.generateSignedCertAndKey(getVizierDNSNamesForNamespace(namespace, "local.pixielabs"))
 	if err != nil {
 		return "", err
 	}

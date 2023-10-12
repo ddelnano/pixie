@@ -328,7 +328,7 @@ func getNATSState(client HTTPClient, pods *concurrentPodMap) *vizierState {
 
 	u := url.URL{
 		Scheme: "http",
-		Host:   net.JoinHostPort(k8s.GetPodAddr(*natsPod.pod), "8222"),
+		Host:   net.JoinHostPort(k8s.GetSvcPodAddr(*natsPod.pod, "pl-nats-mgmt"), "8222"),
 	}
 
 	resp, err := client.Get(u.String())
@@ -788,7 +788,7 @@ func queryPodStatusz(client HTTPClient, pod *v1.Pod) (bool, string) {
 
 	u := url.URL{
 		Scheme: "https",
-		Host:   net.JoinHostPort(k8s.GetPodAddr(*pod), fmt.Sprintf("%d", port)),
+		Host:   net.JoinHostPort("vizier-cloud-connector-svc.pl.svc.local.pixielabs.", fmt.Sprintf("%d", port)),
 		Path:   "statusz",
 	}
 	resp, err := client.Get(u.String())

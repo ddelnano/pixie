@@ -101,6 +101,7 @@ func getCloudClientConnection(cloudAddr string, devCloudNS string, extraDialOpts
 
 	dialOpts, err := services.GetGRPCClientDialOptsServerSideTLS(isInternal)
 	dialOpts = append(dialOpts, extraDialOpts...)
+	dialOpts = append(dialOpts, grpc.WithTimeout(5*time.Second))
 	if err != nil {
 		return nil, err
 	}

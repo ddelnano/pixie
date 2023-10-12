@@ -31,5 +31,15 @@ func GetPodAddr(pod v1.Pod) string {
 	// IPv6
 	podIP = strings.ReplaceAll(podIP, ":", "-")
 
+	//vizier-cloud-connector-svc.pl.svc.local.pixielabs
 	return fmt.Sprintf("%s.%s.pod.cluster.local", podIP, pod.Namespace)
+}
+
+func GetSvcPodAddr(pod v1.Pod, svc string) string {
+	// IPv4
+	podIP := strings.ReplaceAll(pod.Status.PodIP, ".", "-")
+	// IPv6
+	podIP = strings.ReplaceAll(podIP, ":", "-")
+
+	return fmt.Sprintf("%s.%s.%s", podIP, svc, pod.Namespace)
 }
