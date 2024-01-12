@@ -51,6 +51,9 @@ cc_library(
 pl_bpf_cc_resource(
     name = "socket_trace",
     src = "socket_trace.c",
+    headers = [
+        "//src/stirling/bpf_tools/bcc_bpf:post_preprocess_headers",
+    ],
     # Uncomment to enable debug printks.
     # defines = ["BPF_DEBUG"],
     defines = select({

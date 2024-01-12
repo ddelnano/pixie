@@ -44,6 +44,7 @@ def _pl_bpf_preprocess_impl(ctx):
         action_name = "c-preprocess",
     )
 
+    cpp_output = ctx.actions.declare_file(ctx.attr.name + ".i")
     output = ctx.actions.declare_file(ctx.attr.name + ".c")
 
     merged_cc_info = cc_common.merge_cc_infos(direct_cc_infos = [dep[CcInfo] for dep in ctx.attr.deps])
@@ -60,10 +61,10 @@ def _pl_bpf_preprocess_impl(ctx):
     args.add("-I.")
     args.add_all(["-I" + path for path in includes])
     args.add(ctx.attr.src.files.to_list()[0].path)
-    args.add("-o", output.path)
+    args.add("-o", cpp_output.path)
 
     ctx.actions.run(
-        outputs = [output],
+        outputs = [cpp_output],
         inputs = depset(
             transitive = [
                 ctx.attr.src.files,
@@ -74,6 +75,26 @@ def _pl_bpf_preprocess_impl(ctx):
         executable = preprocessor_tool,
         arguments = [args],
         mnemonic = "CPreprocess",
+    )
+
+    headers = []
+    for h in ctx.attr.headers:
+        headers += [f.path for f in h[CcInfo].compilation_context.headers.to_list()]
+
+    header_concat = "cat {headers} {output} | tee {out} > /dev/null".format(
+        output = cpp_output.path,
+        out = output.path,
+        headers = " ".join(headers),
+    )
+    concat_inputs = []
+    if len(headers) > 0:
+        concat_inputs = [f for f in h[CcInfo].compilation_context.headers.to_list() for h in ctx.attr.headers]
+    concat_inputs.append(cpp_output)
+    ctx.actions.run_shell(
+        outputs = [output],
+        inputs = concat_inputs,
+        command = header_concat,
+        mnemonic = "ConcatHeaders",
     )
     return DefaultInfo(files = depset([output]))
 
@@ -87,6 +108,11 @@ pl_bpf_preprocess = rule(
         ),
         deps = attr.label_list(
             doc = "cc dependencies to take headers from",
+            providers = [CcInfo],
+        ),
+        headers = attr.label_list(
+            doc = "The header files to be prepended to the bpf file",
+            allow_files = True,
             providers = [CcInfo],
         ),
         defines = attr.string_list(

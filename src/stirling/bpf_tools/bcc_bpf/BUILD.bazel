@@ -31,7 +31,15 @@ package(default_visibility = [
 
 cc_library(
     name = "headers",
-    hdrs = glob(["*.h"]),
+    hdrs = glob(
+        ["*.h"],
+        exclude = ["test.h"],
+    ),
+)
+
+cc_library(
+    name = "post_preprocess_headers",
+    hdrs = ["test.h"],
 )
 
 # Build :task_struct_mem_read_bpf_preprocess to examine the preprocessing output.
