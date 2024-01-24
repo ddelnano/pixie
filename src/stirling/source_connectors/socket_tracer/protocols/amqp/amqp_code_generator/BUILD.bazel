@@ -68,7 +68,6 @@ py_binary(
 
 genrule(
     name = "amqp_gen_files",
-    srcs = [".clang-format"],
     outs = [
         "decode.h",
         "decode.cc",
@@ -77,12 +76,10 @@ genrule(
     ],
     cmd = """
         export TMP=$$(mktemp -d)
-        PATH="$$PATH:/opt/px_dev/bin" $(location //src/stirling/source_connectors/socket_tracer/protocols/amqp/amqp_code_generator:amqp_code_gen_main) run --generation_dir=$${TMP} --clang-format-file=$<
+        PATH="$$PATH:/opt/px_dev/bin" $(location //src/stirling/source_connectors/socket_tracer/protocols/amqp/amqp_code_generator:amqp_code_gen_main) run --generation_dir=$${TMP}
         cp $${TMP}/* $(RULEDIR)
         rm -rf $${TMP}
     """,
-    # clang-format is installed within /opt/px_dev/bin and is used by the amqp code generator
-    local = True,
     tools = ["//src/stirling/source_connectors/socket_tracer/protocols/amqp/amqp_code_generator:amqp_code_gen_main"],
 )
 

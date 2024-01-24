@@ -21,7 +21,6 @@ from enum import Enum, auto
 from typing import List
 from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
-import subprocess
 from rules_python.python.runfiles import runfiles
 
 
@@ -810,7 +809,6 @@ class CodeGeneratorWriter:
         xml_file="amqp0-9-1.stripped.xml",
         generation_dir="generated_files",
         gen_template_dir="gen_templates",
-        clang_format_file="",
     ):
         bzl_base_path = "px/src/stirling/source_connectors/socket_tracer/protocols/amqp/amqp_code_generator/"
         r = runfiles.Create()
@@ -818,7 +816,6 @@ class CodeGeneratorWriter:
         runfiles_base_path = os.path.dirname(xml_file)
         full_base_path = os.getcwd()
 
-        self.clang_format_file = clang_format_file
         self.generation_dir = os.path.join(full_base_path, generation_dir)
         self.template_dir = Path(os.path.join(runfiles_base_path, gen_template_dir))
         os.makedirs(self.generation_dir, exist_ok=True)
@@ -925,21 +922,4 @@ class CodeGeneratorWriter:
         self.write_struct_declr()
         self.write_buffer_decode()
         self.write_px_script_functions()
-        self.format_all()
 
-    def format_all(self):
-        """
-        Runs clang-format to format outputted c code
-        """
-        p = subprocess.Popen(
-            [
-                "clang-format",
-                f"-style=file:{self.clang_format_file}",
-                "-i",
-                str(self.struct_gen_header_path),
-                str(self.decode_gen_path),
-                str(self.types_gen_header_path),
-                str(self.amqp_pxl_function_gen_path),
-            ]
-        )
-        p.wait()

@@ -15,7 +15,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import os
-import subprocess
 import json
 from pathlib import Path
 from typing import OrderedDict
@@ -374,21 +373,6 @@ class CodeTestGenerator:
         print("Generating Code...")
         self.generate_test_code()
         print("Formating code...")
-        self.format()
-
-    def format(self):
-        if input("Use clang-format to format code[y/n]") != "y":
-            return
-
-        p = subprocess.Popen(
-            [
-                "clang-format",
-                "-style=Google",
-                "-i",
-                str(self.parse_decode_test_gen_path),
-            ]
-        )
-        p.wait()
 
 
 if __name__ == "__main__":
