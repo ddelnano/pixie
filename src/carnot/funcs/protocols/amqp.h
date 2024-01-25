@@ -41,311 +41,248 @@ inline std::string FrameTypeName(int frame_type) {
   }
 }
 
-        std::string ClassIdToClassName(uint16_t class_id) {
-            switch(class_id) {
-                
-                    case 10:
-                        return "Connection";
-                
-
-                    case 20:
-                        return "Channel";
-                
-
-                    case 40:
-                        return "Exchange";
-                
-
-                    case 50:
-                        return "Queue";
-                
-
-                    case 60:
-                        return "Basic";
-                
-
-                    case 90:
-                        return "Tx";
-                
-                default:
-                    return "Unknown";
-            }
-        }
+std::string ClassIdToClassName(uint16_t class_id) {
+  switch (class_id) {
+    
+    case 10:
+      return "Connection";
+    case 20:
+      return "Channel";
+    case 40:
+      return "Exchange";
+    case 50:
+      return "Queue";
+    case 60:
+      return "Basic";
+    case 90:
+      return "Tx";
+    default:
+      return "Unknown";
+  }
+}
         
 
 
-        std::string ClassIdMethodIdToMethodName(uint16_t class_id, uint16_t method_id) {
-            if(class_id != 0 && method_id == 0) {
-                return ClassIdToClassName(class_id);
-            }
-            
-                        if(method_id == 10 && class_id == 10) {
-                            return "ConnectionStart";
-                        }
-                    
+std::string ClassIdMethodIdToMethodName(uint16_t class_id, uint16_t method_id) {
+  if (class_id != 0 && method_id == 0) {
+    return ClassIdToClassName(class_id);
+  }
+  
+  if (method_id == 10 && class_id == 10) {
+    return "ConnectionStart";
+  }
 
-                        if(method_id == 11 && class_id == 10) {
-                            return "ConnectionStart-ok";
-                        }
-                    
+  if (method_id == 11 && class_id == 10) {
+    return "ConnectionStart-ok";
+  }
 
-                        if(method_id == 20 && class_id == 10) {
-                            return "ConnectionSecure";
-                        }
-                    
+  if (method_id == 20 && class_id == 10) {
+    return "ConnectionSecure";
+  }
 
-                        if(method_id == 21 && class_id == 10) {
-                            return "ConnectionSecure-ok";
-                        }
-                    
+  if (method_id == 21 && class_id == 10) {
+    return "ConnectionSecure-ok";
+  }
 
-                        if(method_id == 30 && class_id == 10) {
-                            return "ConnectionTune";
-                        }
-                    
+  if (method_id == 30 && class_id == 10) {
+    return "ConnectionTune";
+  }
 
-                        if(method_id == 31 && class_id == 10) {
-                            return "ConnectionTune-ok";
-                        }
-                    
+  if (method_id == 31 && class_id == 10) {
+    return "ConnectionTune-ok";
+  }
 
-                        if(method_id == 40 && class_id == 10) {
-                            return "ConnectionOpen";
-                        }
-                    
+  if (method_id == 40 && class_id == 10) {
+    return "ConnectionOpen";
+  }
 
-                        if(method_id == 41 && class_id == 10) {
-                            return "ConnectionOpen-ok";
-                        }
-                    
+  if (method_id == 41 && class_id == 10) {
+    return "ConnectionOpen-ok";
+  }
 
-                        if(method_id == 50 && class_id == 10) {
-                            return "ConnectionClose";
-                        }
-                    
+  if (method_id == 50 && class_id == 10) {
+    return "ConnectionClose";
+  }
 
-                        if(method_id == 51 && class_id == 10) {
-                            return "ConnectionClose-ok";
-                        }
-                    
+  if (method_id == 51 && class_id == 10) {
+    return "ConnectionClose-ok";
+  }
 
-                        if(method_id == 10 && class_id == 20) {
-                            return "ChannelOpen";
-                        }
-                    
+  if (method_id == 10 && class_id == 20) {
+    return "ChannelOpen";
+  }
 
-                        if(method_id == 11 && class_id == 20) {
-                            return "ChannelOpen-ok";
-                        }
-                    
+  if (method_id == 11 && class_id == 20) {
+    return "ChannelOpen-ok";
+  }
 
-                        if(method_id == 20 && class_id == 20) {
-                            return "ChannelFlow";
-                        }
-                    
+  if (method_id == 20 && class_id == 20) {
+    return "ChannelFlow";
+  }
 
-                        if(method_id == 21 && class_id == 20) {
-                            return "ChannelFlow-ok";
-                        }
-                    
+  if (method_id == 21 && class_id == 20) {
+    return "ChannelFlow-ok";
+  }
 
-                        if(method_id == 40 && class_id == 20) {
-                            return "ChannelClose";
-                        }
-                    
+  if (method_id == 40 && class_id == 20) {
+    return "ChannelClose";
+  }
 
-                        if(method_id == 41 && class_id == 20) {
-                            return "ChannelClose-ok";
-                        }
-                    
+  if (method_id == 41 && class_id == 20) {
+    return "ChannelClose-ok";
+  }
 
-                        if(method_id == 10 && class_id == 40) {
-                            return "ExchangeDeclare";
-                        }
-                    
+  if (method_id == 10 && class_id == 40) {
+    return "ExchangeDeclare";
+  }
 
-                        if(method_id == 11 && class_id == 40) {
-                            return "ExchangeDeclare-ok";
-                        }
-                    
+  if (method_id == 11 && class_id == 40) {
+    return "ExchangeDeclare-ok";
+  }
 
-                        if(method_id == 20 && class_id == 40) {
-                            return "ExchangeDelete";
-                        }
-                    
+  if (method_id == 20 && class_id == 40) {
+    return "ExchangeDelete";
+  }
 
-                        if(method_id == 21 && class_id == 40) {
-                            return "ExchangeDelete-ok";
-                        }
-                    
+  if (method_id == 21 && class_id == 40) {
+    return "ExchangeDelete-ok";
+  }
 
-                        if(method_id == 10 && class_id == 50) {
-                            return "QueueDeclare";
-                        }
-                    
+  if (method_id == 10 && class_id == 50) {
+    return "QueueDeclare";
+  }
 
-                        if(method_id == 11 && class_id == 50) {
-                            return "QueueDeclare-ok";
-                        }
-                    
+  if (method_id == 11 && class_id == 50) {
+    return "QueueDeclare-ok";
+  }
 
-                        if(method_id == 20 && class_id == 50) {
-                            return "QueueBind";
-                        }
-                    
+  if (method_id == 20 && class_id == 50) {
+    return "QueueBind";
+  }
 
-                        if(method_id == 21 && class_id == 50) {
-                            return "QueueBind-ok";
-                        }
-                    
+  if (method_id == 21 && class_id == 50) {
+    return "QueueBind-ok";
+  }
 
-                        if(method_id == 50 && class_id == 50) {
-                            return "QueueUnbind";
-                        }
-                    
+  if (method_id == 50 && class_id == 50) {
+    return "QueueUnbind";
+  }
 
-                        if(method_id == 51 && class_id == 50) {
-                            return "QueueUnbind-ok";
-                        }
-                    
+  if (method_id == 51 && class_id == 50) {
+    return "QueueUnbind-ok";
+  }
 
-                        if(method_id == 30 && class_id == 50) {
-                            return "QueuePurge";
-                        }
-                    
+  if (method_id == 30 && class_id == 50) {
+    return "QueuePurge";
+  }
 
-                        if(method_id == 31 && class_id == 50) {
-                            return "QueuePurge-ok";
-                        }
-                    
+  if (method_id == 31 && class_id == 50) {
+    return "QueuePurge-ok";
+  }
 
-                        if(method_id == 40 && class_id == 50) {
-                            return "QueueDelete";
-                        }
-                    
+  if (method_id == 40 && class_id == 50) {
+    return "QueueDelete";
+  }
 
-                        if(method_id == 41 && class_id == 50) {
-                            return "QueueDelete-ok";
-                        }
-                    
+  if (method_id == 41 && class_id == 50) {
+    return "QueueDelete-ok";
+  }
 
-                        if(method_id == 10 && class_id == 60) {
-                            return "BasicQos";
-                        }
-                    
+  if (method_id == 10 && class_id == 60) {
+    return "BasicQos";
+  }
 
-                        if(method_id == 11 && class_id == 60) {
-                            return "BasicQos-ok";
-                        }
-                    
+  if (method_id == 11 && class_id == 60) {
+    return "BasicQos-ok";
+  }
 
-                        if(method_id == 20 && class_id == 60) {
-                            return "BasicConsume";
-                        }
-                    
+  if (method_id == 20 && class_id == 60) {
+    return "BasicConsume";
+  }
 
-                        if(method_id == 21 && class_id == 60) {
-                            return "BasicConsume-ok";
-                        }
-                    
+  if (method_id == 21 && class_id == 60) {
+    return "BasicConsume-ok";
+  }
 
-                        if(method_id == 30 && class_id == 60) {
-                            return "BasicCancel";
-                        }
-                    
+  if (method_id == 30 && class_id == 60) {
+    return "BasicCancel";
+  }
 
-                        if(method_id == 31 && class_id == 60) {
-                            return "BasicCancel-ok";
-                        }
-                    
+  if (method_id == 31 && class_id == 60) {
+    return "BasicCancel-ok";
+  }
 
-                        if(method_id == 40 && class_id == 60) {
-                            return "BasicPublish";
-                        }
-                    
+  if (method_id == 40 && class_id == 60) {
+    return "BasicPublish";
+  }
 
-                        if(method_id == 50 && class_id == 60) {
-                            return "BasicReturn";
-                        }
-                    
+  if (method_id == 50 && class_id == 60) {
+    return "BasicReturn";
+  }
 
-                        if(method_id == 60 && class_id == 60) {
-                            return "BasicDeliver";
-                        }
-                    
+  if (method_id == 60 && class_id == 60) {
+    return "BasicDeliver";
+  }
 
-                        if(method_id == 70 && class_id == 60) {
-                            return "BasicGet";
-                        }
-                    
+  if (method_id == 70 && class_id == 60) {
+    return "BasicGet";
+  }
 
-                        if(method_id == 71 && class_id == 60) {
-                            return "BasicGet-ok";
-                        }
-                    
+  if (method_id == 71 && class_id == 60) {
+    return "BasicGet-ok";
+  }
 
-                        if(method_id == 72 && class_id == 60) {
-                            return "BasicGet-empty";
-                        }
-                    
+  if (method_id == 72 && class_id == 60) {
+    return "BasicGet-empty";
+  }
 
-                        if(method_id == 80 && class_id == 60) {
-                            return "BasicAck";
-                        }
-                    
+  if (method_id == 80 && class_id == 60) {
+    return "BasicAck";
+  }
 
-                        if(method_id == 90 && class_id == 60) {
-                            return "BasicReject";
-                        }
-                    
+  if (method_id == 90 && class_id == 60) {
+    return "BasicReject";
+  }
 
-                        if(method_id == 100 && class_id == 60) {
-                            return "BasicRecover-async";
-                        }
-                    
+  if (method_id == 100 && class_id == 60) {
+    return "BasicRecover-async";
+  }
 
-                        if(method_id == 110 && class_id == 60) {
-                            return "BasicRecover";
-                        }
-                    
+  if (method_id == 110 && class_id == 60) {
+    return "BasicRecover";
+  }
 
-                        if(method_id == 111 && class_id == 60) {
-                            return "BasicRecover-ok";
-                        }
-                    
+  if (method_id == 111 && class_id == 60) {
+    return "BasicRecover-ok";
+  }
 
-                        if(method_id == 10 && class_id == 90) {
-                            return "TxSelect";
-                        }
-                    
+  if (method_id == 10 && class_id == 90) {
+    return "TxSelect";
+  }
 
-                        if(method_id == 11 && class_id == 90) {
-                            return "TxSelect-ok";
-                        }
-                    
+  if (method_id == 11 && class_id == 90) {
+    return "TxSelect-ok";
+  }
 
-                        if(method_id == 20 && class_id == 90) {
-                            return "TxCommit";
-                        }
-                    
+  if (method_id == 20 && class_id == 90) {
+    return "TxCommit";
+  }
 
-                        if(method_id == 21 && class_id == 90) {
-                            return "TxCommit-ok";
-                        }
-                    
+  if (method_id == 21 && class_id == 90) {
+    return "TxCommit-ok";
+  }
 
-                        if(method_id == 30 && class_id == 90) {
-                            return "TxRollback";
-                        }
-                    
+  if (method_id == 30 && class_id == 90) {
+    return "TxRollback";
+  }
 
-                        if(method_id == 31 && class_id == 90) {
-                            return "TxRollback-ok";
-                        }
-                    
-            return "Unknown";
-        }
-        
+  if (method_id == 31 && class_id == 90) {
+    return "TxRollback-ok";
+  }
+
+  return "Unknown";
+}
+
 
 }  // namespace amqp
 

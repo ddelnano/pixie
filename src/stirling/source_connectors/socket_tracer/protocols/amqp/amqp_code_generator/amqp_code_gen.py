@@ -113,7 +113,7 @@ class Field:
         """
         c_field_type_name = FieldType.get_c_type_name(self.field_type)
         default_value = FieldType.get_c_default_value(self.field_type)
-        return f"{c_field_type_name} {self.c_field_name} = {default_value};"
+        return f"  {c_field_type_name} {self.c_field_name} = {default_value};"
 
     def gen_json_builder(self):
         """
@@ -124,8 +124,8 @@ class Field:
         The field name is used as json key to be close to the key used in spec
         """
         if self.field_type == FieldType.table:
-            return f"// TODO(vsrivatsa): support KV for {self.field_name} field table type"
-        return f'builder->WriteKV("{self.c_field_name}", {self.c_field_name});'
+            return f"    // TODO(vsrivatsa): support KV for {self.field_name} field table type"
+        return f'    builder->WriteKV("{self.c_field_name}", {self.c_field_name});'
 
     def gen_buffer_extract(self):
         """
@@ -138,13 +138,13 @@ class Field:
         }
         """
         extract_function = FieldType.get_field_extract_function(self.field_type)
-        return f"PX_ASSIGN_OR_RETURN(r.{self.c_field_name}, {extract_function});"
+        return f"  PX_ASSIGN_OR_RETURN(r.{self.c_field_name}, {extract_function});"
 
     def gen_buffer_extract_bit(self, index):
         """
         The bit type in AMQP packs multiple values into a single octet
         """
-        return f"PX_ASSIGN_OR_RETURN(r.{self.c_field_name}, ExtractNthBit(decoder, {index}));"
+        return f"  PX_ASSIGN_OR_RETURN(r.{self.c_field_name}, ExtractNthBit(decoder, {index}));"
 
     def get_class_buffer_extract(self, index):
         """
@@ -153,10 +153,10 @@ class Field:
         """
         extract_function = FieldType.get_field_extract_function(self.field_type)
         return f"""
-            if((property_flags >> {index}) & 1) {{
-                PX_ASSIGN_OR_RETURN(r.{self.c_field_name}, {extract_function});
-            }}
-            """
+  if ((property_flags >> {index}) & 1) {{
+    PX_ASSIGN_OR_RETURN(r.{self.c_field_name}, {extract_function});
+  }}
+"""
 
 
 @dataclass
@@ -188,19 +188,19 @@ class AMQPMethod:
         field_json_builder = "\n".join(
             [field.gen_json_builder() for field in self.fields]
         )
-        unused_attribute = "[[maybe_unused]]" if len(self.fields) == 0 else ""
+        unused_attribute = "[[maybe_unused]] " if len(self.fields) == 0 else ""
         json_builder_function = f"""
-            void ToJSON({unused_attribute} utils::JSONObjectBuilder* builder) const {{
-                        {field_json_builder}
-            }}
-        """
+  void ToJSON({unused_attribute}utils::JSONObjectBuilder* builder) const {{
+{field_json_builder}
+  }}
+"""
         return f"""
-            struct {self.c_struct_name} {{
-                {field_declarations}
-                bool synchronous = {self.synchronous};
-                {json_builder_function}
-            }};
-        """
+struct {self.c_struct_name} {{
+{field_declarations}
+  bool synchronous = {self.synchronous};
+{json_builder_function}
+}};
+"""
 
     def get_field_buffer_extractions(self, fields: List[Field]):
         """
@@ -220,7 +220,7 @@ class AMQPMethod:
         """
         field_type_bit_counter = 0
         field_buffer_extractions = []
-        extract_octet_str = f"{FieldType.get_field_extract_function(FieldType.octet)};"
+        extract_octet_str = f"  {FieldType.get_field_extract_function(FieldType.octet)};"
         for field in fields:
             if field.field_type == FieldType.bit:
                 if field_type_bit_counter == 8:
@@ -243,16 +243,16 @@ class AMQPMethod:
 
     def gen_buffer_extract(self):
         field_buffer_extractions = self.get_field_buffer_extractions(self.fields)
-        unused_attribute = "[[maybe_unused]]" if len(self.fields) == 0 else ""
+        unused_attribute = "[[maybe_unused]] " if len(self.fields) == 0 else ""
         return f"""
-            Status Extract{self.c_struct_name}({unused_attribute} BinaryDecoder* decoder, Frame* frame) {{
-                {self.c_struct_name} r;
-                {field_buffer_extractions}
-                frame->msg = ToString(r);
-                frame->synchronous = {self.synchronous};
-                return Status::OK();
-            }}
-        """
+Status Extract{self.c_struct_name}({unused_attribute}BinaryDecoder* decoder, Frame* frame) {{
+  {self.c_struct_name} r;
+{field_buffer_extractions}
+  frame->msg = ToString(r);
+  frame->synchronous = {self.synchronous};
+  return Status::OK();
+}}
+"""
 
     def gen_method_enum_declr(self):
         """
@@ -262,7 +262,7 @@ class AMQPMethod:
             ...
         }
         """
-        return f"k{self.c_struct_name} = {self.method_id}"
+        return f"  k{self.c_struct_name} = {self.method_id}"
 
     def gen_method_enum_select_case(self, constant_enum_name):
         """
@@ -271,11 +271,11 @@ class AMQPMethod:
             case AMQPChannelMethods::kAMQPChannelOpen:
                 return ExtractAMQPChannelOpen(decoder, req);
             ...
-        """
+"""
         return f"""
-            case {constant_enum_name}::k{self.c_struct_name}:
-                return Extract{self.c_struct_name}(decoder, req);
-        """
+    case {constant_enum_name}::k{self.c_struct_name}:
+      return Extract{self.c_struct_name}(decoder, req);
+"""
 
     def get_class_buffer_extract(self):
         """
@@ -301,17 +301,17 @@ class AMQPMethod:
             ]
         )
         return f"""
-            Status Extract{self.c_struct_name}(BinaryDecoder* decoder, Frame* frame) {{
-                {self.c_struct_name} r;
-                PX_ASSIGN_OR_RETURN(r.body_size, decoder->ExtractBEInt<uint64_t>());
-                PX_ASSIGN_OR_RETURN(uint16_t property_flags, decoder->ExtractBEInt<uint16_t>());
-                r.property_flags = property_flags;
-                {field_buffer_extractions}
-                frame->msg = ToString(r);
-                frame->synchronous = {self.synchronous};
-                return Status::OK();
-            }}
-        """
+Status Extract{self.c_struct_name}(BinaryDecoder* decoder, Frame* frame) {{
+  {self.c_struct_name} r;
+  PX_ASSIGN_OR_RETURN(r.body_size, decoder->ExtractBEInt<uint64_t>());
+  PX_ASSIGN_OR_RETURN(uint16_t property_flags, decoder->ExtractBEInt<uint16_t>());
+  r.property_flags = property_flags;
+  {field_buffer_extractions}
+  frame->msg = ToString(r);
+  frame->synchronous = {self.synchronous};
+  return Status::OK();
+}}
+"""
 
 
 @dataclass
@@ -361,10 +361,10 @@ class AMQPClass:
             [method.gen_method_enum_declr() for method in self.methods]
         )
         return f"""
-            enum {self.constant_enum_name} : uint8_t {{
-                {method_declaration}
-            }};
-            """
+enum {self.constant_enum_name} : uint8_t {{
+{method_declaration}
+}};
+"""
 
     def gen_content_header_enum_select(self):
         """
@@ -374,9 +374,9 @@ class AMQPClass:
                 return ExtractAMQPConnectionStart(decoder, req);
         """
         return f"""
-            case AMQPClasses::k{self.class_name}:
-                return Extract{self.content_header_method.c_struct_name}(decoder, req);
-        """
+    case AMQPClasses::k{self.class_name}:
+      return Extract{self.content_header_method.c_struct_name}(decoder, req);
+"""
 
     def gen_method_select(self):
         """
@@ -393,15 +393,15 @@ class AMQPClass:
             ]
         )
         return f"""
-            Status Process{self.class_name}(BinaryDecoder *decoder, Frame *req, uint16_t  method_id) {{
-                switch(static_cast<{self.constant_enum_name}>(method_id)) {{
-                    {method_cases}
-                    default:
-                        VLOG(1) << absl::Substitute("Invalid {self.class_name} frame method $0", method_id);
-                }}
-                return Status::OK();
-            }}
-        """
+Status Process{self.class_name}(BinaryDecoder* decoder, Frame* req, uint16_t method_id) {{
+  switch (static_cast<{self.constant_enum_name}>(method_id)) {{
+    {method_cases}
+    default:
+      VLOG(1) << absl::Substitute("Invalid {self.class_name} frame method $0", method_id);
+  }}
+  return Status::OK();
+}}
+"""
 
     def gen_class_enum_declr(self):
         """
@@ -411,7 +411,7 @@ class AMQPClass:
             ...
         }
         """
-        return f"k{self.class_name} = {self.class_id}"
+        return f"  k{self.class_name} = {self.class_id}"
 
     def gen_class_enum_select_case(self):
         """
@@ -421,9 +421,9 @@ class AMQPClass:
                 return ExtractAMQPConnectionStart(decoder, req);
         """
         return f"""
-            case AMQPClasses::k{self.class_name}:
-                return Process{self.class_name}(decoder, req, method_id);
-        """
+    case AMQPClasses::k{self.class_name}:
+      return Process{self.class_name}(decoder, req, method_id);
+"""
 
 
 class CodeGenerator:
@@ -565,13 +565,13 @@ class CodeGenerator:
         General AMQP constants
         """
         constant_declarations = ",\n".join(
-            [f"k{to_camel_case(k)} = {v}" for k, v in self.constants.items()]
+            [f"  k{to_camel_case(k)} = {v}" for k, v in self.constants.items()]
         )
         return f"""
-            enum class AMQPConstant : uint16_t {{
-                {constant_declarations}
-            }};
-        """
+enum class AMQPConstant : uint16_t {{
+{constant_declarations}
+}};
+"""
 
     def generate_class_enums(self):
         """
@@ -589,10 +589,10 @@ class CodeGenerator:
             [amqp_class.gen_class_enum_declr() for amqp_class in self.amqp_classes]
         )
         return f"""
-            enum class AMQPClasses : uint8_t {{
-                {constant_declarations}
-            }};
-        """
+enum class AMQPClasses : uint8_t {{
+{constant_declarations}
+}};
+"""
 
     def gen_method_enum_declrs(self):
         """
@@ -669,49 +669,49 @@ class CodeGenerator:
 
         amqp_extract_class_case_str = "\n".join(amqp_extract_class_case)
         return f"""
-        Status ProcessFrameMethod(BinaryDecoder* decoder, Frame* req) {{
-            PX_ASSIGN_OR_RETURN(uint16_t class_id, decoder->ExtractBEInt<uint16_t>());
-            PX_ASSIGN_OR_RETURN(uint16_t method_id, decoder->ExtractBEInt<uint16_t>());
+Status ProcessFrameMethod(BinaryDecoder* decoder, Frame* req) {{
+  PX_ASSIGN_OR_RETURN(uint16_t class_id, decoder->ExtractBEInt<uint16_t>());
+  PX_ASSIGN_OR_RETURN(uint16_t method_id, decoder->ExtractBEInt<uint16_t>());
 
-            req->class_id = class_id;
-            req->method_id = method_id;
+  req->class_id = class_id;
+  req->method_id = method_id;
 
-            switch(static_cast<AMQPClasses>(class_id)) {{
-                {amqp_extract_class_case_str}
-                default:
-                    VLOG(1) << absl::Substitute("Unparsed frame method class $0 method $1", class_id, method_id);
-            }}
+  switch (static_cast<AMQPClasses>(class_id)) {{
+      {amqp_extract_class_case_str}
+    default:
+      VLOG(1) << absl::Substitute("Unparsed frame method class $0 method $1", class_id, method_id);
+  }}
 
-            return Status::OK();
-        }}
-        """
+  return Status::OK();
+}}
+"""
 
     def gen_process_frame_type(self):
         return """
-        Status ProcessPayload(Frame* req, BinaryDecoder* decoder) {
-            // Extracts api_key, api_version, and correlation_id.
-            AMQPFrameTypes amqp_frame_type = static_cast<AMQPFrameTypes>(req->frame_type);
-            switch (amqp_frame_type) {
-                case AMQPFrameTypes::kFrameHeader:
-                    return ProcessContentHeader(decoder, req);
-                case AMQPFrameTypes::kFrameBody: {
-                    req->msg = "";
-                    auto status = decoder->ExtractBufIgnore(req->payload_size);
-                    if (!status.ok()) {
-                        VLOG(1) << absl::Substitute("Failed to extract body for AMQP, error: $0", status.ToString());
-                    }
-                    break; // Ignore bytes in content body since length already provided by header
-                }
-                case AMQPFrameTypes::kFrameHeartbeat:
-                    req->msg = "";
-                    break; // Heartbeat frames have no body or length
-                case AMQPFrameTypes::kFrameMethod:
-                    return ProcessFrameMethod(decoder, req);
-                default:
-                    VLOG(1) << absl::Substitute("Unparsed frame $0", req->frame_type);
-            }
-            return Status::OK();
-        }"""
+Status ProcessPayload(Frame* req, BinaryDecoder* decoder) {
+  // Extracts api_key, api_version, and correlation_id.
+  AMQPFrameTypes amqp_frame_type = static_cast<AMQPFrameTypes>(req->frame_type);
+  switch (amqp_frame_type) {
+    case AMQPFrameTypes::kFrameHeader:
+      return ProcessContentHeader(decoder, req);
+    case AMQPFrameTypes::kFrameBody: {
+      req->msg = "";
+      auto status = decoder->ExtractBufIgnore(req->payload_size);
+      if (!status.ok()) {
+        VLOG(1) << absl::Substitute("Failed to extract body for AMQP, error: $0", status.ToString());
+      }
+      break; // Ignore bytes in content body since length already provided by header
+    }
+    case AMQPFrameTypes::kFrameHeartbeat:
+      req->msg = "";
+      break; // Heartbeat frames have no body or length
+    case AMQPFrameTypes::kFrameMethod:
+      return ProcessFrameMethod(decoder, req);
+    default:
+      VLOG(1) << absl::Substitute("Unparsed frame $0", req->frame_type);
+  }
+  return Status::OK();
+}"""
 
     def gen_process_content_header_select(self):
         """
@@ -724,22 +724,22 @@ class CodeGenerator:
 
         amqp_extract_class_case_str = "\n".join(amqp_extract_class_case)
         return f"""
-        Status ProcessContentHeader(BinaryDecoder* decoder, Frame* req) {{
-            PX_ASSIGN_OR_RETURN(uint16_t class_id, decoder->ExtractBEInt<uint16_t>());
-            PX_ASSIGN_OR_RETURN(uint16_t weight, decoder->ExtractBEInt<uint16_t>());
-            req->class_id = class_id;
+Status ProcessContentHeader(BinaryDecoder* decoder, Frame* req) {{
+  PX_ASSIGN_OR_RETURN(uint16_t class_id, decoder->ExtractBEInt<uint16_t>());
+  PX_ASSIGN_OR_RETURN(uint16_t weight, decoder->ExtractBEInt<uint16_t>());
+  req->class_id = class_id;
 
-            if(weight != 0) {{
-                return error::Internal("AMQP content header weight should be 0");
-            }}
-            switch(static_cast<AMQPClasses>(class_id)) {{
-                {amqp_extract_class_case_str}
-                default:
-                    VLOG(1) << absl::Substitute("Unparsed content header class $0", class_id);
-            }}
-            return Status::OK();
-        }}
-        """
+  if (weight != 0) {{
+    return error::Internal("AMQP content header weight should be 0");
+  }}
+  switch (static_cast<AMQPClasses>(class_id)) {{
+  {amqp_extract_class_case_str}
+    default:
+      VLOG(1) << absl::Substitute("Unparsed content header class $0", class_id);
+  }}
+  return Status::OK();
+}}
+"""
 
     def gen_class_id_to_class_name(self):
         """
@@ -749,19 +749,18 @@ class CodeGenerator:
         for amqp_class in self.amqp_classes:
             amqp_class_id_class_name.append(
                 f"""
-                    case {amqp_class.class_id}:
-                        return "{amqp_class.class_name}";
-                """
+    case {amqp_class.class_id}:
+      return "{amqp_class.class_name}";"""
             )
-        amqp_class_id_class_name_str = "\n".join(amqp_class_id_class_name)
+        amqp_class_id_class_name_str = "".join(amqp_class_id_class_name)
         return f"""
-        std::string ClassIdToClassName(uint16_t class_id) {{
-            switch(class_id) {{
-                {amqp_class_id_class_name_str}
-                default:
-                    return "Unknown";
-            }}
-        }}
+std::string ClassIdToClassName(uint16_t class_id) {{
+  switch (class_id) {{
+    {amqp_class_id_class_name_str}
+    default:
+      return "Unknown";
+  }}
+}}
         """
 
     def gen_method_id_to_method_name(self):
@@ -776,21 +775,21 @@ class CodeGenerator:
                 amqp_method_name = method.method_name.capitalize()
                 amqp_class_id_method_name.append(
                     f"""
-                        if(method_id == {method.method_id} && class_id == {amqp_class.class_id}) {{
-                            return "{amqp_class_name}{amqp_method_name}";
-                        }}
-                    """
+  if (method_id == {method.method_id} && class_id == {amqp_class.class_id}) {{
+    return "{amqp_class_name}{amqp_method_name}";
+  }}
+"""
                 )
-        amqp_class_id_method_name_str = "\n".join(amqp_class_id_method_name)
+        amqp_class_id_method_name_str = "".join(amqp_class_id_method_name)
         return f"""
-        std::string ClassIdMethodIdToMethodName(uint16_t class_id, uint16_t method_id) {{
-            if(class_id != 0 && method_id == 0) {{
-                return ClassIdToClassName(class_id);
-            }}
-            {amqp_class_id_method_name_str}
-            return "Unknown";
-        }}
-        """
+std::string ClassIdMethodIdToMethodName(uint16_t class_id, uint16_t method_id) {{
+  if (class_id != 0 && method_id == 0) {{
+    return ClassIdToClassName(class_id);
+  }}
+  {amqp_class_id_method_name_str}
+  return "Unknown";
+}}
+"""
 
 
 class CodeGeneratorWriter:
