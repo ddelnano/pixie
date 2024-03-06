@@ -76,7 +76,7 @@ struct KProbeSpec {
   bool is_optional = false;
 
   // If the kernel function is not found, then this fallback function will be used instead.
-  struct KProbeSpec* fallback_probe = nullptr;
+  struct KProbeSpec* fallback_probe = unique_ptr;
 
   std::string ToString() const {
     return absl::Substitute("[kernel_function=$0 type=$1 probe=$2]", kernel_fn,
