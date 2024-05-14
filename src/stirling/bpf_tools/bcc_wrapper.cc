@@ -192,7 +192,7 @@ Status BCCWrapperImpl::AttachKProbe(const KProbeSpec& probe) {
   }
 
   if (status.ok()) {
-    kprobes_.push_back(probe);
+    kprobes_.push_back(&probe);
     ++num_attached_kprobes_;
   }
   return Status::OK();
@@ -324,7 +324,7 @@ Status BCCWrapperImpl::DetachTracepoint(const TracepointSpec& probe) {
 }
 
 void BCCWrapperImpl::DetachKProbes() {
-  for (const auto& p : kprobes_) {
+  for (auto& p : kprobes_) {
     auto res = DetachKProbe(p);
     LOG_IF(ERROR, !res.ok()) << res.msg();
   }
