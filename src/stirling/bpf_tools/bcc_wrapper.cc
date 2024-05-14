@@ -324,8 +324,8 @@ Status BCCWrapperImpl::DetachTracepoint(const TracepointSpec& probe) {
 }
 
 void BCCWrapperImpl::DetachKProbes() {
-  for (auto& p : kprobes_) {
-    auto res = DetachKProbe(p);
+  for (const auto& p : kprobes_) {
+    auto res = DetachKProbe(*p);
     LOG_IF(ERROR, !res.ok()) << res.msg();
   }
   kprobes_.clear();

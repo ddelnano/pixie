@@ -303,7 +303,7 @@ void SocketTraceConnector::InitProtocolTransferSpecs() {
 }
 
 using ProbeType = bpf_tools::BPFProbeAttachType;
-const auto kProbeSpecs = MakeArray<bpf_tools::KProbeSpecWithFallback>({
+const auto kProbeSpecs = MakeArray<bpf_tools::KProbeSpec>({
     {"connect", ProbeType::kEntry, "syscall__probe_entry_connect"},
     {"connect", ProbeType::kReturn, "syscall__probe_ret_connect"},
     {"accept", ProbeType::kEntry, "syscall__probe_entry_accept"},
