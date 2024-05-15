@@ -343,13 +343,11 @@ const auto kProbeSpecs = MakeArray<bpf_tools::KProbeSpec>({
     {"mmap", ProbeType::kEntry, "syscall__probe_entry_mmap"},
     {"sock_alloc", ProbeType::kReturn, "probe_ret_sock_alloc", /*is_syscall*/ false},
     {"security_socket_sendmsg", ProbeType::kEntry, "probe_entry_socket_sendmsg",
-     /*is_syscall*/ false, /* is_optional */ false,
-     std::make_unique<bpf_tools::KProbeSpec>(bpf_tools::KProbeSpec{
-         "sock_sendmesg", ProbeType::kEntry, "probe_entry_socket_sendmsg", false, true})},
+     /*is_syscall*/ false, /* is_optional */ false, bpf_tools::KProbeSpec{
+         "sock_sendmesg", ProbeType::kEntry, "probe_entry_socket_sendmsg", false, true}},
     {"security_socket_recvmsg", ProbeType::kEntry, "probe_entry_socket_recvmsg",
-     /*is_syscall*/ false, /* is_optional */ false,
-     std::make_unique<bpf_tools::KProbeSpec>(bpf_tools::KProbeSpec{
-         "sock_recvmsg", ProbeType::kEntry, "probe_entry_socket_recvmsg", false, true})},
+     /*is_syscall*/ false, /* is_optional */ false, bpf_tools::KProbeSpec{
+         "sock_recvmsg", ProbeType::kEntry, "probe_entry_socket_recvmsg", false, true}},
 });
 
 using bpf_tools::PerfBufferSizeCategory;

@@ -33,6 +33,7 @@
 #include <linux/perf_event.h>
 
 #include <filesystem>
+#include <optional>
 #include <memory>
 #include <string>
 
@@ -77,7 +78,7 @@ struct KProbeSpec {
   bool is_optional = false;
 
   // If the kernel function is not found, then this fallback function will be used instead.
-  std::unique_ptr<KProbeSpec> fallback_probe = nullptr;
+  std::optional<KProbeSpec> fallback_probe = std::nullopt;
 
   std::string ToString() const {
     return absl::Substitute("[kernel_function=$0 type=$1 probe=$2]", kernel_fn,
