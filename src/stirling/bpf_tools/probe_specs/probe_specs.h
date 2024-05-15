@@ -34,6 +34,7 @@
 
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include <magic_enum.hpp>
@@ -76,13 +77,17 @@ struct KProbeSpec {
   // kernels.
   bool is_optional = false;
 
-  // If the kernel function is not found, then this fallback function will be used instead.
-  std::unique_ptr<KProbeSpec> fallback_probe = nullptr;
-
   std::string ToString() const {
     return absl::Substitute("[kernel_function=$0 type=$1 probe=$2]", kernel_fn,
                             magic_enum::enum_name(attach_type), probe_fn);
   }
+
+  virtual ~KProbeSpec() = default;
+};
+
+struct KProbeSpecWithFallback : KProbeSpec {
+  // If the kernel function is not found, then this fallback function will be used instead.
+  std::optional<KProbeSpec> fallback_probe = std::nullopt;
 };
 
 /**
