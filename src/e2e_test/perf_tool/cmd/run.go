@@ -91,7 +91,7 @@ func init() {
 	RunCmd.Flags().Int("max_retries", 3, "Number of times to retry a failing experiment")
 	RunCmd.Flags().Int("num_runs", 1, "Number of times to repeat each experiment")
 
-	RunCmd.Flags().String("ds_report_id", "04fc228e-4f26-4e5a-bc2c-101ed86132df", "The unique ID of the datastudio report, used to print links to datastudio views")
+	RunCmd.Flags().String("ds_report_id", "9a379859-f643-4154-823d-0f155b5c4ece", "The unique ID of the datastudio report, used to print links to datastudio views")
 	RunCmd.Flags().String("ds_experiment_page_id", "p_g7fj6pf4yc", "The unique ID of the datastudio experiment page, used to print links to datastudio views")
 	RunCmd.Flags().Bool("pretty", false, "Pretty print output json")
 
