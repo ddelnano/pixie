@@ -32,17 +32,22 @@ import (
 var (
 	pxl = `
 import px
+px.display(px.GetTables(), 'table_desc')
+px.display(px.GetSchemas(), 'table_schemas')
+`
+	pxlScript = `
+import px
 
-# Look at the http_events.
-df = px.DataFrame(table='http_events')
+df = px.DataFrame(table='http_events', start_time='-5m')
+df.cmdline = df.ctx['cmdline']
+df = df[px.contains(df.cmdline, "python main_http")]
+df.time_ = px.bin(df.time_, 60000000000)
 
-# Grab the command line from the metadata.
-df.cmdline = px.upid_to_cmdline(df.upid)
+df = df.groupby('encrypted').agg(count=('time_', px.count))
+# df = df.groupby('time_').agg(tls=('encrypted', px.count))
 
-# Limit to the first 10.
-df = df.head(10)
-
-px.display(df)`
+px.display(df, 'http_table')
+`
 )
 
 func main() {
@@ -65,7 +70,7 @@ func main() {
 	// Create TableMuxer to accept results table.
 	tm := &tableMux{}
 	// Execute the PxL script.
-	resultSet, err := vz.ExecuteScript(ctx, pxl, tm)
+	resultSet, err := vz.ExecuteScript(ctx, pxlScript, tm)
 	if err != nil && err != io.EOF {
 		panic(err)
 	}

@@ -47,6 +47,7 @@
 DECLARE_bool(treat_loopback_as_in_cluster);
 constexpr int64_t kUnsetPIDFD = -1;
 DECLARE_int64(stirling_conn_trace_pid);
+DECLARE_string(stirling_conn_trace_pids);
 DECLARE_int64(stirling_conn_trace_fd);
 DECLARE_bool(stirling_conn_disable_to_bpf);
 DECLARE_int64(stirling_check_proc_for_conn_close);

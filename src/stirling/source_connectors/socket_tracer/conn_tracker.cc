@@ -27,6 +27,7 @@
 #include <deque>
 #include <filesystem>
 #include <numeric>
+#include <string>
 #include <vector>
 
 #include <absl/strings/numbers.h>
@@ -47,6 +48,7 @@ DEFINE_bool(treat_loopback_as_in_cluster, true,
             "Whether loopback is treated as inside the cluster of not");
 
 DEFINE_int64(stirling_conn_trace_pid, kUnsetPIDFD, "Trace activity on this pid.");
+DEFINE_string(stirling_conn_trace_pids, "", "Trace activity on these pids.");
 DEFINE_int64(stirling_conn_trace_fd, kUnsetPIDFD, "Trace activity on this fd.");
 
 DEFINE_bool(
@@ -68,6 +70,15 @@ using ::px::system::ProcPidPath;
 // Parse failure rate threshold, after which a connection tracker will be disabled.
 constexpr double kParseFailureRateThreshold = 0.4;
 constexpr double kStitchFailureRateThreshold = 0.5;
+
+std::vector<uint32_t> GetTracePids() {
+    std::vector<uint32_t> pids;
+    for (auto piece : absl::StrSplit(FLAGS_stirling_conn_trace_pids, ",")) {
+        std::string pid = std::string(piece);
+        pids.push_back(static_cast<uint32_t>(std::stoul(pid)));
+    }
+    return pids;
+}
 
 //--------------------------------------------------------------
 // ConnTracker
@@ -434,6 +445,12 @@ namespace {
 
 bool ShouldTraceConn(const struct conn_id_t& conn_id) {
   bool pid_match = FLAGS_stirling_conn_trace_pid == conn_id.upid.pid;
+  for (auto pid : GetTracePids()) {
+    if (pid == conn_id.upid.pid) {
+      pid_match = true;
+      break;
+    }
+  }
   bool fd_match =
       FLAGS_stirling_conn_trace_fd == kUnsetPIDFD || FLAGS_stirling_conn_trace_fd == conn_id.fd;
   return pid_match && fd_match;
