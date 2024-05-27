@@ -8,6 +8,9 @@ on:
         required: false
         default: false
         type: boolean
+  push:
+    branches:
+    - ddelnano/fix-dry-run-logic
 permissions:
   contents: read
 jobs:
