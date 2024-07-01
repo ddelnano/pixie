@@ -41,6 +41,7 @@
 #include "src/shared/metadata/metadata.h"
 #include "src/stirling/bpf_tools/macros.h"
 #include "src/stirling/bpf_tools/utils.h"
+#include "src/stirling/source_connectors/socket_tracer/bcc_bpf_intf/common.h"
 #include "src/stirling/source_connectors/socket_tracer/bcc_bpf_intf/go_grpc_types.hpp"
 #include "src/stirling/source_connectors/socket_tracer/bcc_bpf_intf/socket_trace.hpp"
 #include "src/stirling/source_connectors/socket_tracer/conn_stats.h"
@@ -117,6 +118,9 @@ DEFINE_int32(stirling_enable_mongodb_tracing,
              gflags::Int32FromEnv("PX_STIRLING_ENABLE_MONGODB_TRACING",
                                   px::stirling::TraceMode::OnForNewerKernel),
              "If true, stirling will trace and process MongoDB messages");
+DEFINE_int32(stirling_enable_pulsar_tracing,
+             gflags::Int32FromEnv("PX_STIRLING_ENABLE_PULSAR_TRACING", px::stirling::TraceMode::On),
+             "If true, stirling will trace and process pulsar messages.");
 DEFINE_bool(stirling_disable_golang_tls_tracing,
             gflags::BoolFromEnv("PX_STIRLING_DISABLE_GOLANG_TLS_TRACING", false),
             "If true, stirling will not trace TLS traffic for Go applications. This implies "
@@ -283,6 +287,10 @@ void SocketTraceConnector::InitProtocolTransferSpecs() {
                                    kAMQPTableNum,
                                    {kRoleClient, kRoleServer},
                                    TRANSFER_STREAM_PROTOCOL(amqp)}},
+      {kProtocolPulsar, TransferSpec{FLAGS_stirling_enable_pulsar_tracing,
+                                     kPulsarTableNum,
+                                     {kRoleClient, kRoleServer},
+                                     TRANSFER_STREAM_PROTOCOL(pulsar)}},
       {kProtocolUnknown, TransferSpec{/* trace_mode */ px::stirling::TraceMode::Off,
                                       /* table_num */ static_cast<uint32_t>(-1),
                                       /* trace_roles */ {},
@@ -472,6 +480,7 @@ Status SocketTraceConnector::InitBPF() {
       absl::StrCat("-DENABLE_NATS_TRACING=", protocol_transfer_specs_[kProtocolNATS].enabled),
       absl::StrCat("-DENABLE_AMQP_TRACING=", protocol_transfer_specs_[kProtocolAMQP].enabled),
       absl::StrCat("-DENABLE_MONGO_TRACING=", protocol_transfer_specs_[kProtocolMongo].enabled),
+      absl::StrCat("-DENABLE_PULSAR_TRACING=", protocol_transfer_specs_[kProtocolPulsar].enabled),
       absl::StrCat("-DBPF_LOOP_LIMIT=", FLAGS_stirling_bpf_loop_limit),
       absl::StrCat("-DBPF_CHUNK_LIMIT=", FLAGS_stirling_bpf_chunk_limit),
   };
@@ -1659,6 +1668,16 @@ void SocketTraceConnector::AppendMessage(ConnectorContext* ctx, const ConnTracke
 #ifndef NDEBUG
   r.Append<r.ColIndex("px_info_")>(PXInfoString(conn_tracker, record));
 #endif
+}
+
+template <>
+void SocketTraceConnector::AppendMessage(ConnectorContext* ctx, const ConnTracker& conn_tracker,
+                                         protocols::pulsar::Record record, DataTable* data_table) {
+  PX_UNUSED(ctx);
+  PX_UNUSED(conn_tracker);
+  DataTable::RecordBuilder<&kPulsarTable> r(data_table, record.resp.timestamp_ns);
+  r.Append<r.ColIndex("cmd")>(record.req.command);
+  r.Append<r.ColIndex("topic")>(record.req.topic);
 }
 
 void SocketTraceConnector::SetupOutput(const std::filesystem::path& path) {

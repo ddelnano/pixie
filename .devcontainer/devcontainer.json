@@ -1,0 +1,17 @@
+{
+    "image": "ghcr.io/pixie-io/dev_image_with_extras:202405102250",
+    "features": {
+        "ghcr.io/devcontainers/features/sshd": "latest"
+    },
+    "containerEnv": {
+        "PL_HOST_PATH": "/host",
+        "XDG_CACHE_HOME": "/workspaces/cache"
+    },
+    "privileged": true,
+    "runArgs": [
+        "--network=host",
+        "--pid=host",
+        "--volume=/:/host",
+        "--volume=/var/run:/var/run",
+    ]
+}

@@ -21,6 +21,8 @@
 
 #include "src/stirling/source_connectors/socket_tracer/data_stream.h"
 #include "src/stirling/source_connectors/socket_tracer/metrics.h"
+#include "src/stirling/source_connectors/socket_tracer/protocols/common/interface.h"
+#include "src/stirling/source_connectors/socket_tracer/protocols/pulsar/types.h"
 #include "src/stirling/source_connectors/socket_tracer/protocols/types.h"
 
 DEFINE_uint32(datastream_buffer_spike_size,
@@ -215,6 +217,9 @@ template void DataStream::ProcessBytesToFrames<protocols::amqp::channel_id, prot
 template void DataStream::ProcessBytesToFrames<
     protocols::mongodb::stream_id_t, protocols::mongodb::Frame, protocols::mongodb::StateWrapper>(
     message_type_t type, protocols::mongodb::StateWrapper* state);
+template void DataStream::ProcessBytesToFrames<protocols::pulsar::stream_id_t,
+                                               protocols::pulsar::Packet, protocols::NoState>(
+    message_type_t type, protocols::NoState* state);
 void DataStream::Reset() {
   data_buffer_.Reset();
   has_new_events_ = false;

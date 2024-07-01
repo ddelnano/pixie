@@ -94,9 +94,9 @@ enum TraceMode : int32_t {
 class SocketTraceConnector : public BCCSourceConnector {
  public:
   static constexpr std::string_view kName = "socket_tracer";
-  static constexpr auto kTables =
-      MakeArray(kConnStatsTable, kHTTPTable, kMySQLTable, kCQLTable, kPGSQLTable, kDNSTable,
-                kRedisTable, kNATSTable, kKafkaTable, kMuxTable, kAMQPTable, kMongoDBTable);
+  static constexpr auto kTables = MakeArray(
+      kConnStatsTable, kHTTPTable, kMySQLTable, kCQLTable, kPGSQLTable, kDNSTable, kRedisTable,
+      kNATSTable, kKafkaTable, kMuxTable, kAMQPTable, kMongoDBTable, kPulsarTable);
 
   static constexpr uint32_t kConnStatsTableNum = TableNum(kTables, kConnStatsTable);
   static constexpr uint32_t kHTTPTableNum = TableNum(kTables, kHTTPTable);
@@ -110,6 +110,7 @@ class SocketTraceConnector : public BCCSourceConnector {
   static constexpr uint32_t kMuxTableNum = TableNum(kTables, kMuxTable);
   static constexpr uint32_t kAMQPTableNum = TableNum(kTables, kAMQPTable);
   static constexpr uint32_t kMongoDBTableNum = TableNum(kTables, kMongoDBTable);
+  static constexpr uint32_t kPulsarTableNum = TableNum(kTables, kPulsarTable);
 
   static constexpr auto kSamplingPeriod = std::chrono::milliseconds{200};
   // TODO(yzhao): This is not used right now. Eventually use this to control data push frequency.

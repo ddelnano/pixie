@@ -683,6 +683,17 @@ static __inline enum message_type_t infer_nats_message(const char* buf, size_t c
   return kUnknown;
 }
 
+static __inline enum message_type_t infer_pulsar_message(const char* buf, size_t count) {
+  // Pulsar messages always have int32 + int32 + char (for Base command) + char (for enum value)
+  if (count < 10) {
+    return kUnknown;
+  }
+  if (buf[7] == 0x08 && (buf[9] > 2 && buf[9] <= 17))
+    return kRequest; // TODO This is a guess. Need to verify.
+  
+  return kUnknown;
+}
+
 static __inline struct protocol_message_t infer_protocol(const char* buf, size_t count,
                                                          struct conn_info_t* conn_info) {
   struct protocol_message_t inferred_message;
@@ -732,6 +743,9 @@ static __inline struct protocol_message_t infer_protocol(const char* buf, size_t
   } else if (ENABLE_NATS_TRACING &&
              (inferred_message.type = infer_nats_message(buf, count)) != kUnknown) {
     inferred_message.protocol = kProtocolNATS;
+  } else if (ENABLE_PULSAR_TRACING &&
+             (inferred_message.type = infer_pulsar_message(buf, count)) != kUnknown) {
+    inferred_message.protocol = kProtocolPulsar;
   }
 
   conn_info->prev_count = count;

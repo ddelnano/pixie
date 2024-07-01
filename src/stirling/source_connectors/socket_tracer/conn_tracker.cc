@@ -674,6 +674,7 @@ auto CreateTraceRoles() {
   res.Set(kProtocolKafka, {kRoleServer});
   res.Set(kProtocolMux, {kRoleServer});
   res.Set(kProtocolAMQP, {kRoleServer});
+  res.Set(kProtocolPulsar, {kRoleServer});
 
   DCHECK(res.AreAllKeysSet());
   return res;
