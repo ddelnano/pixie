@@ -41,6 +41,7 @@ import (
 
 var (
 	AvailableCloudAddrs = []string{
+		"getcosmic.ai:443",
 		"withpixie.ai:443",
 	}
 	// cloud addr is a required argument. Use empty string since Viper requires a default value.
