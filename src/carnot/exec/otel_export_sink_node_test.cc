@@ -64,6 +64,7 @@ namespace otelmetricscollector = opentelemetry::proto::collector::metrics::v1;
 namespace oteltracecollector = opentelemetry::proto::collector::trace::v1;
 
 class OTelExportSinkNodeTest : public ::testing::Test {
+ friend class OTelExportSinkNode;
  public:
   OTelExportSinkNodeTest() {
     func_registry_ = std::make_unique<udf::Registry>("test_registry");
@@ -1729,6 +1730,7 @@ eos: true)pb";
   auto rb = RowBatch::FromProto(row_batch_proto).ConsumeValueOrDie();
   auto retval = tester.node()->ConsumeNext(exec_state_.get(), *rb.get(), 1);
   EXPECT_NOT_OK(retval);
+  EXPECT_THAT(tester.node()->metrics_response_.ByteSizeLong(), 0);
   EXPECT_THAT(retval.ToString(), ::testing::MatchesRegex(".*INTERNAL.*"));
 }
 

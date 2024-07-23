@@ -222,7 +222,7 @@ Status OTelExportSinkNode::ConsumeMetrics(ExecState* exec_state, const RowBatch&
   }
   context.set_compression_algorithm(GRPC_COMPRESS_GZIP);
 
-  metrics_response_.Clear();
+  /* metrics_response_.Clear(); */
   opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceRequest request;
 
   for (int64_t row_idx = 0; row_idx < rb.ColumnAt(0)->length(); ++row_idx) {
