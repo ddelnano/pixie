@@ -52,6 +52,10 @@ DEFINE_double(stirling_rescan_exp_backoff_factor, 2.0,
               "Exponential backoff factor used in decided how often to rescan binaries for "
               "dynamically loaded libraries");
 
+DEFINE_string(stirling_uprobe_opt_out, "",
+        "Comma separated list of binaries that should be excluded from uprobe attachment."
+        "[one,two,three]");
+
 namespace px {
 namespace stirling {
 
@@ -64,6 +68,7 @@ using ::px::system::ProcPidRootPath;
 
 UProbeManager::UProbeManager(bpf_tools::BCCWrapper* bcc) : bcc_(bcc) {
   proc_parser_ = std::make_unique<system::ProcParser>();
+  uprobe_opt_out_ = absl::StrSplit(FLAGS_stirling_uprobe_opt_out, ",", absl::SkipWhitespace());
 }
 
 void UProbeManager::Init(bool disable_go_tls_tracing, bool enable_http2_tracing,
@@ -564,6 +569,10 @@ std::map<std::string, std::vector<int32_t>> ConvertPIDsListToMap(
 
     if (!fs::Exists(host_exe_path)) {
       continue;
+    }
+    // Add filter here if the executable should be omitted
+    if (uprobe_opt_out_.find(host_exe_path.filename()) != uprobe_opt_out_.end()) {
+        continue
     }
     pids[host_exe_path.string()].push_back(upid.pid());
   }
