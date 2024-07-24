@@ -63,8 +63,6 @@ class OTelExportSinkNode : public SinkNode {
   std::unique_ptr<plan::OTelExportSinkOperator> plan_node_;
 
   std::unique_ptr<SpanConfig> span_config_;
-
-  FRIEND_TEST(OTelExportSinkNodeTest, metrics_stub_errors);
 };
 
 }  // namespace exec
