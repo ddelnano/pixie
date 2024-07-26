@@ -240,6 +240,7 @@ Status OTelExportSinkNode::ConsumeMetrics(ExecState* exec_state, const RowBatch&
       metric->set_description(metric_pb.description());
       metric->set_unit(metric_pb.unit());
 
+      // TODO(ddelnano): Add branch here for histograms
       if (metric_pb.has_summary()) {
         auto summary = metric->mutable_summary();
         auto data_point = summary->add_data_points();

@@ -479,6 +479,8 @@ message OTelMetric {
   oneof data {
     OTelMetricGauge gauge = 101;
     OTelMetricSummary summary = 102;
+    OTelMetricExpotentialHistogram exponential_histogram = 103;
+    // TODO(ddelnano): Add Otel historgram type here.
   }
 }
 
@@ -511,7 +513,7 @@ message OTelExportSinkOperator {
   OTelEndpointConfig endpoint_config = 1;
   // Resource describes where the telemetry data comes from.
   OTelResource resource = 2;
-  // Metrics describest the exported metrics for this resource.
+  // Metrics describes the exported metrics for this resource.
   repeated OTelMetric metrics = 3;
   // Metrics describes the exported spans for this resource.
   repeated OTelSpan spans = 4;
