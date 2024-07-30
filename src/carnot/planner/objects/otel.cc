@@ -177,6 +177,37 @@ StatusOr<QLObjectPtr> GaugeDefinition(IR* graph, const pypa::AstPtr& ast, const 
   return OTelDataContainer::Create(visitor, std::move(metric));
 }
 
+StatusOr<QLObjectPtr> ExpHistoDefinition(IR* graph, const pypa::AstPtr& ast, const ParsedArgs& args,
+                                        ASTVisitor* visitor) {
+  OTelMetric metric;
+  PX_ASSIGN_OR_RETURN(metric.name, ParseName(args.GetArg("name")));
+  PX_ASSIGN_OR_RETURN(metric.description, GetArgAsString(ast, args, "description"));
+  // We add the time_ column  automatically.
+  PX_ASSIGN_OR_RETURN(metric.time_column,
+                      graph->CreateNode<ColumnIR>(ast, "time_", /* parent_op_idx */ 0));
+
+  OTelExponentialHistogram histo;
+  PX_ASSIGN_OR_RETURN(histo.buckets_column, GetArgAs<ColumnIR>(ast, args, "buckets"));
+
+  /* metric.unit_column = summary.quantiles[0].value_column; */
+  if (!NoneObject::IsNoneObject(args.GetArg("unit"))) {
+    PX_ASSIGN_OR_RETURN(auto unit, GetArgAsString(ast, args, "unit"));
+    metric.unit_str = unit;
+  }
+  metric.metric = histo;
+
+  QLObjectPtr attributes = args.GetArg("attributes");
+  if (!DictObject::IsDict(attributes)) {
+    return attributes->CreateError("Expected attributes to be a dictionary, received $0",
+                                   attributes->name());
+  }
+
+  PX_ASSIGN_OR_RETURN(metric.attributes,
+                      ParseAttributes(static_cast<DictObject*>(attributes.get())));
+
+  return OTelDataContainer::Create(visitor, std::move(metric));
+}
+
 StatusOr<QLObjectPtr> SummaryDefinition(IR* graph, const pypa::AstPtr& ast, const ParsedArgs& args,
                                         ASTVisitor* visitor) {
   OTelMetric metric;
@@ -355,6 +386,20 @@ Status OTelMetrics::Init() {
                          ast_visitor()));
   PX_RETURN_IF_ERROR(gauge_fn->SetDocString(kGaugeOpDocstring));
   AddMethod(kGaugeOpID, gauge_fn);
+
+  PX_ASSIGN_OR_RETURN(
+      std::shared_ptr<FuncObject> exp_histo_fn,
+      FuncObject::Create(
+          kExpHistogramOpID,
+          {"name", "value", "description", "attributes", "unit", "boundaries", "counts"},
+          {{"description", "\"\""}, {"attributes", "{}"}, {"unit", "None"}, {"counts", "None"}},
+          /* has_variable_len_args */ false,
+          /* has_variable_len_kwargs */ false,
+          std::bind(&ExpHistoDefinition, graph_, std::placeholders::_1, std::placeholders::_2,
+                    std::placeholders::_3),
+          ast_visitor()));
+  PX_RETURN_IF_ERROR(exp_histo_fn->SetDocString(kSummaryOpDocstring));
+  AddMethod(kExpHistoOpID, exp_histo_fn);
 
   PX_ASSIGN_OR_RETURN(
       std::shared_ptr<FuncObject> summary_fn,

@@ -153,6 +153,11 @@ class OTelMetrics : public QLObject {
       into `px.otel.Data()` as the data argument.
   )doc";
 
+  inline static constexpr char kExpHistogramOpID[] = "ExpoentialHistogram";
+  inline static constexpr char kExpHistogramOpDocstring[] = R"doc(
+Replace later
+  )doc";
+
  protected:
   OTelMetrics(ASTVisitor* ast_visitor, IR* graph)
       : QLObject(OTelMetricsModuleType, ast_visitor), graph_(graph) {}

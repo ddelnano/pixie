@@ -96,6 +96,10 @@ struct OTelMetricSummary {
   std::vector<QuantileValues> quantiles;
 };
 
+struct OTelExponentialHistogram {
+  ColumnIR* buckets_column;
+};
+
 struct OTelMetric {
   std::string name;
   std::string description;
@@ -110,7 +114,7 @@ struct OTelMetric {
 
   std::vector<OTelAttribute> attributes;
 
-  std::variant<OTelMetricGauge, OTelMetricSummary> metric;
+  std::variant<OTelMetricGauge, OTelMetricSummary, OTelExponentialHistogram> metric;
 };
 
 struct OTelSpan {

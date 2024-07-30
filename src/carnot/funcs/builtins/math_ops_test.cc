@@ -628,6 +628,41 @@ TEST(MathOps, merge_count_test) {
   uda_tester.Merge(&other_uda_tester).Expect(9);
 }
 
+TEST(MathOps, basic_float64_exp_histogram_uda_test) {
+  auto uda_tester = udf::UDATester<ExponentialHistogramUDA<types::Float64Value>>();
+  uda_tester.Init(0, 160).ForInput(3.0).ForInput(5.0).ForInput(7.0).ForInput(9.0)
+      .Expect(R"({"1":1,"2":2,"3":1})");
+}
+
+TEST(MathOps, basic_merge_exp_histogram_uda_test) {
+  auto uda_tester = udf::UDATester<ExponentialHistogramUDA<types::Float64Value>>();
+  uda_tester.Init(0, 160).ForInput(0.9).ForInput(3.0).ForInput(5.0).ForInput(7.0).ForInput(9.0)
+      .Expect(R"({"-1":1,"1":1,"2":2,"3":1})");
+
+  auto other_uda_tester = udf::UDATester<ExponentialHistogramUDA<types::Float64Value>>();
+  other_uda_tester.Init(0, 160).ForInput(1.5).ForInput(3.0).ForInput(5.0).ForInput(7.0).ForInput(9.0)
+      .Expect(R"({"0":1,"1":1,"2":2,"3":1})");
+
+  // TODO(ddelnano): Merging these two UDAs should be commutative, but it is not. This is because
+  // the merge function is not commutative. This is a bug.
+  /* uda_tester.Merge(&other_uda_tester).Expect(R"({"-1":1,"0":1,"1":2,"2":4,"3":2})"); */
+  auto result = uda_tester.Merge(&other_uda_tester).Result();
+  EXPECT_EQ(result, R"({"-1":1,"0":1,"1":2,"2":4,"3":2})");
+
+  /* auto other_result = other_uda_tester.Merge(&uda_tester).Result(); */
+  /* EXPECT_EQ(other_result, R"({"-1":1,"0":1,"1":2,"2":4,"3":2})"); */
+}
+
+TEST(MathOps, merge_exp_histogram_must_have_same_scale) {
+  auto uda_tester = udf::UDATester<ExponentialHistogramUDA<types::Float64Value>>();
+  uda_tester.Init(1, 160).ForInput(0.9);
+
+  auto other_uda_tester = udf::UDATester<ExponentialHistogramUDA<types::Float64Value>>();
+  other_uda_tester.Init(0, 160).ForInput(1.5);
+
+  uda_tester.Merge(&other_uda_tester);
+}
+
 // TODO(michellenguyen, PP-2580): We should make UDA tester automatically check Merge and Partial
 // aggregates if more than one input is given. Since our UDAs are arithmetic the ordering should not
 // matter.

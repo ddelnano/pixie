@@ -411,6 +411,10 @@ message OTelMetricGauge {
   }
 }
 
+message OTelExponentialHisogram {
+  AggregateExpression histogram = 1;
+}
+
 // OTelMetricSummary maps operator columns to the fields of OpenTelemetry summary metric.
 // Allows users to specify statistics about the distribution, including the quantile
 // values.
@@ -479,6 +483,7 @@ message OTelMetric {
   oneof data {
     OTelMetricGauge gauge = 101;
     OTelMetricSummary summary = 102;
+    OTelExponentialHisogram histogram = 103;
   }
 }
 

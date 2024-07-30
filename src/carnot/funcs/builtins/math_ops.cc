@@ -248,6 +248,10 @@ void RegisterMathOpsOrDie(udf::Registry* registry) {
   registry->RegisterOrDie<CountUDA<types::BoolValue>>("count");
   registry->RegisterOrDie<CountUDA<types::StringValue>>("count");
   registry->RegisterOrDie<CountUDA<types::UInt128Value>>("count");
+  // ExponentialHistogram
+  registry->RegisterOrDie<ExponentialHistogramUDA<types::Float64Value>>("histogram");
+  registry->RegisterOrDie<ExponentialHistogramUDA<types::Int64Value>>("histogram");
+  registry->RegisterOrDie<ExponentialHistogramUDA<types::Time64NSValue>>("histogram");
 }
 
 }  // namespace builtins

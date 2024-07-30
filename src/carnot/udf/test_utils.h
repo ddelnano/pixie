@@ -148,6 +148,12 @@ class UDATester {
     return *this;
   }
 
+  template <typename... Args>
+  UDATester& Init(Args... args) {
+    EXPECT_OK(uda_.Init(function_ctx_.get(), args...));
+    return *this;
+  }
+
   /*
    * Assert that the finalized result, computed on the UDA's inputs, is equal to the given value.
    */
@@ -213,6 +219,7 @@ class UDATester {
   // Vector of UDAs, created for each ForInput call, for testing merge.
   // std::vector<std::unique_ptr<TUDA>> merge_udas_;
   std::vector<std::unique_ptr<TUDA>> merge_udas_;
+  std::unique_ptr<udf::FunctionContext> function_ctx_ = nullptr;
 };
 
 }  // namespace udf

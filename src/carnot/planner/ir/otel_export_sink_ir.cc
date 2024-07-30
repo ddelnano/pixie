@@ -60,6 +60,7 @@ std::string ConvertSemanticTypeToOtel(const types::SemanticType& stype) {
     case types::ST_CONTAINER_STATE:
     case types::ST_CONTAINER_STATUS:
     case types::ST_NAMESPACE_NAME:
+    case types::ST_EXPONENTIAL_HISTO:
     case types::ST_QUANTILES:
     case types::ST_IP_ADDRESS:
     case types::ST_PORT:
@@ -110,6 +111,11 @@ Status OTelExportSinkIR::ProcessConfig(const OTelData& data) {
             [&new_metric, this](const OTelMetricGauge& gauge) {
               PX_ASSIGN_OR_RETURN(auto val, AddColumn(gauge.value_column));
               new_metric.metric = OTelMetricGauge{val};
+              return Status::OK();
+            },
+            [&new_metric, this](const OTelExponentialHistogram& histo) {
+              PX_ASSIGN_OR_RETURN(auto buckets, AddColumn(histo.buckets_column));
+              new_metric.metric = OTelExponentialHistogram{buckets};
               return Status::OK();
             },
             [&new_metric, this](const OTelMetricSummary& summary) {
@@ -210,6 +216,30 @@ Status OTelExportSinkIR::ToProto(planpb::Operator* op) const {
                       "Expected value column '$0' to be INT64 or FLOAT64, received $1",
                       gauge.value_column->col_name(),
                       types::ToString(gauge.value_column->EvaluatedDataType()));
+              }
+              return Status::OK();
+            },
+            [&metric_pb](const OTelExponentialHistogram& histo) {
+              metric_pb->mutable_histogram();
+              /* auto histogram_pb = metric_pb->mutable_histogram(); */
+              /* PX_ASSIGN_OR_RETURN(auto histogram_index, histo.buckets_column->GetColumnIndex()); */
+              auto semantic_type =  histo.buckets_column->type_cast()->semantic_type();
+              if (semantic_type != types::ST_EXPONENTIAL_HISTO) {
+                /* histogram_pb->set_quantiles_column_index(histogram_index); */
+                  return histo.buckets_column->CreateIRNodeError("ST_EXPONENTIAL_HISTO expected");
+              }
+              switch (histo.buckets_column->EvaluatedDataType()) {
+                /* case types::INT64: */
+                /*   gauge_pb->set_int_column_index(gauge_index); */
+                /*   break; */
+                /* case types::FLOAT64: */
+                /*   gauge_pb->set_float_column_index(gauge_index); */
+                /*   break; */
+                /* default: */
+                /*   return gauge.value_column->CreateIRNodeError( */
+                /*       "Expected value column '$0' to be INT64 or FLOAT64, received $1", */
+                /*       gauge.value_column->col_name(), */
+                /*       types::ToString(gauge.value_column->EvaluatedDataType())); */
               }
               return Status::OK();
             },
@@ -339,6 +369,8 @@ Status OTelExportSinkIR::CopyFromNodeImpl(const IRNode* node,
   return ProcessConfig(source->data_);
 }
 
+// TODO(ddelnano): See if parent_type()->semantic_type can be checked for
+// the ExponentialHistogram type.
 Status OTelExportSinkIR::ResolveType(CompilerState* compiler_state) {
   DCHECK_EQ(1U, parent_types().size());
 
@@ -346,6 +378,8 @@ Status OTelExportSinkIR::ResolveType(CompilerState* compiler_state) {
   auto table = TableType::Create();
   for (const auto& column : columns_to_resolve_) {
     PX_RETURN_IF_ERROR(ResolveExpressionType(column, compiler_state, parent_types()));
+    LOG(INFO) << "Resolved column " << column->col_name() << " to "
+              << column->resolved_type()->DebugString();
     if (table->HasColumn(column->col_name())) {
       continue;
     }

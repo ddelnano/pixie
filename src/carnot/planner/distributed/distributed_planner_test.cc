@@ -398,6 +398,8 @@ TEST_F(DistributedRulesTest, init_args) {
   EXPECT_OK(distributed_plan_or_s);
 }
 
+//TODO(ddelnano): Add test here for histogram
+
 }  // namespace distributed
 }  // namespace planner
 }  // namespace carnot

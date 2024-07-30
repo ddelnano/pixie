@@ -21,14 +21,21 @@
 #include <cmath>
 #include <limits>
 
+#include "src/common/base/base2_exponential_histogram_indexer.h"
 #include "src/carnot/udf/registry.h"
 #include "src/carnot/udf/type_inference.h"
 #include "src/shared/types/types.h"
 #include "src/shared/types/typespb/types.pb.h"
 
+#include <rapidjson/document.h>
+#include <rapidjson/stringbuffer.h>
+#include <rapidjson/writer.h>
+
 namespace px {
 namespace carnot {
 namespace builtins {
+
+using px::Base2ExponentialHistogramIndexer;
 
 udf::ScalarUDFDocBuilder AddDoc();
 template <typename TReturn, typename TArg1 = TReturn, typename TArg2 = TReturn>
@@ -748,6 +755,102 @@ class CountUDA : public udf::UDA {
 
  protected:
   Int64Value count_ = 0;
+};
+
+template <typename TArg>
+class ExponentialHistogramUDA : public udf::UDA {
+ public:
+  Status Init(udf::FunctionContext*,
+          types::Int64Value scale_factor,
+          types::Int64Value /*buckets*/) {
+      histogram_indexer_ = Base2ExponentialHistogramIndexer(scale_factor.val);
+      return Status::OK();
+  }
+
+  void Update(FunctionContext*, TArg val) {
+      histogram_[histogram_indexer_.ComputeIndex(val.val)] += 1;
+  }
+  void Merge(FunctionContext*, const ExponentialHistogramUDA& other) {
+      // Handle the case where there is perfect subsetting
+      DCHECK(other.scale_factor_ == scale_factor_);
+      for (const auto& [key, value] : other.histogram_) {
+          histogram_[key] += value;
+      }
+  }
+
+  StringValue Finalize(FunctionContext*) {
+    rapidjson::Document d;
+    d.SetObject();
+    for (const auto& [key, value] : histogram_) {
+        d.AddMember(rapidjson::Value().SetString(std::to_string(key).c_str(), d.GetAllocator()), value, d.GetAllocator());
+    }
+    rapidjson::StringBuffer sb;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+    d.Accept(writer);
+    return sb.GetString();
+  }
+
+  /* StringValue Serialize(FunctionContext*) { */
+  /*   rapidjson::StringBuffer sb; */
+  /*   rapidjson::Writer<rapidjson::StringBuffer> writer(sb); */
+  /*   writer.StartObject(); */
+  /*   writer.Key(kProcessedKey); */
+  /*   WriteCentroidArray(&writer, digest_.processed()); */
+  /*   writer.Key(kUnprocessedKey); */
+  /*   WriteCentroidArray(&writer, digest_.unprocessed()); */
+  /*   writer.Key(kCompressionKey); */
+  /*   writer.Double(digest_.compression()); */
+  /*   writer.Key(kMaxUnprocessedKey); */
+  /*   writer.Uint64(digest_.maxUnprocessed()); */
+  /*   writer.Key(kMaxProcessedKey); */
+  /*   writer.Uint64(digest_.maxProcessed()); */
+  /*   writer.EndObject(); */
+  /*   return sb.GetString(); */
+  /* } */
+
+  /* Status Deserialize(FunctionContext*, const StringValue& json) { */
+  /*   rapidjson::Document d; */
+  /*   rapidjson::ParseResult ok = d.Parse(json.data()); */
+  /*   if (ok == nullptr) { */
+  /*     return error::InvalidArgument("invalid serialized tdigest"); */
+  /*   } */
+  /*   auto processed = CentroidArrayFromJSON(d[kProcessedKey]); */
+  /*   auto unprocessed = CentroidArrayFromJSON(d[kUnprocessedKey]); */
+  /*   auto compression = d[kCompressionKey].GetDouble(); */
+  /*   auto maxUnprocessed = d[kMaxUnprocessedKey].GetUint64(); */
+  /*   auto maxProcessed = d[kMaxProcessedKey].GetUint64(); */
+  /*   digest_ = tdigest::TDigest(std::move(processed), std::move(unprocessed), compression, */
+  /*                              maxUnprocessed, maxProcessed); */
+  /*   return Status::OK(); */
+  /* } */
+
+  static udf::InfRuleVec SemanticInferenceRules() {
+    return {udf::ExplicitRule::Create<ExponentialHistogramUDA>(types::ST_EXPONENTIAL_HISTO, {types::ST_NONE})};
+  }
+
+  static udf::UDADocBuilder Doc() {
+    return udf::UDADocBuilder("Approximates the distribution of aggregated data in an exponential histogram.")
+        .Details(
+            "Calculates several useful percentiles of the aggregated data using "
+            "[tdigest](https://github.com/tdunning/t-digest). Returns a serialized JSON object "
+            "with the "
+            "keys for 1%, 10%, 50%, 90%, and 99%. You can use `px.pluck_float64` to grab the "
+            "specific values from the result.")
+        .Example(R"doc(
+        | # Calculate the quantiles.
+        | df = df.agg(latency_dist=('latency_ms', px.quantiles))
+        | # Pluck p99 from the quantiles.
+        | df.p99 = px.pluck_float64(df.latency_dist, 'p99')
+        )doc")
+        .Arg("val", "The data to calculate the quantiles distribution.")
+        .Returns("The quantiles data, serialized as a JSON dictionary.");
+  }
+  std::map<int64_t, int64_t> histogram_;
+  int64_t scale_factor_;
+  
+  private:
+    int64_t buckets_;
+    Base2ExponentialHistogramIndexer histogram_indexer_;
 };
 
 void RegisterMathOpsOrDie(udf::Registry* registry);
