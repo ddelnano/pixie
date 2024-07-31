@@ -399,7 +399,7 @@ Status OTelMetrics::Init() {
                     std::placeholders::_3),
           ast_visitor()));
   PX_RETURN_IF_ERROR(exp_histo_fn->SetDocString(kSummaryOpDocstring));
-  AddMethod(kExpHistoOpID, exp_histo_fn);
+  AddMethod(kExpHistogramOpID, exp_histo_fn);
 
   PX_ASSIGN_OR_RETURN(
       std::shared_ptr<FuncObject> summary_fn,

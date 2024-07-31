@@ -842,6 +842,8 @@ class ExponentialHistogramUDA : public udf::UDA {
         | # Pluck p99 from the quantiles.
         | df.p99 = px.pluck_float64(df.latency_dist, 'p99')
         )doc")
+        .Arg("scale", "The scale used for calculating the histogram buckets.")
+        .Arg("buckets", "The total number of buckets the histogram can create.")
         .Arg("val", "The data to calculate the quantiles distribution.")
         .Returns("The quantiles data, serialized as a JSON dictionary.");
   }

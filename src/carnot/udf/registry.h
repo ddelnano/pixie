@@ -165,7 +165,7 @@ class Registry {
   template <typename T>
   void RegisterOrDie(const std::string& name) {
     auto status = Register<T>(name);
-    CHECK(status.ok()) << "Failed to register UDF: " << status.msg();
+    CHECK(status.ok()) << "Failed to register UDF: " << name << " " << status.msg();
   }
 
   /**

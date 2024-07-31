@@ -220,26 +220,25 @@ Status OTelExportSinkIR::ToProto(planpb::Operator* op) const {
               return Status::OK();
             },
             [&metric_pb](const OTelExponentialHistogram& histo) {
-              metric_pb->mutable_histogram();
-              /* auto histogram_pb = metric_pb->mutable_histogram(); */
-              /* PX_ASSIGN_OR_RETURN(auto histogram_index, histo.buckets_column->GetColumnIndex()); */
+              auto histogram_pb = metric_pb->mutable_histogram();
+              PX_ASSIGN_OR_RETURN(auto histogram_index, histo.buckets_column->GetColumnIndex());
               auto semantic_type =  histo.buckets_column->type_cast()->semantic_type();
               if (semantic_type != types::ST_EXPONENTIAL_HISTO) {
                 /* histogram_pb->set_quantiles_column_index(histogram_index); */
                   return histo.buckets_column->CreateIRNodeError("ST_EXPONENTIAL_HISTO expected");
               }
               switch (histo.buckets_column->EvaluatedDataType()) {
-                /* case types::INT64: */
-                /*   gauge_pb->set_int_column_index(gauge_index); */
-                /*   break; */
-                /* case types::FLOAT64: */
-                /*   gauge_pb->set_float_column_index(gauge_index); */
-                /*   break; */
-                /* default: */
-                /*   return gauge.value_column->CreateIRNodeError( */
-                /*       "Expected value column '$0' to be INT64 or FLOAT64, received $1", */
-                /*       gauge.value_column->col_name(), */
-                /*       types::ToString(gauge.value_column->EvaluatedDataType())); */
+                case types::INT64:
+                  histogram_pb->set_int_column_index(histogram_index);
+                  break;
+                case types::FLOAT64:
+                  histogram_pb->set_float_column_index(histogram_index);
+                  break;
+                default:
+                  return histo.buckets_column->CreateIRNodeError(
+                      "Expected value column '$0' to be INT64 or FLOAT64, received $1",
+                      histo.buckets_column->col_name(),
+                      types::ToString(histo.buckets_column->EvaluatedDataType()));
               }
               return Status::OK();
             },
