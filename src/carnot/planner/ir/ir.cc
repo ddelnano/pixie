@@ -180,6 +180,7 @@ std::vector<absl::flat_hash_set<int64_t>> IR::IndependentGraphs() const {
 StatusOr<std::unique_ptr<IR>> IR::Clone() const {
   auto new_ir = std::make_unique<IR>();
   absl::flat_hash_set<int64_t> nodes{dag().nodes().begin(), dag().nodes().end()};
+  /* LOG(INFO) << DebugString(); */
   PX_RETURN_IF_ERROR(new_ir->CopySelectedNodesAndDeps(this, nodes));
   // TODO(philkuz) check to make sure these are the same.
   new_ir->dag_ = dag_;

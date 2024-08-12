@@ -177,27 +177,7 @@ StatusOr<QLObjectPtr> JoinHandler(CompilerState* compiler_state, IR* graph, Oper
   return Dataframe::Create(compiler_state, join_op, visitor);
 }
 
-StatusOr<FuncIR*> ParseNameTuple(IR* ir, const pypa::AstPtr& ast,
-                                 std::shared_ptr<TupleObject> tuple) {
-  DCHECK_GE(tuple->items().size(), 2UL);
-  auto num_args = tuple->items().size() - 1;
-  std::vector<StringIR*> arg_names;
-  for (auto i = 0UL; i < num_args; i++) {
-    auto name_or_s =
-        GetArgAs<StringIR>(tuple->items()[i], absl::Substitute("$0-th tuple argument", i + 1));
-    if (!name_or_s.ok()) {
-      return tuple->items()[i]->CreateError(
-          "All elements of the agg tuple must be column names, except the last which should be a "
-          "function");
-    }
-    arg_names.push_back(name_or_s.ConsumeValueOrDie());
-  }
-
-  auto func = tuple->items()[num_args];
-  if (func->type() != QLObjectType::kFunction) {
-    return func->CreateError("Expected second tuple argument to be type Func, received $0",
-                             func->name());
-  }
+StatusOr<FuncIR*> ParseNormalAggFunc(IR* ir, std::shared_ptr<FuncObject> func, const pypa::AstPtr& ast, const std::vector<StringIR*>& arg_names) {
   PX_ASSIGN_OR_RETURN(auto called, std::static_pointer_cast<FuncObject>(func)->Call({}, ast));
 
   PX_ASSIGN_OR_RETURN(FuncIR * func_ir, GetArgAs<FuncIR>(called, "last tuple argument"));
@@ -215,6 +195,77 @@ StatusOr<FuncIR*> ParseNameTuple(IR* ir, const pypa::AstPtr& ast,
     PX_RETURN_IF_ERROR(func_ir->AddArg(argcol));
   }
   return func_ir;
+}
+
+StatusOr<FuncIR*> ParseAggFuncInitArgs(IR* ir, std::shared_ptr<TupleObject> tuple, const pypa::AstPtr& ast, const std::vector<StringIR*>& arg_names) {
+  
+  auto num_args = tuple->items().size();
+
+  if (num_args < 1 || tuple->items()[0]->type() != QLObjectType::kFunction) {
+    return tuple->items()[0]->CreateError(
+        "First element of the tuple must be a function, received $0", tuple->items()[0]->name());
+  }
+  PX_ASSIGN_OR_RETURN(auto called, std::static_pointer_cast<FuncObject>(tuple->items()[0])->Call({}, ast));
+  PX_ASSIGN_OR_RETURN(FuncIR * func_ir, GetArgAs<FuncIR>(called, "first tuple argument with init_args"));
+
+  // The function should be specified as a single function by itself.
+  // This could change in the future.
+  if (func_ir->all_args().size() != 0) {
+    return func_ir->CreateIRNodeError("Unexpected aggregate function");
+  }
+
+  for (auto i = 1UL; i < num_args; i++) {
+
+    auto init_arg_or_s =
+        GetArgAs<ExpressionIR>(tuple->items()[i], absl::Substitute("$0-th tuple argument (init_args)", i + 1));
+    if (!init_arg_or_s.ok()) {
+      return tuple->items()[i]->CreateError(
+          "All elements of the tuple must must be argument names, except the first which should be a "
+          "function. $0", init_arg_or_s.status().ToString());
+    }
+    auto init_arg = init_arg_or_s.ConsumeValueOrDie();
+    if (!Match(init_arg, DataNode())) {
+      return tuple->items()[i]->CreateError("init_arg must be DataIR");
+    }
+    PX_RETURN_IF_ERROR(func_ir->AddInitArg(static_cast<DataIR*>(init_arg)));
+  }
+
+  // parent_op_idx is 0 because we only have one parent for an aggregate.
+  for (auto name : arg_names) {
+    PX_ASSIGN_OR_RETURN(ColumnIR * argcol, ir->CreateNode<ColumnIR>(name->ast(), name->str(),
+                                                                    /* parent_op_idx */ 0));
+    PX_RETURN_IF_ERROR(func_ir->AddArg(argcol));
+  }
+  return func_ir;
+}
+
+
+StatusOr<FuncIR*> ParseNameTuple(IR* ir, const pypa::AstPtr& ast,
+                                 std::shared_ptr<TupleObject> tuple) {
+  DCHECK_GE(tuple->items().size(), 2UL);
+  auto num_args = tuple->items().size() - 1;
+  std::vector<StringIR*> arg_names;
+  for (auto i = 0UL; i < num_args; i++) {
+    auto name_or_s =
+        GetArgAs<StringIR>(tuple->items()[i], absl::Substitute("$0-th tuple argument", i + 1));
+    if (!name_or_s.ok()) {
+      return tuple->items()[i]->CreateError(
+          "All elements of the agg tuple must be column names, except the last which should be a "
+          "function. $0", name_or_s.status().ToString());
+    }
+    arg_names.push_back(name_or_s.ConsumeValueOrDie());
+  }
+
+  auto func = tuple->items()[num_args];
+  switch (func->type()) {
+    case QLObjectType::kFunction:
+      return ParseNormalAggFunc(ir, std::static_pointer_cast<FuncObject>(func), ast, arg_names);
+    case QLObjectType::kTuple:
+      return ParseAggFuncInitArgs(ir, std::static_pointer_cast<TupleObject>(func), ast, arg_names);
+    default:
+      return func->CreateError("Expected second tuple argument to be type Func, received $0",
+                               func->name());
+  }
 }
 
 StatusOr<QLObjectPtr> AggHandler(CompilerState* compiler_state, IR* graph, OperatorIR* op,

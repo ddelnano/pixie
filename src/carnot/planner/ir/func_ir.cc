@@ -63,7 +63,7 @@ Status FuncIR::AddArg(ExpressionIR* arg) {
   if (is_init_args_split_) {
     args_.push_back(arg);
   }
-  return graph()->AddEdge(this, arg);
+  return graph()->OptionallyCloneWithEdge(this, arg).status();
 }
 
 Status FuncIR::AddInitArg(DataIR* arg) {
@@ -71,7 +71,9 @@ Status FuncIR::AddInitArg(DataIR* arg) {
     return error::Internal("Init argument for FuncIR is null.");
   }
   init_args_.push_back(arg);
-  return graph()->AddEdge(this, arg);
+  all_args_.push_back(arg);
+  auto s = graph()->OptionallyCloneWithEdge(this, arg);
+  return s.status();
 }
 
 Status FuncIR::UpdateArg(int64_t idx, ExpressionIR* arg) {

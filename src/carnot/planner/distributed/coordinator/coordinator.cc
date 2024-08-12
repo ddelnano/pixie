@@ -204,6 +204,9 @@ StatusOr<std::unique_ptr<DistributedPlan>> CoordinatorImpl::CoordinateImpl(const
   PX_ASSIGN_OR_RETURN(auto agent_schema_map,
                       LoadSchemaMap(*distributed_state_, distributed_plan->uuid_to_id_map()));
 
+  LOG(INFO) << "before_blocking : " << split_plan->before_blocking->DebugString();
+  LOG(INFO) << "after_blocking : " << split_plan->after_blocking->DebugString();
+  LOG(INFO) << "original_plan: " << split_plan->original_plan->DebugString();
   PX_ASSIGN_OR_RETURN(auto agent_to_plan_map,
                       GetUniquePEMPlans(split_plan->before_blocking.get(), distributed_plan.get(),
                                         source_node_ids, agent_schema_map));

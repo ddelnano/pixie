@@ -19,6 +19,9 @@
 #include "src/carnot/udf_exporter/udf_exporter.h"
 #include "src/vizier/funcs/context/vizier_context.h"
 #include "src/vizier/funcs/funcs.h"
+#include "src/vizier/funcs/funcs.h"
+
+#include <google/protobuf/text_format.h>
 
 namespace px {
 namespace carnot {
@@ -31,6 +34,9 @@ StatusOr<std::unique_ptr<planner::RegistryInfo>> ExportUDFInfo() {
   vizier::funcs::RegisterFuncsOrDie(ctx, registry.get());
 
   udfspb::UDFInfo udf_proto = registry->ToProto();
+  std::string out;
+  ::google::protobuf::TextFormat::PrintToString(udf_proto, &out);
+  LOG(INFO) << "Exported UDFs: " << out;
   auto registry_info = std::make_unique<planner::RegistryInfo>();
   PX_RETURN_IF_ERROR(registry_info->Init(udf_proto));
   return registry_info;

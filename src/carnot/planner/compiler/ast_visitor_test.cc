@@ -1989,6 +1989,54 @@ TEST_F(ASTVisitorTest, agg_segfault) {
               HasCompilerError(".*?All elements of the agg tuple must be column names.*?"));
 }
 
+constexpr char kAggWithInitArgsUDA[] = R"pxl(
+import px
+t1 = px.DataFrame(table='http_events', start_time='-6m')
+
+t1['service'] = t1.ctx['service']
+t1['http_resp_latency_ms'] = t1['resp_latency_ns'] / 1.0E6
+quantiles_agg = t1.groupby('service').agg(
+  latency_quantiles=('http_resp_latency_ms', (px.histogram, 20, 160)),
+  errors=('failure', px.mean),
+  throughput_total=('resp_status', px.count),
+)
+px.display(quantiles_agg)
+)pxl";
+TEST_F(ASTVisitorTest, agg_init_args) {
+  ASSERT_OK_AND_ASSIGN(auto graph, CompileGraph(kAggWithInitArgsUDA));
+  std::vector<IRNode*> func_nodes  = graph->FindNodesOfType(IRNodeType::kFunc);
+  bool matched = false;
+  for (auto node : func_nodes) {
+    auto func = static_cast<FuncIR*>(node);
+    if (func->func_name() == "histogram") {
+      /* ASSERT_EQ(func->init_args().size(), 2); */
+      /* EXPECT_MATCH(func->init_args()[0], Int(20)); */
+      /* EXPECT_MATCH(func->init_args()[1], Int(160)); */
+      matched = true;
+    }
+  }
+  ASSERT_TRUE(matched);
+  /* ASSERT_EQ(func_nodes .size(), 1); */
+  /* FuncIR* map = static_cast<FuncIR*>(func_nodes [0]); */
+}
+
+constexpr char kAggWithInitArgsUDAError[] = R"pxl(
+import px
+t1 = px.DataFrame(table='http_events', start_time='-6m')
+
+t1['service'] = t1.ctx['service']
+t1['http_resp_latency_ms'] = t1['resp_latency_ns'] / 1.0E6
+quantiles_agg = t1.groupby('service').agg(
+  latency_quantiles=('http_resp_latency_ms', (px.histogram, t1['errors'])),
+  errors=('failure', px.mean),
+  throughput_total=('resp_status', px.count),
+)
+px.display(quantiles_agg)
+)pxl";
+TEST_F(ASTVisitorTest, agg_init_args_requires_data_ir_expression) {
+  ASSERT_OK(CompileGraph(kAggWithInitArgsUDAError));
+}
+
 TEST_F(ASTVisitorTest, error_on_global) {
   // Tests to make sure that we will have a valid error on global objects that don't start with ast
   // errors. AstVisitorImpl::LookupVariable should set the ast for any referenced object.

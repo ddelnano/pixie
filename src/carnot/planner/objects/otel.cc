@@ -187,9 +187,9 @@ StatusOr<QLObjectPtr> ExpHistoDefinition(IR* graph, const pypa::AstPtr& ast, con
                       graph->CreateNode<ColumnIR>(ast, "time_", /* parent_op_idx */ 0));
 
   OTelExponentialHistogram histo;
-  PX_ASSIGN_OR_RETURN(histo.buckets_column, GetArgAs<ColumnIR>(ast, args, "buckets"));
+  PX_ASSIGN_OR_RETURN(histo.buckets_column, GetArgAs<ColumnIR>(ast, args, "value"));
 
-  /* metric.unit_column = summary.quantiles[0].value_column; */
+  metric.unit_column = histo.buckets_column;
   if (!NoneObject::IsNoneObject(args.GetArg("unit"))) {
     PX_ASSIGN_OR_RETURN(auto unit, GetArgAsString(ast, args, "unit"));
     metric.unit_str = unit;
@@ -391,8 +391,8 @@ Status OTelMetrics::Init() {
       std::shared_ptr<FuncObject> exp_histo_fn,
       FuncObject::Create(
           kExpHistogramOpID,
-          {"name", "value", "description", "attributes", "unit", "boundaries", "counts"},
-          {{"description", "\"\""}, {"attributes", "{}"}, {"unit", "None"}, {"counts", "None"}},
+          {"name", "value", "description", "attributes", "unit"},
+          {{"description", "\"\""}, {"attributes", "{}"}, {"unit", "None"}},
           /* has_variable_len_args */ false,
           /* has_variable_len_kwargs */ false,
           std::bind(&ExpHistoDefinition, graph_, std::placeholders::_1, std::placeholders::_2,

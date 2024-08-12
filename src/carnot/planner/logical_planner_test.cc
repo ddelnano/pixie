@@ -853,6 +853,30 @@ px.export(df, px.otel.Data(
 ))
 )pxl";
 
+const char kOTelHisto[] = R"pxl(
+import px
+
+t1 = px.DataFrame(table='http_events', start_time='-6m')
+
+t1['service'] = t1.ctx['service']
+t1['http_resp_latency_ms'] = t1['resp_latency_ns'] / 1.0E6
+quantiles_agg = t1.groupby('service').agg(
+  latency_quantiles=('http_resp_latency_ms', (px.histogram, 20, 160)),
+)
+#px.export(t1, px.otel.Data(
+#  endpoint=px.otel.Endpoint(url="px.dev:55555"),
+#  resource={
+#      'service.name' : t1.service,
+#  },
+#  data=[
+#    px.otel.metric.ExponentialHistogram(
+#      name='resp_latency_dist',
+#      value=quantiles_agg.latency_quantiles2
+#    ),
+#  ]
+#))
+px.display(quantiles_agg)
+)pxl";
 TEST_F(LogicalPlannerTest, otel_debug_attributes_end_to_end) {
   auto state = testutils::CreateTwoPEMsOneKelvinPlannerState(testutils::kHttpEventsSchema);
   auto debug_info = state.mutable_debug_info();
@@ -906,6 +930,21 @@ attributes {
   name: "pixie_version"
   string_value: "v1.2.3"
 })proto"));
+}
+
+TEST_F(LogicalPlannerTest, otel_histogram_end_to_end) {
+  auto state = testutils::CreateTwoPEMsOneKelvinPlannerState(testutils::kHttpEventsSchema);
+  planner::RegistryInfo registry_info;
+  ASSERT_OK(registry_info.Init(info_));
+  ASSERT_OK_AND_ASSIGN(auto compiler_state, CreateCompilerState(state, &registry_info,
+                                                                /* max_output_rows_per_table*/ 0));
+
+  auto planner = LogicalPlanner::Create(info_).ConsumeValueOrDie();
+  ASSERT_OK_AND_ASSIGN(auto plan, planner->Plan(MakeQueryRequest(state, kOTelHisto)));
+  for (auto& id : plan->id_to_node_map_) {
+    LOG(INFO) << id.second->plan()->DebugString();
+  }
+  ASSERT_OK(plan->ToProto());
 }
 
 TEST_F(LogicalPlannerTest, GenerateOTelScript) {

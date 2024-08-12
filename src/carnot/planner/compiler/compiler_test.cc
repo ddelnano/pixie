@@ -67,6 +67,7 @@ class CompilerTest : public ::testing::Test {
     auto udf_proto = func_registry->ToProto();
 
     std::string new_udf_info = absl::Substitute("$0$1", udf_proto.DebugString(), kExtraScalarUDFs);
+    LOG(INFO) << new_udf_info;
     google::protobuf::TextFormat::MergeFromString(new_udf_info, &udf_proto);
 
     info_ = std::make_unique<planner::RegistryInfo>();
@@ -3187,6 +3188,34 @@ TEST_F(CompilerTest, init_args_udf) {
 
   ASSERT_EQ(1, pb.func().init_args_size());
   ASSERT_EQ(types::STRING, pb.func().init_args(0).data_type());
+}
+
+constexpr char kInitArgsUDA[] = R"pxl(
+import px
+t1 = px.DataFrame(table='http_events', start_time='-6m')
+
+t1['service'] = t1.ctx['service']
+t1['http_resp_latency_ms'] = t1['resp_latency_ns'] / 1.0E6
+quantiles_agg = t1.groupby('service').agg(
+  latency_quantiles=('http_resp_latency_ms', (px.histogram, 20, 160)),
+)
+px.display(quantiles_agg)
+)pxl";
+
+TEST_F(CompilerTest, init_args_uda) {
+  auto plan_or_s = compiler_.CompileToIR(kInitArgsUDA, compiler_state_.get());
+  ASSERT_OK(plan_or_s);
+
+  /* auto plan = plan_or_s.ConsumeValueOrDie(); */
+  /* auto nodes = plan->FindNodesThatMatch(Func("histogram")); */
+  /* ASSERT_EQ(1, nodes.size()); */
+
+  /* auto node = static_cast<FuncIR*>(nodes[0]); */
+  /* planpb::ScalarExpression pb; */
+  /* ASSERT_OK(node->ToProto(&pb)); */
+
+  /* ASSERT_EQ(1, pb.func().init_args_size()); */
+  /* ASSERT_EQ(types::STRING, pb.func().init_args(0).data_type()); */
 }
 
 constexpr char kMultipleInitArgsQuery[] = R"pxl(

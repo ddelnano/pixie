@@ -79,6 +79,7 @@ Status RegistryInfo::Init(const udfspb::UDFInfo& info) {
       DCHECK(UDFExecType::kUDA == type);
     }
     funcs_[uda.name()] = UDFExecType::kUDA;
+    LOG(INFO) << "Adding UDA: " << uda.name() << " " << uda.init_arg_types_size();;
   }
 
   for (const auto& udf : info.scalar_udfs()) {
@@ -103,6 +104,7 @@ Status RegistryInfo::Init(const udfspb::UDFInfo& info) {
       DCHECK(UDFExecType::kUDF == type);
     }
     funcs_[udf.name()] = UDFExecType::kUDF;
+    LOG(INFO) << "Adding UDF: " << udf.name();
   }
 
   for (const auto& udtf : info.udtfs()) {

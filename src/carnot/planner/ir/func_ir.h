@@ -80,7 +80,7 @@ class FuncIR : public ExpressionIR {
   Status Init(Op op, const std::vector<ExpressionIR*>& args);
 
   std::string DebugString() const override {
-    return absl::Substitute("$0(id=$1, $2)", func_name(), id(),
+    return absl::Substitute("Fn $0(id=$1, $2)", func_name(), id(),
                             absl::StrJoin(all_args_, ",", [](std::string* out, IRNode* in) {
                               absl::StrAppend(out, in->DebugString());
                             }));
@@ -162,6 +162,7 @@ class FuncIR : public ExpressionIR {
     return init_args_;
   }
   bool IsInitArgsSplit() const { return is_init_args_split_; }
+  Status AddInitArg(DataIR* arg);
 
  private:
   std::string func_prefix_ = kPLFuncPrefix;
@@ -178,7 +179,6 @@ class FuncIR : public ExpressionIR {
   // Adds the arg if it isn't already present in the func, otherwise clones it so that there is no
   // duplicate edge.
   Status AddOrCloneArg(ExpressionIR* arg);
-  Status AddInitArg(DataIR* arg);
   Status SetInfoFromRegistry(CompilerState* compiler_state,
                              const std::vector<types::DataType>& registry_arg_types);
   Status SplitInitArgs(size_t num_init_args);
