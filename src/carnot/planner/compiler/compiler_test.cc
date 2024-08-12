@@ -67,7 +67,6 @@ class CompilerTest : public ::testing::Test {
     auto udf_proto = func_registry->ToProto();
 
     std::string new_udf_info = absl::Substitute("$0$1", udf_proto.DebugString(), kExtraScalarUDFs);
-    LOG(INFO) << new_udf_info;
     google::protobuf::TextFormat::MergeFromString(new_udf_info, &udf_proto);
 
     info_ = std::make_unique<planner::RegistryInfo>();
@@ -3206,16 +3205,19 @@ TEST_F(CompilerTest, init_args_uda) {
   auto plan_or_s = compiler_.CompileToIR(kInitArgsUDA, compiler_state_.get());
   ASSERT_OK(plan_or_s);
 
-  /* auto plan = plan_or_s.ConsumeValueOrDie(); */
-  /* auto nodes = plan->FindNodesThatMatch(Func("histogram")); */
-  /* ASSERT_EQ(1, nodes.size()); */
+  auto plan = plan_or_s.ConsumeValueOrDie();
+  auto nodes = plan->FindNodesThatMatch(Func("histogram"));
+  ASSERT_EQ(1, nodes.size());
 
-  /* auto node = static_cast<FuncIR*>(nodes[0]); */
-  /* planpb::ScalarExpression pb; */
-  /* ASSERT_OK(node->ToProto(&pb)); */
+  auto node = static_cast<FuncIR*>(nodes[0]);
+  planpb::ScalarExpression pb;
+  ASSERT_OK(node->ToProto(&pb));
 
-  /* ASSERT_EQ(1, pb.func().init_args_size()); */
-  /* ASSERT_EQ(types::STRING, pb.func().init_args(0).data_type()); */
+  ASSERT_EQ(2, pb.func().init_args_size());
+  ASSERT_EQ(types::INT64, pb.func().init_args(0).data_type());
+  ASSERT_EQ(20, pb.func().init_args(0).int64_value());
+  ASSERT_EQ(types::INT64, pb.func().init_args(1).data_type());
+  ASSERT_EQ(160, pb.func().init_args(1).int64_value());
 }
 
 constexpr char kMultipleInitArgsQuery[] = R"pxl(
