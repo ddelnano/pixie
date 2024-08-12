@@ -70,8 +70,10 @@ Status FuncIR::AddInitArg(DataIR* arg) {
   if (arg == nullptr) {
     return error::Internal("Init argument for FuncIR is null.");
   }
-  init_args_.push_back(arg);
   all_args_.push_back(arg);
+  if (is_init_args_split_) {
+    init_args_.push_back(arg);
+  }
   auto s = graph()->OptionallyCloneWithEdge(this, arg);
   return s.status();
 }
