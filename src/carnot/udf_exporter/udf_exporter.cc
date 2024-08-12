@@ -36,7 +36,6 @@ StatusOr<std::unique_ptr<planner::RegistryInfo>> ExportUDFInfo() {
   udfspb::UDFInfo udf_proto = registry->ToProto();
   std::string out;
   ::google::protobuf::TextFormat::PrintToString(udf_proto, &out);
-  LOG(INFO) << "Exported UDFs: " << out;
   auto registry_info = std::make_unique<planner::RegistryInfo>();
   PX_RETURN_IF_ERROR(registry_info->Init(udf_proto));
   return registry_info;

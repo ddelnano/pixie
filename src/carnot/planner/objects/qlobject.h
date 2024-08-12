@@ -119,7 +119,7 @@ class QLObject {
    */
   StatusOr<std::shared_ptr<FuncObject>> GetCallMethod() const {
     if (!HasMethod(kCallMethodName)) {
-      return CreateError("'$0' object is not callable.....", type_descriptor_.name());
+      return CreateError("'$0' object is not callable", type_descriptor_.name());
     }
     return GetMethod(kCallMethodName);
   }

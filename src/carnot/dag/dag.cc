@@ -98,7 +98,7 @@ void DAG::ToProto(planpb::DAG* dag, const absl::flat_hash_set<int64_t>& ignore_i
 }
 
 void DAG::AddNode(int64_t node) {
-  DCHECK(!HasNode(node)) << absl::Substitute("Node: $0 already exists\n Debug: $1", node, DebugString());
+  DCHECK(!HasNode(node)) << absl::Substitute("Node: $0 already exists", node);
   nodes_.insert(node);
 
   forward_edges_by_node_[node] = {};
@@ -343,7 +343,6 @@ vector<int64_t> DAG::TopologicalSort() const {
   }
 
   CHECK_EQ(ordered.size(), nodes_.size()) << "Cycle detected in graph";
-  LOG(INFO) << ordered;
   return ordered;
 }
 
