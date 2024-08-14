@@ -412,12 +412,9 @@ message OTelMetricGauge {
 }
 
 message OTelExponentialHisogram {
-  /* AggregateExpression histogram = 1; */
-  // The column that contains the Gauge value in each row.
-  // Must be either a FLOAT64 or an INT64
+  // The column that contains the ST_EXPONENTIAL_HISTO value in each row.
   oneof value_column {
-    int64 float_column_index = 1;
-    int64 int_column_index = 2;
+    int64 string_column_index = 1;
   }
 }
 

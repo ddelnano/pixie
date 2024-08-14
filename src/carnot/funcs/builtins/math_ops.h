@@ -825,7 +825,12 @@ class ExponentialHistogramUDA : public udf::UDA {
   /* } */
 
   static udf::InfRuleVec SemanticInferenceRules() {
-    return {udf::ExplicitRule::Create<ExponentialHistogramUDA>(types::ST_EXPONENTIAL_HISTO, {types::ST_NONE})};
+    return {
+      udf::ExplicitRule::Create<ExponentialHistogramUDA>(types::ST_EXPONENTIAL_HISTO, {types::ST_NONE, types::ST_NONE, types::ST_NONE}),
+      // TODO(ddelnano): init_args of ST_NONE need to be matched for the remaining rules
+      udf::ExplicitRule::Create<ExponentialHistogramUDA>(types::ST_EXPONENTIAL_HISTO, {types::ST_DURATION_NS}),
+      udf::ExplicitRule::Create<ExponentialHistogramUDA>(types::ST_EXPONENTIAL_HISTO, {types::ST_THROUGHPUT_PER_NS}),
+    };
   }
 
   static udf::UDADocBuilder Doc() {

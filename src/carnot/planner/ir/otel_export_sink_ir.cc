@@ -222,21 +222,17 @@ Status OTelExportSinkIR::ToProto(planpb::Operator* op) const {
             [&metric_pb](const OTelExponentialHistogram& histo) {
               auto histogram_pb = metric_pb->mutable_histogram();
               PX_ASSIGN_OR_RETURN(auto histogram_index, histo.buckets_column->GetColumnIndex());
-              auto semantic_type =  histo.buckets_column->type_cast()->semantic_type();
+              auto semantic_type =  histo.buckets_column->resolved_value_type()->semantic_type();
               if (semantic_type != types::ST_EXPONENTIAL_HISTO) {
-                /* histogram_pb->set_quantiles_column_index(histogram_index); */
-                  return histo.buckets_column->CreateIRNodeError("ST_EXPONENTIAL_HISTO expected");
+                  return histo.buckets_column->CreateIRNodeError("Expected ExponentialHistogram value column to have type ST_EXPONENTIAL_HISTO. Received '$0' instead.", types::ToString(semantic_type));
               }
               switch (histo.buckets_column->EvaluatedDataType()) {
-                case types::INT64:
-                  histogram_pb->set_int_column_index(histogram_index);
-                  break;
-                case types::FLOAT64:
-                  histogram_pb->set_float_column_index(histogram_index);
+                case types::STRING:
+                  histogram_pb->set_string_column_index(histogram_index);
                   break;
                 default:
                   return histo.buckets_column->CreateIRNodeError(
-                      "Expected value column '$0' to be INT64 or FLOAT64, received $1",
+                      "Expected value column '$0' to be STRING, received $1",
                       histo.buckets_column->col_name(),
                       types::ToString(histo.buckets_column->EvaluatedDataType()));
               }
@@ -368,8 +364,6 @@ Status OTelExportSinkIR::CopyFromNodeImpl(const IRNode* node,
   return ProcessConfig(source->data_);
 }
 
-// TODO(ddelnano): See if parent_type()->semantic_type can be checked for
-// the ExponentialHistogram type.
 Status OTelExportSinkIR::ResolveType(CompilerState* compiler_state) {
   DCHECK_EQ(1U, parent_types().size());
 
@@ -377,8 +371,6 @@ Status OTelExportSinkIR::ResolveType(CompilerState* compiler_state) {
   auto table = TableType::Create();
   for (const auto& column : columns_to_resolve_) {
     PX_RETURN_IF_ERROR(ResolveExpressionType(column, compiler_state, parent_types()));
-    LOG(INFO) << "Resolved column " << column->col_name() << " to "
-              << column->resolved_type()->DebugString();
     if (table->HasColumn(column->col_name())) {
       continue;
     }
