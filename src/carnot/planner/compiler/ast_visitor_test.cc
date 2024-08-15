@@ -2034,7 +2034,8 @@ quantiles_agg = t1.groupby('service').agg(
 px.display(quantiles_agg)
 )pxl";
 TEST_F(ASTVisitorTest, agg_init_args_requires_data_ir_expression) {
-  ASSERT_OK(CompileGraph(kAggWithInitArgsUDAError));
+  EXPECT_COMPILER_ERROR(CompileGraph(kAggWithInitArgsUDAError).status(),
+                        ".*init_arg must be DataIR.*");
 }
 
 TEST_F(ASTVisitorTest, error_on_global) {

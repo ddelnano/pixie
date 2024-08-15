@@ -398,45 +398,6 @@ TEST_F(DistributedRulesTest, init_args) {
   EXPECT_OK(distributed_plan_or_s);
 }
 
-constexpr char kInitArgUDAQuery[] = R"pxl(
-import px
-
-t1 = px.DataFrame(table='http_events', start_time='-6m')
-
-t1['service'] = t1.ctx['service']
-t1['http_resp_latency_ms'] = t1['resp_latency_ns'] / 1.0E6
-quantiles_agg = t1.groupby('service').agg(
-  latency_quantiles=('http_resp_latency_ms', (px.histogram, 20, 160)),
-)
-#px.export(t1, px.otel.Data(
-#  endpoint=px.otel.Endpoint(url="px.dev:55555"),
-#  resource={
-#      'service.name' : t1.service,
-#  },
-#  data=[
-#    px.otel.metric.ExponentialHistogram(
-#      name='resp_latency_dist',
-#      value=quantiles_agg.latency_quantiles2
-#    ),
-#  ]
-#))
-px.display(quantiles_agg)
-)pxl";
-
-TEST_F(DistributedRulesTest, init_args_uda) {
-  compiler::Compiler compiler;
-  auto plan_or_s = compiler.CompileToIR(kInitArgUDAQuery, compiler_state_.get());
-  ASSERT_OK(plan_or_s);
-  auto single_node_plan = plan_or_s.ConsumeValueOrDie();
-
-  auto distributed_planner = distributed::DistributedPlanner::Create().ConsumeValueOrDie();
-  auto distributed_plan_or_s = distributed_planner->Plan(
-      logical_state_.distributed_state(), compiler_state_.get(), single_node_plan.get());
-  EXPECT_OK(distributed_plan_or_s);
-}
-
-//TODO(ddelnano): Add test here for histogram
-
 }  // namespace distributed
 }  // namespace planner
 }  // namespace carnot

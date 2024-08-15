@@ -163,10 +163,10 @@ class DistributedPlan {
   }
 
   CarnotInstance* kelvin() const { return kelvin_; }
-  absl::flat_hash_map<int64_t, std::unique_ptr<CarnotInstance>> id_to_node_map_;
 
  private:
   plan::DAG dag_;
+  absl::flat_hash_map<int64_t, std::unique_ptr<CarnotInstance>> id_to_node_map_;
   absl::flat_hash_map<IR*, absl::flat_hash_set<int64_t>> plan_to_agent_map_;
   CarnotInstance* kelvin_ = nullptr;
   std::vector<std::unique_ptr<IR>> plan_pool_;

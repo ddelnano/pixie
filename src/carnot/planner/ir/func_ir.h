@@ -80,7 +80,7 @@ class FuncIR : public ExpressionIR {
   Status Init(Op op, const std::vector<ExpressionIR*>& args);
 
   std::string DebugString() const override {
-    return absl::Substitute("Fn $0(id=$1, $2)", func_name(), id(),
+    return absl::Substitute("$0(id=$1, $2)", func_name(), id(),
                             absl::StrJoin(all_args_, ",", [](std::string* out, IRNode* in) {
                               absl::StrAppend(out, in->DebugString());
                             }));
