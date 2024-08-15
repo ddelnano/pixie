@@ -264,6 +264,41 @@ Status OTelExportSinkNode::ConsumeMetrics(ExecState* exec_state, const RowBatch&
           auto qv_col = rb.ColumnAt(px_qv.value_column_index()).get();
           qv->set_value(types::GetValueFromArrowArray<types::FLOAT64>(qv_col, row_idx));
         }
+      } else if (metric_pb.has_histogram()) {
+        auto histogram = metric->mutable_exponential_histogram();
+        histogram->set_aggregation_temporality(
+            ::opentelemetry::proto::metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE);
+        auto data_point = histogram->add_data_points();
+        AddAttributes(data_point->mutable_attributes(), metric_pb.attributes(), rb, row_idx);
+
+        auto histo_str_col = rb.ColumnAt(metric_pb.histogram().string_column_index()).get();
+        auto histo_str = types::GetValueFromArrowArray<types::STRING>(histo_str_col, row_idx);
+
+        rapidjson::Document doc;
+        doc.Parse(histo_str.data());
+        DCHECK(doc.IsObject());
+        DCHECK(doc.HasMember("offset"));
+        DCHECK(doc.HasMember("count"));
+        DCHECK(doc.HasMember("scale"));
+        DCHECK(doc.HasMember("buckets"));
+        DCHECK(doc.HasMember("max_buckets"));
+
+        auto time_col = rb.ColumnAt(metric_pb.time_column_index()).get();
+        auto start_time_col = rb.ColumnAt(metric_pb.histogram().start_time_column_index()).get();
+
+        data_point->set_time_unix_nano(
+            types::GetValueFromArrowArray<types::TIME64NS>(time_col, row_idx));
+        data_point->set_start_time_unix_nano(
+            types::GetValueFromArrowArray<types::TIME64NS>(start_time_col, row_idx));
+        data_point->set_count(doc["count"].GetInt());
+        data_point->set_scale(doc["scale"].GetInt());
+        auto pos_buckets = data_point->mutable_positive();
+        pos_buckets->set_offset(doc["offset"].GetInt());
+        auto bucket_counts = doc["buckets"].GetObject();
+        for (auto& bucket_count : bucket_counts) {
+          pos_buckets->add_bucket_counts(bucket_count.value.GetInt());
+        }
+
       } else if (metric_pb.has_gauge()) {
         auto gauge = metric->mutable_gauge();
         auto data_point = gauge->add_data_points();

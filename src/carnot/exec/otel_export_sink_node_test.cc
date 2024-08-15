@@ -356,6 +356,93 @@ resource_metrics {
     }
   }
 })pb"}},
+                             {"exponential_histogram",
+                              R"pb(
+metrics {
+  name: "http.resp.latency"
+  attributes {
+    name: "http.method"
+    column {
+      column_type: STRING
+      column_index: 1
+    }
+  }
+  histogram {
+    start_time_column_index: 0
+    string_column_index: 2
+  }
+  time_column_index: 3
+}
+)pb",
+                              {R"pb(
+cols { time64ns_data { data: 10 data: 13 } }
+cols { string_data { data: "GET" data: "POST" } }
+cols { string_data { data: "{\"offset\": -1, \"scale\": 0, \"count\": 4, \"max_buckets\": 160, \"buckets\": {\"1\": 1, \"2\": 2, \"3\": 1}}" data: "{\"offset\": -1, \"scale\": 0, \"count\": 40, \"max_buckets\": 160, \"buckets\": {\"1\": 10, \"2\": 20, \"3\": 10}}" } }
+cols { time64ns_data { data: 12 data: 14 } }
+num_rows: 2
+eow: true
+eos: true)pb"},
+                              {R"pb(
+resource_metrics {
+  resource {
+  }
+  scope_metrics {
+    metrics {
+      name: "http.resp.latency"
+      exponential_histogram {
+        data_points {
+          attributes {
+            key: "http.method"
+            value {
+              string_value: "GET"
+            }
+          }
+          start_time_unix_nano: 10
+          time_unix_nano: 12
+          count: 4
+          scale: 0
+          positive {
+            offset: -1
+            bucket_counts: 1
+            bucket_counts: 2
+            bucket_counts: 1
+          }
+        }
+        aggregation_temporality: AGGREGATION_TEMPORALITY_CUMULATIVE
+      }
+    }
+  }
+}
+resource_metrics {
+  resource {
+  }
+  scope_metrics {
+    metrics {
+      name: "http.resp.latency"
+      exponential_histogram {
+        data_points {
+          attributes {
+            key: "http.method"
+            value {
+              string_value: "POST"
+            }
+          }
+          start_time_unix_nano: 13
+          time_unix_nano: 14
+          count: 40
+          scale: 0
+          positive {
+            offset: -1
+            bucket_counts: 10
+            bucket_counts: 20
+            bucket_counts: 10
+          }
+        }
+        aggregation_temporality: AGGREGATION_TEMPORALITY_CUMULATIVE
+      }
+    }
+  }
+})pb"}},
                              {"gauge_float_and_attributes",
                               R"pb(
 resource {
