@@ -368,9 +368,9 @@ INSTANTIATE_TEST_SUITE_P(
         {
             "exp_histo",
             table_store::schema::Relation{
-                {types::TIME64NS, types::INT64, types::STRING},
-                {"time_", "latency_ns", "histo_output"},
-                {types::ST_NONE, types::ST_DURATION_NS, types::ST_EXPONENTIAL_HISTO}},
+                {types::TIME64NS, types::TIME64NS, types::INT64, types::STRING},
+                {"time_", "start_time", "latency_ns", "histo_output"},
+                {types::ST_NONE, types::ST_NONE, types::ST_DURATION_NS, types::ST_EXPONENTIAL_HISTO}},
             R"pb(
             endpoint_config {}
             resource {}
@@ -379,7 +379,8 @@ INSTANTIATE_TEST_SUITE_P(
               unit: "ns"
               time_column_index: 0
               histogram {
-                string_column_index: 2
+                start_time_column_index: 1
+                string_column_index: 3
               }
             })pb",
             [](IR* graph, OperatorIR* parent, table_store::schema::Relation* relation) {
@@ -390,7 +391,7 @@ INSTANTIATE_TEST_SUITE_P(
               histo.time_column = CreateTypedColumn(graph, "time_", relation);
 
               histo.unit_column = CreateTypedColumn(graph, "latency_ns", relation);
-              histo.metric = OTelExponentialHistogram{CreateTypedColumn(graph, "histo_output", relation)};
+              histo.metric = OTelExponentialHistogram{CreateTypedColumn(graph, "histo_output", relation), CreateTypedColumn(graph, "start_time", relation)};
               return graph->CreateNode<OTelExportSinkIR>(parent->ast(), parent, data)
                   .ConsumeValueOrDie();
             },
@@ -595,7 +596,7 @@ OTelExportSinkIR* CreateHisto(IR* graph, OperatorIR* parent,
   histo.name = "http.resp.latency";
   histo.time_column = CreateTypedColumn(graph, "time_", relation);
   histo.unit_column = CreateTypedColumn(graph, "latency_ns", relation);
-  histo.metric = OTelExponentialHistogram{CreateTypedColumn(graph, "latency_ns", relation)};
+  histo.metric = OTelExponentialHistogram{CreateTypedColumn(graph, "latency_ns", relation), CreateTypedColumn(graph, "start_time", relation)};
 
   return graph->CreateNode<OTelExportSinkIR>(parent->ast(), parent, data).ConsumeValueOrDie();
 }
@@ -767,18 +768,26 @@ INSTANTIATE_TEST_SUITE_P(
             },
         },
         {
-            "exp_histo_start_time_wrong",
-            table_store::schema::Relation{{types::INT64, types::TIME64NS, types::INT64},
-                                          {"time_", "service", "latency_ns"},
-                                          {types::ST_NONE, types::ST_NONE, types::ST_NONE}},
+            "exp_histo_end_time_wrong",
+            table_store::schema::Relation{{types::INT64, types::TIME64NS, types::TIME64NS, types::INT64},
+                                          {"time_", "start_time", "service", "latency_ns"},
+                                          {types::ST_NONE, types::ST_NONE, types::ST_NONE, types::ST_NONE}},
             "Expected time column 'time_' to be TIME64NS, received INT64",
             &CreateHisto,
         },
         {
+            "exp_histo_start_time_wrong",
+            table_store::schema::Relation{{types::TIME64NS, types::INT64, types::TIME64NS, types::INT64},
+                                          {"time_", "start_time", "service", "latency_ns"},
+                                          {types::ST_NONE, types::ST_NONE, types::ST_NONE, types::ST_NONE}},
+            "Expected time column 'start_time' to be TIME64NS, received INT64",
+            &CreateHisto,
+        },
+        {
             "exp_histo_with_non_st_histogram_column",
-            table_store::schema::Relation{{types::TIME64NS, types::TIME64NS, types::INT64},
-                                          {"time_", "service", "latency_ns"},
-                                          {types::ST_NONE, types::ST_NONE, types::ST_NONE}},
+            table_store::schema::Relation{{types::TIME64NS, types::TIME64NS, types::TIME64NS, types::INT64},
+                                          {"time_", "start_time", "service", "latency_ns"},
+                                          {types::ST_NONE, types::ST_NONE, types::ST_NONE, types::ST_NONE}},
             "Expected ExponentialHistogram value column to have type ST_EXPONENTIAL_HISTO",
             [](IR* graph, OperatorIR* parent, table_store::schema::Relation* relation) {
               OTelData data;
@@ -788,16 +797,16 @@ INSTANTIATE_TEST_SUITE_P(
               histo.time_column = CreateTypedColumn(graph, "time_", relation);
               auto latency_col = CreateTypedColumn(graph, "latency_ns", relation);
               histo.unit_column = latency_col;
-              histo.metric = OTelExponentialHistogram{CreateTypedColumn(graph, "latency_ns", relation)};
+              histo.metric = OTelExponentialHistogram{CreateTypedColumn(graph, "latency_ns", relation), CreateTypedColumn(graph, "start_time", relation)};
               return graph->CreateNode<OTelExportSinkIR>(parent->ast(), parent, data)
                   .ConsumeValueOrDie();
             },
         },
         {
             "exp_histo_with_non_string_column",
-            table_store::schema::Relation{{types::TIME64NS, types::TIME64NS, types::INT64},
-                                          {"time_", "service", "latency_ns"},
-                                          {types::ST_NONE, types::ST_NONE, types::ST_EXPONENTIAL_HISTO}},
+            table_store::schema::Relation{{types::TIME64NS, types::TIME64NS, types::TIME64NS, types::INT64},
+                                          {"time_", "start_time", "service", "latency_ns"},
+                                          {types::ST_NONE, types::ST_NONE, types::ST_NONE, types::ST_EXPONENTIAL_HISTO}},
             "Expected value column 'latency_ns' to be STRING, received",
             [](IR* graph, OperatorIR* parent, table_store::schema::Relation* relation) {
               OTelData data;
@@ -807,7 +816,7 @@ INSTANTIATE_TEST_SUITE_P(
               histo.time_column = CreateTypedColumn(graph, "time_", relation);
               auto latency_col = CreateTypedColumn(graph, "latency_ns", relation);
               histo.unit_column = latency_col;
-              histo.metric = OTelExponentialHistogram{CreateTypedColumn(graph, "latency_ns", relation)};
+              histo.metric = OTelExponentialHistogram{CreateTypedColumn(graph, "latency_ns", relation), CreateTypedColumn(graph, "start_time", relation)};
               return graph->CreateNode<OTelExportSinkIR>(parent->ast(), parent, data)
                   .ConsumeValueOrDie();
             },

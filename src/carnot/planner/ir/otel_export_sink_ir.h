@@ -98,6 +98,7 @@ struct OTelMetricSummary {
 
 struct OTelExponentialHistogram {
   ColumnIR* buckets_column;
+  ColumnIR* start_time_column;
 };
 
 struct OTelMetric {

@@ -115,7 +115,8 @@ Status OTelExportSinkIR::ProcessConfig(const OTelData& data) {
             },
             [&new_metric, this](const OTelExponentialHistogram& histo) {
               PX_ASSIGN_OR_RETURN(auto buckets, AddColumn(histo.buckets_column));
-              new_metric.metric = OTelExponentialHistogram{buckets};
+              PX_ASSIGN_OR_RETURN(auto start_time_column, AddColumn(histo.start_time_column));
+              new_metric.metric = OTelExponentialHistogram{buckets, start_time_column};
               return Status::OK();
             },
             [&new_metric, this](const OTelMetricSummary& summary) {
@@ -221,6 +222,16 @@ Status OTelExportSinkIR::ToProto(planpb::Operator* op) const {
             },
             [&metric_pb](const OTelExponentialHistogram& histo) {
               auto histogram_pb = metric_pb->mutable_histogram();
+              if (histo.start_time_column->EvaluatedDataType() != types::TIME64NS) {
+                return histo.start_time_column->CreateIRNodeError(
+                    "Expected time column '$0' to be TIME64NS, received $1",
+                    histo.start_time_column->col_name(),
+                    types::ToString(histo.start_time_column->EvaluatedDataType()));
+              }
+
+              PX_ASSIGN_OR_RETURN(auto start_time_column_index, histo.start_time_column->GetColumnIndex());
+              histogram_pb->set_start_time_column_index(start_time_column_index);
+
               PX_ASSIGN_OR_RETURN(auto histogram_index, histo.buckets_column->GetColumnIndex());
               auto semantic_type =  histo.buckets_column->resolved_value_type()->semantic_type();
               if (semantic_type != types::ST_EXPONENTIAL_HISTO) {
