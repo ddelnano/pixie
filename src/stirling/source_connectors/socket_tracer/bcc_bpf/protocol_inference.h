@@ -683,6 +683,28 @@ static __inline enum message_type_t infer_nats_message(const char* buf, size_t c
   return kUnknown;
 }
 
+static __inline enum MessageType infer_http2_message(const char* buf, size_t count) {
+  // Technically, HTTP2 client connection preface is 24 octets [1]. Practically,
+  // the first 3 shall be sufficient. Note this is sent from client,
+  // so it would be captured on server's read()/recvfrom()/recvmsg() or client's
+  // write()/sendto()/sendmsg().
+  //
+  // [1] https://http2.github.io/http2-spec/#ConnectionHeader
+  if (count < 3) {
+    return kUnknown;
+  }
+
+  if (buf[0] == 'P' && buf[1] == 'R' && buf[2] == 'I') {
+    return kRequest;
+  }
+
+  if (looks_like_grpc_req_http2_headers_frame(buf, count)) {
+    return kRequest;
+  }
+
+  return kUnknown;
+}
+
 static __inline struct protocol_message_t infer_protocol(const char* buf, size_t count,
                                                          struct conn_info_t* conn_info) {
   struct protocol_message_t inferred_message;
@@ -712,6 +734,9 @@ static __inline struct protocol_message_t infer_protocol(const char* buf, size_t
     inferred_message.protocol = kProtocolPGSQL;
   } else if (ENABLE_MYSQL_TRACING &&
              (inferred_message.type = infer_mysql_message(buf, count, conn_info)) != kUnknown) {
+    inferred_message.protocol = kProtocolMySQL;
+  } else if (ENABLE_HTTP2_TRACING &&
+             (inferred_message.type = infer_http2_message(buf, count)) != kUnknown) {
     inferred_message.protocol = kProtocolMySQL;
   } else if (ENABLE_MUX_TRACING &&
              (inferred_message.type = infer_mux_message(buf, count)) != kUnknown) {
