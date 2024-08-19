@@ -72,6 +72,7 @@ pl_cc_test(
     # PROTOCOL_LIST: Requires update on new protocols.
     defines = [
         "ENABLE_HTTP_TRACING=true",
+        "ENABLE_HTTP2_TRACING=true",
         "ENABLE_CQL_TRACING=true",
         "ENABLE_MUX_TRACING=true",
         "ENABLE_PGSQL_TRACING=true",

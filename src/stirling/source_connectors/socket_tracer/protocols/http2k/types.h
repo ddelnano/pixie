@@ -15,6 +15,8 @@ namespace stirling {
 namespace protocols {
 namespace http2k {
 
+constexpr size_t kGRPCMessageHeaderSizeInBytes = 5;
+
 namespace headers {
 
 constexpr char kContentType[] = "content-type";

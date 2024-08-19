@@ -185,6 +185,11 @@ void DataStream::ProcessBytesToFrames(message_type_t type, TStateType* state) {
 template void DataStream::ProcessBytesToFrames<
     protocols::http::stream_id_t, protocols::http::Message, protocols::http::StateWrapper>(
     message_type_t type, protocols::http::StateWrapper* state);
+
+template void DataStream::ProcessBytesToFrames<
+    protocols::http2k::stream_id_t, protocols::http2k::Message, protocols::http2k::StateWrapper>(
+    message_type_t type, protocols::http2k::StateWrapper* state);
+
 template void DataStream::ProcessBytesToFrames<protocols::mux::stream_id_t, protocols::mux::Frame,
                                                protocols::NoState>(message_type_t type,
                                                                    protocols::NoState* state);

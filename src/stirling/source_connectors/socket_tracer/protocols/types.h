@@ -45,6 +45,7 @@ namespace protocols {
 using FrameDequeVariant = std::variant<std::monostate,
                                        absl::flat_hash_map<cass::stream_id_t, std::deque<cass::Frame>>,
                                        absl::flat_hash_map<http::stream_id_t, std::deque<http::Message>>,
+                                       absl::flat_hash_map<http2k::stream_id_t, std::deque<http2k::Message>>,
                                        absl::flat_hash_map<mux::stream_id_t, std::deque<mux::Frame>>,
                                        absl::flat_hash_map<mysql::connection_id_t, std::deque<mysql::Packet>>,
                                        absl::flat_hash_map<pgsql::connection_id_t, std::deque<pgsql::RegularMessage>>,

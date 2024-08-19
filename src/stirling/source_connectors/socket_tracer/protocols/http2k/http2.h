@@ -75,10 +75,13 @@ struct State {
   http2k::Inflater recv;
 };
 
+using stream_id_t = uint16_t;
+
 struct ProtocolTraits {
   using frame_type = Frame;
   using record_type = Record;
   using state_type = State;
+  using key_type = stream_id_t;
 };
 
 /**
