@@ -10,19 +10,19 @@ extern "C" {
 #include "src/common/base/error.h"
 #include "src/common/base/status.h"
 #include "src/common/testing/testing.h"
-#include "src/stirling/protocols/http2/testing/utils.h"
-#include "src/stirling/testing/event_generator.h"
+#include "src/stirling/source_connectors/socket_tracer/protocols/http2/testing/utils.h"
+// #include "src/stirling/source_connectors/socket_tracer/testing/event_generator.h"
 
-namespace pl {
+namespace px {
 namespace stirling {
 namespace protocols {
 namespace http2k {
 
-using ::pl::grpc::MethodInputOutput;
-using ::pl::grpc::ServiceDescriptorDatabase;
-using ::pl::stirling::protocols::http2k::testing::GreetServiceFDSet;
-using ::pl::stirling::testing::DataEventWithTimestamp;
-using ::pl::testing::proto::EqualsProto;
+using ::px::grpc::MethodInputOutput;
+using ::px::grpc::ServiceDescriptorDatabase;
+using http2::testing::GreetServiceFDSet;
+using ::px::stirling::testing::DataEventWithTimestamp;
+using ::px::testing::proto::EqualsProto;
 using ::testing::_;
 using ::testing::ElementsAre;
 using ::testing::ElementsAreArray;
@@ -134,7 +134,7 @@ TEST_F(HTTP2ParserTest, UnpackFrames) {
   const size_t kFrame4Pos = kFrame3Pos + kDataFrame.size();
 
   std::deque<Frame> frames;
-  ParseResult<size_t> res = parser_.ParseFramesLoop(MessageType::kUnknown, kBuf, &frames);
+  ParseResult<size_t> res = parser_.ParseFramesLoop(message_type_t::kUnknown, kBuf, &frames);
   EXPECT_THAT(res.state, Eq(ParseState::kNeedsMoreData));
   EXPECT_THAT(res.frame_positions, ElementsAre(StartEndPos<size_t>{kFrame1Pos, kFrame2Pos - 1},
                                                StartEndPos<size_t>{kFrame2Pos, kFrame3Pos - 1},
@@ -147,7 +147,7 @@ TEST_F(HTTP2ParserTest, UnpackFrames) {
 }
 
 // Returns a vector of single HTTP2Message constructed from the input.
-HTTP2Message GRPCMsg(MessageType type, std::string_view msg, NVMap headers) {
+HTTP2Message GRPCMsg(message_type_t type, std::string_view msg, NVMap headers) {
   HTTP2Message res;
   res.type = type;
   res.message = msg;
@@ -158,11 +158,11 @@ HTTP2Message GRPCMsg(MessageType type, std::string_view msg, NVMap headers) {
 MATCHER_P2(HasMsgAndHdrs, msg, hdrs, "") { return arg.message == msg && arg.headers == hdrs; }
 
 TEST(MatchGRPCReqRespTest, InputsAreMoved) {
-  std::map<uint32_t, HTTP2Message> reqs{{1u, GRPCMsg(MessageType::kRequest, "a", {{"h1", "v1"}})},
-                                        {2u, GRPCMsg(MessageType::kRequest, "b", {{"h2", "v2"}})}};
+  std::map<uint32_t, HTTP2Message> reqs{{1u, GRPCMsg(message_type_t::kRequest, "a", {{"h1", "v1"}})},
+                                        {2u, GRPCMsg(message_type_t::kRequest, "b", {{"h2", "v2"}})}};
   std::map<uint32_t, HTTP2Message> resps{
-      {0u, GRPCMsg(MessageType::kResponse, "c", {{"h3", "v3"}})},
-      {1u, GRPCMsg(MessageType::kResponse, "d", {{"h4", "v4"}})}};
+      {0u, GRPCMsg(message_type_t::kResponse, "c", {{"h3", "v3"}})},
+      {1u, GRPCMsg(message_type_t::kResponse, "d", {{"h4", "v4"}})}};
 
   std::vector<Record> matched_msgs = MatchGRPCReqResp(std::move(reqs), std::move(resps));
   ASSERT_THAT(matched_msgs, SizeIs(1));
@@ -209,7 +209,7 @@ std::vector<const Frame*> ExtractPtrs(const std::deque<Frame>& frames) {
 TEST_F(HTTP2ParserTest, SuccessiveHeadersFrameCausesError) {
   std::string input = absl::StrCat(PackHeadersFrame("", 0, 1), PackHeadersFrame("", 0, 1));
   std::deque<Frame> frames;
-  ParseResult<size_t> res = parser_.ParseFramesLoop(MessageType::kUnknown, input, &frames);
+  ParseResult<size_t> res = parser_.ParseFramesLoop(message_type_t::kUnknown, input, &frames);
   EXPECT_EQ(ParseState::kSuccess, res.state);
   EXPECT_THAT(frames, SizeIs(2));
 
@@ -223,7 +223,7 @@ TEST_F(HTTP2ParserTest, SuccessiveHeadersFrameCausesError) {
 TEST_F(HTTP2ParserTest, DataAfterHeadersCausesError) {
   std::string input = absl::StrCat(PackHeadersFrame("", 0, 1), PackDataFrame("abcd", 0, 1));
   std::deque<Frame> frames;
-  ParseResult<size_t> res = parser_.ParseFramesLoop(MessageType::kUnknown, input, &frames);
+  ParseResult<size_t> res = parser_.ParseFramesLoop(message_type_t::kUnknown, input, &frames);
   EXPECT_EQ(ParseState::kSuccess, res.state);
   EXPECT_THAT(frames, SizeIs(2));
 
@@ -242,7 +242,7 @@ TEST_F(HTTP2ParserTest, StitchReqsRespsOfDifferentStreams) {
                    PackHeadersFrame("", NGHTTP2_FLAG_END_HEADERS | NGHTTP2_FLAG_END_STREAM, 1));
   std::map<uint32_t, HTTP2Message> stream_msgs;
   std::deque<Frame> frames;
-  ParseResult<size_t> res = parser_.ParseFramesLoop(MessageType::kUnknown, input, &frames);
+  ParseResult<size_t> res = parser_.ParseFramesLoop(message_type_t::kUnknown, input, &frames);
   EXPECT_EQ(ParseState::kSuccess, res.state);
   ASSERT_THAT(frames, SizeIs(5));
 
@@ -254,12 +254,12 @@ TEST_F(HTTP2ParserTest, StitchReqsRespsOfDifferentStreams) {
   ASSERT_THAT(stream_msgs, ElementsAre(Pair(1, _), Pair(2, _)));
 
   const HTTP2Message& req_msg = stream_msgs[2];
-  EXPECT_EQ(MessageType::kRequest, req_msg.type);
+  EXPECT_EQ(message_type_t::kRequest, req_msg.type);
   EXPECT_EQ("abcd", req_msg.message);
   EXPECT_THAT(req_msg.frames, ElementsAre(&frames[1], &frames[3]));
 
   const HTTP2Message& resp_msg = stream_msgs[1];
-  EXPECT_EQ(MessageType::kResponse, resp_msg.type);
+  EXPECT_EQ(message_type_t::kResponse, resp_msg.type);
   EXPECT_EQ("abcd", resp_msg.message);
   // Note we put the HEADERS frames first, and then DATA frames.
   EXPECT_THAT(resp_msg.frames, ElementsAre(&frames[0], &frames[4], &frames[2]));
@@ -269,7 +269,7 @@ TEST_F(HTTP2ParserTest, IncompleteMessage) {
   std::string input =
       absl::StrCat(PackHeadersFrame("", NGHTTP2_FLAG_END_HEADERS, 1), PackDataFrame("abcd", 0, 2));
   std::deque<Frame> frames;
-  ParseResult<size_t> res = parser_.ParseFramesLoop(MessageType::kUnknown, input, &frames);
+  ParseResult<size_t> res = parser_.ParseFramesLoop(message_type_t::kUnknown, input, &frames);
   EXPECT_EQ(ParseState::kSuccess, res.state);
 
   Inflater inflater;
@@ -436,7 +436,7 @@ TEST(HeadersTest, GetHeaderValue) {
 
 struct BoundaryTestCase {
   std::string_view input;
-  MessageType msg_type;
+  message_type_t msg_type;
   size_t exp_res;
 };
 
@@ -452,17 +452,17 @@ INSTANTIATE_TEST_SUITE_P(
     ::testing::Values(
         BoundaryTestCase{
             ConstStringView("abcd\x00\x00\x04\x01\x04\x00\x00\x00\x0D\x86\x83\xC0\xBF"),
-            MessageType::kRequest, 4},
+            message_type_t::kRequest, 4},
         BoundaryTestCase{ConstStringView("abcd\x00\x00\x04\x01\x04\x00\x00\x00\x0D\x86\x83"),
-                         MessageType::kRequest, std::string_view::npos},
-        BoundaryTestCase{ConstStringView("abcd"), MessageType::kRequest, std::string_view::npos},
+                         message_type_t::kRequest, std::string_view::npos},
+        BoundaryTestCase{ConstStringView("abcd"), message_type_t::kRequest, std::string_view::npos},
         BoundaryTestCase{ConstStringView("abcd\x00\x00\x04\x01\x04\x00\x00\x00\x0D\x88"),
-                         MessageType::kResponse, 4},
+                         message_type_t::kResponse, 4},
         BoundaryTestCase{ConstStringView("abcd\x00\x00\x04\x01\x04\x00\x00\x00\x0D"),
-                         MessageType::kResponse, std::string_view::npos},
-        BoundaryTestCase{ConstStringView("abcd"), MessageType::kResponse, std::string_view::npos},
-        BoundaryTestCase{std::string_view(), MessageType::kRequest, std::string_view::npos},
-        BoundaryTestCase{std::string_view(), MessageType::kResponse, std::string_view::npos}));
+                         message_type_t::kResponse, std::string_view::npos},
+        BoundaryTestCase{ConstStringView("abcd"), message_type_t::kResponse, std::string_view::npos},
+        BoundaryTestCase{std::string_view(), message_type_t::kRequest, std::string_view::npos},
+        BoundaryTestCase{std::string_view(), message_type_t::kResponse, std::string_view::npos}));
 
 TEST(DecodeIntegerTest, AllCases) {
   {
@@ -500,7 +500,7 @@ TEST_F(HTTP2ParserTest, HeadersAndContinuationFramesAreStitched) {
   const std::string input = absl::StrCat(
       PackHeadersFrame("\x86", 0, 1), PackContinuationFrame("\x83", NGHTTP2_FLAG_END_HEADERS, 1));
   std::deque<Frame> frames;
-  parser_.ParseFramesLoop(MessageType::kUnknown, input, &frames);
+  parser_.ParseFramesLoop(message_type_t::kUnknown, input, &frames);
   EXPECT_THAT(frames, ElementsAre(MatchesTypePayload(NGHTTP2_HEADERS, "\x86"),
                                   MatchesTypePayload(NGHTTP2_CONTINUATION, "\x83")));
   Inflater inflater;
@@ -522,7 +522,7 @@ TEST_F(HTTP2ParserTest, HeadersAndThenDataFrame) {
       absl::StrCat(PackHeadersFrame("a:b", 0, 1), PackContinuationFrame("c:d", 0, 1),
                    PackDataFrame("abc", 1, 2));
   std::deque<Frame> frames;
-  parser_.ParseFramesLoop(MessageType::kUnknown, input, &frames);
+  parser_.ParseFramesLoop(message_type_t::kUnknown, input, &frames);
   EXPECT_THAT(frames, ElementsAre(MatchesTypePayload(NGHTTP2_HEADERS, "a:b"),
                                   MatchesTypePayload(NGHTTP2_CONTINUATION, "c:d"),
                                   MatchesTypePayload(NGHTTP2_DATA, "abc")));
@@ -544,7 +544,7 @@ TEST_F(HTTP2ParserTest, SuccessiveHeadersFrames) {
   const std::string input =
       absl::StrCat(PackHeadersFrame("a:b", 0, 1), PackHeadersFrame("c:d", 0, 1));
   std::deque<Frame> frames;
-  parser_.ParseFramesLoop(MessageType::kUnknown, input, &frames);
+  parser_.ParseFramesLoop(message_type_t::kUnknown, input, &frames);
   EXPECT_THAT(frames, ElementsAre(MatchesTypePayload(NGHTTP2_HEADERS, "a:b"),
                                   MatchesTypePayload(NGHTTP2_HEADERS, "c:d")));
   Inflater inflater;
@@ -565,7 +565,7 @@ TEST_F(HTTP2ParserTest, SuccessiveContinuationFrames) {
       absl::StrCat(PackContinuationFrame("a", 0, 1), PackContinuationFrame("b", 0, 1),
                    PackContinuationFrame("c", 9, 1));
   std::deque<Frame> frames;
-  parser_.ParseFramesLoop(MessageType::kUnknown, input, &frames);
+  parser_.ParseFramesLoop(message_type_t::kUnknown, input, &frames);
   EXPECT_THAT(frames, ElementsAre(MatchesTypePayload(NGHTTP2_CONTINUATION, "a"),
                                   MatchesTypePayload(NGHTTP2_CONTINUATION, "b"),
                                   MatchesTypePayload(NGHTTP2_CONTINUATION, "c")));
@@ -590,7 +590,7 @@ TEST_F(HTTP2ParserTest, SuccessiveContinuationFrames) {
 TEST_F(HTTP2ParserTest, IncompleteHeaderBlock) {
   std::string input = absl::StrCat(PackHeadersFrame("a", 0, 1), PackContinuationFrame("b", 0, 1));
   std::deque<Frame> frames;
-  parser_.ParseFramesLoop(MessageType::kUnknown, input, &frames);
+  parser_.ParseFramesLoop(message_type_t::kUnknown, input, &frames);
   EXPECT_THAT(frames, ElementsAre(MatchesTypePayload(NGHTTP2_HEADERS, "a"),
                                   MatchesTypePayload(NGHTTP2_CONTINUATION, "b")));
 
@@ -635,7 +635,7 @@ TEST(EventsTimeSpanTest, FromEventsToHTTP2Message) {
   parser.Append(event2);
 
   std::deque<Frame> frames;
-  ParseResult<BufferPosition> res = parser.ParseFrames(MessageType::kUnknown, &frames);
+  ParseResult<BufferPosition> res = parser.ParseFrames(message_type_t::kUnknown, &frames);
   EXPECT_EQ(ParseState::kSuccess, res.state);
   EXPECT_THAT(frames, ElementsAre(MatchesTypePayload(NGHTTP2_HEADERS, "\x86\x83"),
                                   MatchesTypePayload(NGHTTP2_CONTINUATION, "\x88"),
@@ -652,4 +652,4 @@ TEST(EventsTimeSpanTest, FromEventsToHTTP2Message) {
 }  // namespace http2k
 }  // namespace protocols
 }  // namespace stirling
-}  // namespace pl
+}  // namespace px

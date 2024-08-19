@@ -18,16 +18,15 @@ extern "C" {
 
 #include "src/common/base/mixins.h"
 #include "src/common/base/status.h"
-#include "src/common/grpcutils/service_descriptor_database.h"
-#include "src/stirling/bcc_bpf_interface/socket_trace.h"
-#include "src/stirling/common/parse_state.h"
-#include "src/stirling/protocols/common/event_parser.h"
-#include "src/stirling/protocols/common/protocol_traits.h"
-#include "src/stirling/protocols/common/stitcher.h"
-#include "src/stirling/protocols/http2/frame.h"
-#include "src/stirling/protocols/http2/message.h"
+// #include "src/common/grpcutils/service_descriptor_database.h"
+#include "src/stirling/source_connectors/socket_tracer/bcc_bpf_intf/socket_trace.hpp"
+#include "src/stirling/utils/parse_state.h"
+#include "src/stirling/source_connectors/socket_tracer/protocols/common/event_parser.h"
+// #include "src/stirling/protocols/common/protocol_traits.h" // interface.h file
+// #include "src/stirling/protocols/common/stitcher.h"
+#include "src/stirling/source_connectors/socket_tracer/protocols/http2k/types.h"
 
-namespace pl {
+namespace px {
 namespace stirling {
 namespace protocols {
 namespace http2k {
@@ -206,4 +205,4 @@ inline RecordsWithErrorCount<http2k::Record> ProcessFrames(std::deque<http2k::Fr
 
 }  // namespace protocols
 }  // namespace stirling
-}  // namespace pl
+}  // namespace px
