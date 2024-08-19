@@ -99,6 +99,13 @@ def _local_repo(name, **kwargs):  # buildifier: disable=unused-variable
 def _bazel_repo(name, **kwargs):
     _http_archive_repo_impl(name, **kwargs)
 
+def _com_github_nghttp2_nghttp2():
+    _include_all_repo("com_github_nghttp2_nghttp2", patches = ["//bazel/external:nghttp2.patch"], patch_args = ["-p1"])
+    native.bind(
+        name = "nghttp2",
+        actual = "//third_party/foreign_cc:nghttp2",
+    )
+
 # With a predefined "include all files" BUILD file for a non-Bazel repo.
 def _include_all_repo(name, **kwargs):
     kwargs["build_file_content"] = BUILD_ALL_CONTENT
@@ -184,6 +191,7 @@ def _cc_deps():
     _include_all_repo("com_github_libuv_libuv", patches = ["//bazel/external:libuv.patch"], patch_args = ["-p1"])
     _include_all_repo("com_github_libarchive_libarchive", patches = ["//bazel/external:libarchive.patch"], patch_args = ["-p1"])
 
+    _com_github_nghttp2_nghttp2()
     _bazel_repo("org_libc_musl", build_file = "//bazel/external:musl.BUILD")
 
 def _java_deps():

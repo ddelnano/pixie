@@ -71,6 +71,16 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "concurrentqueue-1.0.3",
         urls = ["https://github.com/cameron314/concurrentqueue/archive/refs/tags/v1.0.3.tar.gz"],
     ),
+    com_github_nghttp2_nghttp2 = dict(
+        sha256 = "863e366c530d09d7cebce67c6d7449bdb85bccb5ae0ecff84295a80697a6c989",
+        strip_prefix = "nghttp2-ee4431344511886efc66395a38b9bf5dddd7151b",
+        urls = ["https://github.com/nghttp2/nghttp2/archive/ee4431344511886efc66395a38b9bf5dddd7151b.tar.gz"],
+    ),
+    # com_github_nghttp2_nghttp2 = dict(
+    #     sha256 = "73c8af772dd2b30cedc114d37291cf1485b0a7ce11833595fc2aec7b3ce3ba5c",
+    #     strip_prefix = "nhttp2-1.62.1",
+    #     urls = ["https://github.com/nghttp2/nghttp2/archive/refs/tags/v1.62.1.tar.gz"],
+    # ),
     com_github_cyan4973_xxhash = dict(
         sha256 = "952ebbf5b11fbf59ae5d760a562d1e9112278f244340ad7714e8556cbe54f7f7",
         strip_prefix = "xxHash-0.7.3",
