@@ -217,7 +217,7 @@ TEST_F(HTTP2ParserTest, SuccessiveHeadersFrameCausesError) {
   absl::flat_hash_map<stream_id_t, std::deque<Frame>> frames;
   auto res = ParseFramesLoop(message_type_t::kUnknown, input, &frames);
   EXPECT_EQ(ParseState::kSuccess, res.state);
-  EXPECT_THAT(frames, SizeIs(2));
+  EXPECT_THAT(frames[0], SizeIs(2));
 
   Inflater inflater;
   StitchAndInflateHeaderBlocks(inflater.inflater(), &frames[0]);
