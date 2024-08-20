@@ -57,6 +57,7 @@ DECLARE_int32(test_only_socket_trace_target_pid);
 DECLARE_string(socket_trace_data_events_output_path);
 DECLARE_int32(stirling_enable_http_tracing);
 DECLARE_int32(stirling_enable_http2_tracing);
+DECLARE_int32(stirling_enable_http2_kprobe_tracing);
 DECLARE_int32(stirling_enable_mysql_tracing);
 DECLARE_int32(stirling_enable_cass_tracing);
 DECLARE_int32(stirling_enable_dns_tracing);

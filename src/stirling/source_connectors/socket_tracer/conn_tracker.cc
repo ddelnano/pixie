@@ -657,6 +657,7 @@ auto CreateTraceRoles() {
   res.Set(kProtocolUnknown, {});
   res.Set(kProtocolHTTP, {kRoleServer});
   res.Set(kProtocolHTTP2, {kRoleServer});
+  res.Set(kProtocolHTTP2K, {kRoleClient, kRoleServer});
   // MySQL server-side tracing is functional, but leave client-side on for legacy reasons.
   // TODO(oazizi): Remove MySQL client-side tracing.
   //               This is an PxL-breaking change, so must be done with caution,

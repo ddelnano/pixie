@@ -27,6 +27,7 @@
 #include "src/stirling/source_connectors/socket_tracer/protocols/dns/types.h"
 #include "src/stirling/source_connectors/socket_tracer/protocols/http/types.h"
 #include "src/stirling/source_connectors/socket_tracer/protocols/http2/types.h"
+#include "src/stirling/source_connectors/socket_tracer/protocols/http2k/types.h"
 #include "src/stirling/source_connectors/socket_tracer/protocols/kafka/common/types.h"
 #include "src/stirling/source_connectors/socket_tracer/protocols/mongodb/types.h"
 #include "src/stirling/source_connectors/socket_tracer/protocols/mux/types.h"
