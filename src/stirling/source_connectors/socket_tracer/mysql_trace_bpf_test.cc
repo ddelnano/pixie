@@ -37,6 +37,8 @@
 #include "src/stirling/source_connectors/socket_tracer/testing/container_images/python_mysql_connector_container.h"
 #include "src/stirling/source_connectors/socket_tracer/testing/socket_trace_bpf_test_fixture.h"
 #include "src/stirling/testing/common.h"
+#include "src/stirling/source_connectors/socket_tracer/mysql_table.h"
+#include "src/stirling/source_connectors/socket_tracer/testing/protocol_checkers.h"
 
 namespace px {
 namespace stirling {
@@ -45,11 +47,13 @@ namespace mysql = protocols::mysql;
 
 using ::px::stirling::testing::FindRecordIdxMatchesPID;
 using ::px::stirling::testing::SocketTraceBPFTestFixture;
+using ::px::stirling::testing::GetLocalAddrs;
 using ::px::testing::BazelRunfilePath;
 using ::px::types::ColumnWrapper;
 using ::px::types::ColumnWrapperRecordBatch;
 
 using ::testing::AllOf;
+using ::testing::Contains;
 using ::testing::Eq;
 using ::testing::Field;
 using ::testing::IsEmpty;
@@ -415,10 +419,17 @@ TEST_F(MySQLTraceTest, mysql_capture) {
     std::vector<TaggedRecordBatch> tablets = ConsumeRecords(SocketTraceConnector::kMySQLTableNum);
     ASSERT_NOT_EMPTY_AND_GET_RECORDS(const types::ColumnWrapperRecordBatch& record_batch, tablets);
 
+    for (size_t i = 0; i < record_batch[kMySQLUPIDIdx]->Size(); ++i) {
+      LOG(INFO) << "PID: " << record_batch[kMySQLUPIDIdx]->Get<types::UInt128Value>(i).High64() << " Local addr: " << record_batch[kMySQLTable.ColIndex("local_addr")]->Get<types::StringValue>(i) << " Remote addr: " << record_batch[kMySQLTable.ColIndex("remote_addr")]->Get<types::StringValue>(i);
+    }
+
+
     if (!FLAGS_tracing_mode) {
       // Check client-side tracing results.
-      std::vector<mysql::Record> client_records = GetTargetRecords(record_batch, client_pid);
+      std::vector<size_t> indices = FindRecordIdxMatchesPID(record_batch, kMySQLUPIDIdx, client_pid);
+      std::vector<mysql::Record> client_records = ToRecordVector(record_batch, indices);
 
+      EXPECT_THAT(GetLocalAddrs(record_batch, kMySQLTable.ColIndex("local_addr"), indices), Contains("127.0.0.1"));
       EXPECT_THAT(
           client_records,
           UnorderedElementsAre(EqMySQLRecord(kRecordInit), EqMySQLRecord(kRecordScript1Cmd1),

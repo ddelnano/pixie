@@ -81,6 +81,8 @@ BPF_HASH(active_accept_args_map, uint64_t, struct accept_args_t);
 // Key is {tgid, pid}.
 BPF_HASH(active_connect_args_map, uint64_t, struct connect_args_t);
 
+BPF_HASH(tcp_connect_args_map, uint64_t, struct sock *);
+
 // Map from thread to its ongoing write() syscall's input argument.
 // Tracks write() call from entry -> exit.
 // Key is {tgid, pid}.
@@ -376,6 +378,36 @@ static __inline void read_sockaddr_kernel(struct conn_info_t* conn_info,
   }
 }
 
+static __inline void read_sockaddr_kernel_sock(struct conn_info_t* conn_info,
+                                          struct sock* socket) {
+  // Use BPF_PROBE_READ_KERNEL_VAR since BCC cannot insert them as expected.
+  struct sock* sk = socket;
+
+  struct sock_common* sk_common = &sk->__sk_common;
+  uint16_t family = -1;
+  uint16_t lport = -1;
+  uint16_t rport = -1;
+
+  BPF_PROBE_READ_KERNEL_VAR(family, &sk_common->skc_family);
+  BPF_PROBE_READ_KERNEL_VAR(lport, &sk_common->skc_num);
+  BPF_PROBE_READ_KERNEL_VAR(rport, &sk_common->skc_dport);
+
+  conn_info->laddr.sa.sa_family = family;
+  conn_info->raddr.sa.sa_family = family;
+
+  if (family == AF_INET) {
+    conn_info->laddr.in4.sin_port = lport;
+    conn_info->raddr.in4.sin_port = rport;
+    BPF_PROBE_READ_KERNEL_VAR(conn_info->laddr.in4.sin_addr.s_addr, &sk_common->skc_rcv_saddr);
+    BPF_PROBE_READ_KERNEL_VAR(conn_info->raddr.in4.sin_addr.s_addr, &sk_common->skc_daddr);
+  } else if (family == AF_INET6) {
+    conn_info->laddr.in6.sin6_port = lport;
+    conn_info->raddr.in6.sin6_port = rport;
+    BPF_PROBE_READ_KERNEL_VAR(conn_info->laddr.in6.sin6_addr, &sk_common->skc_v6_rcv_saddr);
+    BPF_PROBE_READ_KERNEL_VAR(conn_info->raddr.in6.sin6_addr, &sk_common->skc_v6_daddr);
+  }
+}
+
 static __inline void submit_new_conn(struct pt_regs* ctx, uint32_t tgid, int32_t fd,
                                      const struct sockaddr* addr, const struct socket* socket,
                                      enum endpoint_role_t role, enum source_function_t source_fn) {
@@ -383,6 +415,40 @@ static __inline void submit_new_conn(struct pt_regs* ctx, uint32_t tgid, int32_t
   init_conn_info(tgid, fd, &conn_info);
   if (socket != NULL) {
     read_sockaddr_kernel(&conn_info, socket);
+  } else if (addr != NULL) {
+    conn_info.raddr = *((union sockaddr_t*)addr);
+  }
+  conn_info.role = role;
+
+  uint64_t tgid_fd = gen_tgid_fd(tgid, fd);
+  conn_info_map.update(&tgid_fd, &conn_info);
+
+  // While we keep all sa_family types in conn_info_map,
+  // we only send connections with supported protocols to user-space.
+  // We use the same filter function to avoid sending data of unwanted connections as well.
+  if (!should_trace_sockaddr_family(conn_info.raddr.sa.sa_family)) {
+    return;
+  }
+
+  struct socket_control_event_t control_event = {};
+  control_event.type = kConnOpen;
+  control_event.timestamp_ns = bpf_ktime_get_ns();
+  control_event.conn_id = conn_info.conn_id;
+  control_event.source_fn = source_fn;
+  control_event.open.raddr = conn_info.raddr;
+  control_event.open.laddr = conn_info.laddr;
+  control_event.open.role = conn_info.role;
+
+  socket_control_events.perf_submit(ctx, &control_event, sizeof(struct socket_control_event_t));
+}
+
+static __inline void submit_new_conn_sock(struct pt_regs* ctx, uint32_t tgid, int32_t fd,
+                                     const struct sockaddr* addr, struct sock* socket,
+                                     enum endpoint_role_t role, enum source_function_t source_fn) {
+  struct conn_info_t conn_info = {};
+  init_conn_info(tgid, fd, &conn_info);
+  if (socket != NULL) {
+    read_sockaddr_kernel_sock(&conn_info, socket);
   } else if (addr != NULL) {
     conn_info.raddr = *((union sockaddr_t*)addr);
   }
@@ -585,6 +651,35 @@ int conn_cleanup_uprobe(struct pt_regs* ctx) {
   return 0;
 }
 
+int probe_entry_tcp_v4_connect(struct pt_regs* ctx) {
+  uint64_t id = bpf_get_current_pid_tgid();
+
+  const struct connect_args_t* connect_args = active_connect_args_map.lookup(&id);
+  if (connect_args == NULL) {
+    return 0;
+  }
+  struct sock* sk = (struct sock *)PT_REGS_PARM1(ctx);
+  tcp_connect_args_map.update(&id, &sk);
+
+  return 0;
+}
+
+int probe_ret_tcp_v4_connect(struct pt_regs* ctx) {
+  uint64_t id = bpf_get_current_pid_tgid();
+
+  struct sock** sk = tcp_connect_args_map.lookup(&id);
+  if (sk == NULL) {
+    return 0;
+  }
+  struct connect_args_t* connect_args = active_connect_args_map.lookup(&id);
+  if (connect_args != NULL) {
+    connect_args->tcp_v4_connect_sock = *sk;
+  }
+
+  tcp_connect_args_map.delete(&id);
+  return 0;
+}
+
 /***********************************************************
  * BPF syscall processing functions
  ***********************************************************/
@@ -629,7 +724,7 @@ static __inline void process_syscall_connect(struct pt_regs* ctx, uint64_t id,
     return;
   }
 
-  submit_new_conn(ctx, tgid, args->fd, args->addr, /*socket*/ NULL, kRoleClient, kSyscallConnect);
+  submit_new_conn_sock(ctx, tgid, args->fd, args->addr, args->tcp_v4_connect_sock, kRoleClient, kSyscallConnect);
 }
 
 static __inline void process_syscall_accept(struct pt_regs* ctx, uint64_t id,
