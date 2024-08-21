@@ -128,8 +128,14 @@ class UDATester {
   UDATester(UDATester const&) = delete;
   UDATester& operator=(UDATester const&) = delete;
   UDATester() = default;
-  template <typename... Args>
-  explicit UDATester(Args... args) : uda_(args...), test_merge_(false) {}
+
+  template <typename Q = TUDA, typename... Args, std::enable_if_t<!UDATraits<Q>::HasInit(), void>* = nullptr>
+  explicit UDATester(Args... args) : uda_(args...), test_merge_(false) { }
+
+  template <typename Q = TUDA, typename... Args, std::enable_if_t<UDATraits<Q>::HasInit(), void>* = nullptr>
+  explicit UDATester(Args... args) :
+    test_merge_(false),
+    invoke_init_{ [=](TUDA* uda) { return uda->Init(function_ctx_.get(), args...); } }  { }
   /*
    * Add the given arguments to the UDAs inputs.
    * Arguments must be of a type that can usually be passed into the UDA's Update function,
@@ -141,6 +147,11 @@ class UDATester {
 
     if (test_merge_) {
       std::unique_ptr<TUDA> merge_uda = std::make_unique<TUDA>();
+      if constexpr(UDATraits<TUDA>::HasInit()) {
+        /* merge_uda->Init(init_args_...); */
+        /* std::apply(merge_uda->Init, init_args_); */
+        PX_UNUSED(invoke_init_(merge_uda.get()));
+      }
       merge_uda->Update(nullptr, args...);
       merge_udas_.emplace_back(std::move(merge_uda));
     }
@@ -216,8 +227,11 @@ class UDATester {
   // without args. Once init args are supported we can properly test UDA/UDFs with init args, rather
   // than having to pass those args to the constructor.
   bool test_merge_ = true;
+  std::function<Status(TUDA*)> invoke_init_;
   // Vector of UDAs, created for each ForInput call, for testing merge.
-  // std::vector<std::unique_ptr<TUDA>> merge_udas_;
+  /* std::tuple<Args...> init_args_; */
+  /* std::array<types::DataType, std::size(UDATraits<TUDA>::InitArguments())> init_args_; */
+  /* static constexpr auto init_args_ = ArrayTransform(UDATraits<TUDA>::InitArguments(), [](auto&& arg) { return arg; }); */
   std::vector<std::unique_ptr<TUDA>> merge_udas_;
   std::unique_ptr<udf::FunctionContext> function_ctx_ = nullptr;
 };

@@ -762,8 +762,10 @@ class ExponentialHistogramUDA : public udf::UDA {
  public:
   Status Init(udf::FunctionContext*,
           types::Int64Value scale_factor,
-          types::Int64Value /*buckets*/) {
+          types::Int64Value buckets) {
       histogram_indexer_ = Base2ExponentialHistogramIndexer(scale_factor.val);
+      scale_factor_ = scale_factor.val;
+      max_buckets_ = buckets.val;
       return Status::OK();
   }
 
@@ -780,10 +782,22 @@ class ExponentialHistogramUDA : public udf::UDA {
 
   StringValue Finalize(FunctionContext*) {
     rapidjson::Document d;
+    rapidjson::Document::AllocatorType& a = d.GetAllocator();
     d.SetObject();
+    d.AddMember("offset", 0, a);
+    d.AddMember("scale", scale_factor_, a);
+    int count = 0;
+    rapidjson::Value buckets(rapidjson::kArrayType);
     for (const auto& [key, value] : histogram_) {
-        d.AddMember(rapidjson::Value().SetString(std::to_string(key).c_str(), d.GetAllocator()), value, d.GetAllocator());
+        rapidjson::Value bucket(rapidjson::kObjectType);
+        bucket.AddMember(rapidjson::Value().SetString(std::to_string(key).c_str(), a), value, a);
+
+        buckets.PushBack(bucket.Move(), a);
+        count += value;
     }
+    d.AddMember("buckets", buckets, a);
+    d.AddMember("count", count, a);
+    d.AddMember("max_buckets", max_buckets_, a);
     rapidjson::StringBuffer sb;
     rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
     d.Accept(writer);
@@ -854,9 +868,9 @@ class ExponentialHistogramUDA : public udf::UDA {
   }
   std::map<int64_t, int64_t> histogram_;
   int64_t scale_factor_;
+  int64_t max_buckets_;
   
   private:
-    int64_t buckets_;
     Base2ExponentialHistogramIndexer histogram_indexer_;
 };
 

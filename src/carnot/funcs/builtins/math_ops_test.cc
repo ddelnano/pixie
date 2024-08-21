@@ -629,35 +629,29 @@ TEST(MathOps, merge_count_test) {
 }
 
 TEST(MathOps, basic_float64_exp_histogram_uda_test) {
-  auto uda_tester = udf::UDATester<ExponentialHistogramUDA<types::Float64Value>>();
+  auto uda_tester = udf::UDATester<ExponentialHistogramUDA<types::Float64Value>>(0, 160);
   uda_tester.Init(0, 160).ForInput(3.0).ForInput(5.0).ForInput(7.0).ForInput(9.0)
-      .Expect(R"({"1":1,"2":2,"3":1})");
+      .Expect(R"({"offset":0,"scale":0,"buckets":[{"1":1},{"2":2},{"3":1}],"count":4,"max_buckets":160})");
 }
 
 TEST(MathOps, basic_merge_exp_histogram_uda_test) {
-  auto uda_tester = udf::UDATester<ExponentialHistogramUDA<types::Float64Value>>();
+  auto uda_tester = udf::UDATester<ExponentialHistogramUDA<types::Float64Value>>(0, 160);
+  auto expected = R"({"offset":0,"scale":0,"buckets":[{"-1":1},{"0":1},{"1":2},{"2":4},{"3":2}],"count":10,"max_buckets":160})";
   uda_tester.Init(0, 160).ForInput(0.9).ForInput(3.0).ForInput(5.0).ForInput(7.0).ForInput(9.0)
-      .Expect(R"({"-1":1,"1":1,"2":2,"3":1})");
+      .Expect(R"({"offset":0,"scale":0,"buckets":[{"-1":1},{"1":1},{"2":2},{"3":1}],"count":5,"max_buckets":160})");
 
-  auto other_uda_tester = udf::UDATester<ExponentialHistogramUDA<types::Float64Value>>();
+  auto other_uda_tester = udf::UDATester<ExponentialHistogramUDA<types::Float64Value>>(0, 160);
   other_uda_tester.Init(0, 160).ForInput(1.5).ForInput(3.0).ForInput(5.0).ForInput(7.0).ForInput(9.0)
-      .Expect(R"({"0":1,"1":1,"2":2,"3":1})");
+      .Expect(R"({"offset":0,"scale":0,"buckets":[{"0":1},{"1":1},{"2":2},{"3":1}],"count":5,"max_buckets":160})");
 
-  // TODO(ddelnano): Merging these two UDAs should be commutative, but it is not. This is because
-  // the merge function is not commutative. This is a bug.
-  /* uda_tester.Merge(&other_uda_tester).Expect(R"({"-1":1,"0":1,"1":2,"2":4,"3":2})"); */
-  auto result = uda_tester.Merge(&other_uda_tester).Result();
-  EXPECT_EQ(result, R"({"-1":1,"0":1,"1":2,"2":4,"3":2})");
-
-  /* auto other_result = other_uda_tester.Merge(&uda_tester).Result(); */
-  /* EXPECT_EQ(other_result, R"({"-1":1,"0":1,"1":2,"2":4,"3":2})"); */
+  uda_tester.Merge(&other_uda_tester).Expect(expected);
 }
 
-TEST(MathOps, merge_exp_histogram_must_have_same_scale) {
-  auto uda_tester = udf::UDATester<ExponentialHistogramUDA<types::Float64Value>>();
+TEST(MathOps, merge_exp_histogram_with_different_scales) {
+  auto uda_tester = udf::UDATester<ExponentialHistogramUDA<types::Float64Value>>(0, 160);
   uda_tester.Init(1, 160).ForInput(0.9);
 
-  auto other_uda_tester = udf::UDATester<ExponentialHistogramUDA<types::Float64Value>>();
+  auto other_uda_tester = udf::UDATester<ExponentialHistogramUDA<types::Float64Value>>(0, 160);
   other_uda_tester.Init(0, 160).ForInput(1.5);
 
   uda_tester.Merge(&other_uda_tester);
