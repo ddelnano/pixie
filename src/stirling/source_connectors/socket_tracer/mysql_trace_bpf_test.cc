@@ -40,6 +40,8 @@
 #include "src/stirling/source_connectors/socket_tracer/mysql_table.h"
 #include "src/stirling/source_connectors/socket_tracer/testing/protocol_checkers.h"
 
+#include <signal.h>
+
 namespace px {
 namespace stirling {
 
@@ -124,7 +126,7 @@ class MySQLTraceTest : public SocketTraceBPFTestFixture</* TClientSideTracing */
         std::string out,
         client_.Run(std::chrono::seconds{60},
                     {absl::Substitute("--network=container:$0", server_.container_name())},
-                    {"/scripts/" + script_filename.string()}));
+                    {"/scripts/" + script_filename.string(), "--wait-after-connect"}));
     LOG(INFO) << "Script output\n" << out;
     client_.Wait();
 
@@ -509,7 +511,55 @@ TEST_F(MySQLTraceTest, mysql_capture) {
 
     // Check client-side tracing results.
     if (!FLAGS_tracing_mode) {
-      std::vector<mysql::Record> records = GetTargetRecords(record_batch, client_pid);
+
+      std::vector<size_t> indices = FindRecordIdxMatchesPID(record_batch, kMySQLUPIDIdx, client_pid);
+      std::vector<mysql::Record> records = ToRecordVector(record_batch, indices);
+
+      EXPECT_THAT(GetLocalAddrs(record_batch, kMySQLTable.ColIndex("local_addr"), indices), Contains("127.0.0.1"));
+
+      auto expected_records = mysql::JSONtoMySQLRecord(
+          "src/stirling/source_connectors/socket_tracer/protocols/mysql/testing/"
+          "mysql_container_bpf_test.json");
+
+      std::vector<Matcher<mysql::Record>> expected_matchers;
+
+      for (size_t i = 0; i < expected_records->size(); ++i) {
+        expected_matchers.push_back(EqMySQLRecord((*expected_records)[i]));
+      }
+
+      EXPECT_THAT(records,
+                  UnorderedElementsAreArray(expected_matchers.begin(), expected_matchers.end()));
+    }
+  }
+}
+
+TEST_F(MySQLTraceTest, mysql_mid_stream_capture) {
+
+  {
+
+    ASSERT_OK_AND_ASSIGN(
+        int32_t client_pid,
+        RunPythonScript(
+            "src/stirling/source_connectors/socket_tracer/protocols/mysql/testing/script.py"));
+
+    StartTransferDataThread();
+
+    // Sleep a little more, just to be safe.
+    sleep(10);
+
+    StopTransferDataThread();
+
+    // Grab the data from Stirling.
+    std::vector<TaggedRecordBatch> tablets = ConsumeRecords(SocketTraceConnector::kMySQLTableNum);
+    ASSERT_NOT_EMPTY_AND_GET_RECORDS(const types::ColumnWrapperRecordBatch& record_batch, tablets);
+
+    // Check client-side tracing results.
+    if (!FLAGS_tracing_mode) {
+
+      std::vector<size_t> indices = FindRecordIdxMatchesPID(record_batch, kMySQLUPIDIdx, client_pid);
+      std::vector<mysql::Record> records = ToRecordVector(record_batch, indices);
+
+      EXPECT_THAT(GetLocalAddrs(record_batch, kMySQLTable.ColIndex("local_addr"), indices), Contains("127.0.0.1"));
 
       auto expected_records = mysql::JSONtoMySQLRecord(
           "src/stirling/source_connectors/socket_tracer/protocols/mysql/testing/"

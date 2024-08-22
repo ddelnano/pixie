@@ -15,9 +15,13 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import mysql.connector
+import time
+import signal
+import sys
 
 # MySQL Python API: https://dev.mysql.com/doc/connector-python/en/connector-python-reference.html
 
+global cnx
 config = {
     "user": "root",
     "host": "0.0.0.0",
@@ -52,16 +56,17 @@ employee_data = [
     ('First2', 'Last2', 'M'),
 ]
 
+def signal_handler(sig, frame):
+    send_queries()
 
-def main():
-    cnx = mysql.connector.connect(**config)
-
+def send_queries():
     # kStatistics 0x09
     # TODO(chengruizhe): MySQL parser currently doesn't support kStatistics.
     #  Turn on when it's supported.
     # cnx.cmd_statistics()
 
     # kQuery 0x03
+    global cnx
     cnx.cmd_query(create_db_command)
 
     # kInitDB 0x02
@@ -89,7 +94,21 @@ def main():
 
     # kQuit 0x01
     cnx.close()
+    sys.exit(0)
 
+def main():
+    global cnx
+    cnx = mysql.connector.connect(**config)
+    signal.signal(signal.SIGCONT, signal_handler)
+
+    # check argv to see if '--wait-for-input' was provided
+    # if so, wait for input before continuing
+    if "--wait-after-connect" in sys.argv:
+        while True:
+            print("Waiting for SIGCONT")
+            time.sleep(2)
+
+    send_queries()
 # MySQL Test Coverage Table
 # https://pixie-labs.quip.com/qVFbAXLrTMUD/MySQL-ParserStitcher-Architecture
 
