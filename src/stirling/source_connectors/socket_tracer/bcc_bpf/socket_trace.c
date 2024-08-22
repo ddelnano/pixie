@@ -651,7 +651,18 @@ int conn_cleanup_uprobe(struct pt_regs* ctx) {
   return 0;
 }
 
-int probe_entry_tcp_v4_connect(struct pt_regs* ctx) {
+// These probes are used to capture the *sock struct during client side tracing
+// of connect() syscalls. This is necessary to capture the socket's local address,
+// which is not accessible via the connect() and later syscalls.
+//
+// This function requires that the function being probed receives a struct sock* as its
+// first argument and that the active_connect_args_map is populated. This means the
+// function being probed must be part of the connect() syscall path.
+//
+// int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len);
+// static int tcp_v6_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len);
+// int tcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t size);
+int probe_entry_populate_active_connect_sock(struct pt_regs* ctx) {
   uint64_t id = bpf_get_current_pid_tgid();
 
   const struct connect_args_t* connect_args = active_connect_args_map.lookup(&id);
@@ -664,7 +675,7 @@ int probe_entry_tcp_v4_connect(struct pt_regs* ctx) {
   return 0;
 }
 
-int probe_ret_tcp_v4_connect(struct pt_regs* ctx) {
+int probe_ret_populate_active_connect_sock(struct pt_regs* ctx) {
   uint64_t id = bpf_get_current_pid_tgid();
 
   struct sock** sk = tcp_connect_args_map.lookup(&id);
@@ -673,7 +684,7 @@ int probe_ret_tcp_v4_connect(struct pt_regs* ctx) {
   }
   struct connect_args_t* connect_args = active_connect_args_map.lookup(&id);
   if (connect_args != NULL) {
-    connect_args->tcp_v4_connect_sock = *sk;
+    connect_args->connect_sock = *sk;
   }
 
   tcp_connect_args_map.delete(&id);
@@ -724,7 +735,7 @@ static __inline void process_syscall_connect(struct pt_regs* ctx, uint64_t id,
     return;
   }
 
-  submit_new_conn_sock(ctx, tgid, args->fd, args->addr, args->tcp_v4_connect_sock, kRoleClient, kSyscallConnect);
+  submit_new_conn_sock(ctx, tgid, args->fd, args->addr, args->connect_sock, kRoleClient, kSyscallConnect);
 }
 
 static __inline void process_syscall_accept(struct pt_regs* ctx, uint64_t id,
@@ -785,7 +796,7 @@ static __inline void process_implicit_conn(struct pt_regs* ctx, uint64_t id,
     return;
   }
 
-  submit_new_conn_sock(ctx, tgid, args->fd, args->addr, args->tcp_v4_connect_sock, kRoleUnknown, source_fn);
+  submit_new_conn_sock(ctx, tgid, args->fd, args->addr, args->connect_sock, kRoleUnknown, source_fn);
 }
 
 static __inline bool should_send_data(uint32_t tgid, uint64_t conn_disabled_tsid,
