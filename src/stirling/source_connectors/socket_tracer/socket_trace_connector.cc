@@ -344,6 +344,8 @@ const auto kProbeSpecs = MakeArray<bpf_tools::KProbeSpec>({
     {"sock_alloc", ProbeType::kReturn, "probe_ret_sock_alloc", /*is_syscall*/ false},
     {"tcp_v4_connect", ProbeType::kEntry, "probe_entry_tcp_v4_connect", /*is_syscall*/ false},
     {"tcp_v4_connect", ProbeType::kReturn, "probe_ret_tcp_v4_connect", /*is_syscall*/ false},
+    {"tcp_sendmsg", ProbeType::kEntry, "probe_entry_tcp_v4_connect", /*is_syscall*/ false},
+    {"tcp_sendmsg", ProbeType::kReturn, "probe_ret_tcp_v4_connect", /*is_syscall*/ false},
     {"security_socket_sendmsg", ProbeType::kEntry, "probe_entry_socket_sendmsg",
      /*is_syscall*/ false, /* is_optional */ false,
      std::make_shared<bpf_tools::KProbeSpec>(bpf_tools::KProbeSpec{
