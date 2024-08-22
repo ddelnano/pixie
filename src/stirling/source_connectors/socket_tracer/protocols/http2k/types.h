@@ -83,6 +83,25 @@ struct Frame : public FrameBase {
   }
 };
 
+/**
+ * @brief Inflater wraps nghttp2_hd_inflater and implements RAII.
+ */
+class Inflater {
+ public:
+  Inflater() {
+    int rv = nghttp2_hd_inflate_init(&inflater_, nghttp2_mem_default());
+    LOG_IF(DFATAL, rv != 0) << "Failed to initialize nghttp2_hd_inflater!";
+  }
+
+  ~Inflater() { nghttp2_hd_inflate_free(&inflater_); }
+
+  nghttp2_hd_inflater* inflater() { return &inflater_; }
+
+ private:
+  nghttp2_hd_inflater inflater_;
+};
+
+
 struct HTTP2Message {
   // TODO(yzhao): We keep this field for easier testing. Update tests to not rely on input invalid
   // data.
@@ -104,6 +123,26 @@ struct HTTP2Message {
   bool HasGRPCContentType() const {
     return absl::StrContains(headers.ValueByKey(headers::kContentType), headers::kContentTypeGRPC);
   }
+};
+
+struct Record {
+  HTTP2Message req;
+  HTTP2Message resp;
+};
+
+struct State {
+  std::monostate global;
+  http2k::Inflater send;
+  http2k::Inflater recv;
+};
+
+using stream_id_t = uint16_t;
+
+struct ProtocolTraits {
+  using frame_type = Frame;
+  using record_type = Record;
+  using state_type = State;
+  using key_type = stream_id_t;
 };
 
 }  // namespace http2k

@@ -119,24 +119,6 @@ using u8string_view = std::basic_string_view<uint8_t>;
 constexpr size_t kFrameHeaderSizeInBytes = 9;
 
 /**
- * @brief Inflater wraps nghttp2_hd_inflater and implements RAII.
- */
-class Inflater {
- public:
-  Inflater() {
-    int rv = nghttp2_hd_inflate_init(&inflater_, nghttp2_mem_default());
-    LOG_IF(DFATAL, rv != 0) << "Failed to initialize nghttp2_hd_inflater!";
-  }
-
-  ~Inflater() { nghttp2_hd_inflate_free(&inflater_); }
-
-  nghttp2_hd_inflater* inflater() { return &inflater_; }
-
- private:
-  nghttp2_hd_inflater inflater_;
-};
-
-/**
  * @brief Inflates a complete header block in the input buf, writes the header field to nv_map.
  */
 ParseState InflateHeaderBlock(nghttp2_hd_inflater* inflater, u8string_view buf, NVMap* nv_map);
@@ -145,26 +127,6 @@ ParseState InflateHeaderBlock(nghttp2_hd_inflater* inflater, u8string_view buf, 
  * @brief Extract HTTP2 frame from the input buffer, and removes the consumed data from the buffer.
  */
 ParseState UnpackFrame(std::string_view* buf, Frame* frame);
-
-struct Record {
-  HTTP2Message req;
-  HTTP2Message resp;
-};
-
-struct State {
-  std::monostate global;
-  http2k::Inflater send;
-  http2k::Inflater recv;
-};
-
-using stream_id_t = uint16_t;
-
-struct ProtocolTraits {
-  using frame_type = Frame;
-  using record_type = Record;
-  using state_type = State;
-  using key_type = stream_id_t;
-};
 
 /**
  * @brief Stitches frames to create header blocks and inflate them.
