@@ -263,7 +263,7 @@ struct socket_control_event_t {
 
 struct connect_args_t {
   const struct sockaddr* addr;
-  struct sock* connect_sock;
+  const struct sock* connect_sock;
   int32_t fd;
 };
 
