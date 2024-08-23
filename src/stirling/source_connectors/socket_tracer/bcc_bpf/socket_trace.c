@@ -732,7 +732,7 @@ static __inline void process_implicit_conn(struct pt_regs* ctx, uint64_t id,
     return;
   }
 
-  submit_new_conn(ctx, tgid, args->fd, args->addr, args->connect_sock, kRoleUnknown, source_fn);
+  submit_new_conn(ctx, tgid, args->fd, args->addr, /*sock*/ NULL, kRoleUnknown, source_fn);
 }
 
 static __inline bool should_send_data(uint32_t tgid, uint64_t conn_disabled_tsid,
