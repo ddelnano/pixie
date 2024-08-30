@@ -36,6 +36,7 @@ pl_cc_library_internal(
     ),
     deps = [
         "//src/common/base/statuspb:status_pl_cc_proto",
+        "//src/common/base/histo:cc_library",
         "@com_google_farmhash//:farmhash",
         "@com_google_googletest//:gtest_prod",
     ],
@@ -44,6 +45,12 @@ pl_cc_library_internal(
 pl_cc_test(
     name = "base2_exponential_histogram_indexer_test",
     srcs = ["base2_exponential_histogram_indexer_test.cc"],
+    deps = [":cc_library"],
+)
+
+pl_cc_test(
+    name = "rescaling_base2_exponential_histogram_indexer_test",
+    srcs = ["rescaling_base2_exponential_histogram_indexer_test.cc"],
     deps = [":cc_library"],
 )
 

@@ -1,7 +1,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-#include "src/common/base/base2_exponential_histogram_indexer.h"
+#include "src/common/base/histo/indexers.h"
 
 #include <gtest/gtest.h>
 
@@ -9,7 +9,7 @@ using namespace px;
 
 TEST(Base2ExponentialHistogramIndexerTest, ScaleOne)
 {
-  const Base2ExponentialHistogramIndexer indexer{1};
+  const Base2LogIndexer indexer{1};
   auto compute_index = [indexer](double value) { return indexer.ComputeIndex(value); };
 
   EXPECT_EQ(compute_index(std::numeric_limits<double>::max()), 2047);
@@ -37,9 +37,9 @@ TEST(Base2ExponentialHistogramIndexerTest, ScaleOne)
   EXPECT_EQ(compute_index(0.45), -3);
 }
 
-TEST(Base2ExponentialHistogramIndexerTest, ScaleZero)
+TEST(Base2ExpIndexer, ScaleZero)
 {
-  const Base2ExponentialHistogramIndexer indexer{0};
+  const Base2ExpIndexer indexer{0};
   auto compute_index = [indexer](double value) { return indexer.ComputeIndex(value); };
 
   // Near +Inf.
@@ -71,9 +71,9 @@ TEST(Base2ExponentialHistogramIndexerTest, ScaleZero)
   EXPECT_EQ(compute_index(0.125), -4);
 }
 
-TEST(Base2ExponentialHistogramIndexerTest, ScaleNegativeOne)
+TEST(Base2ExpIndexer, ScaleNegativeOne)
 {
-  const Base2ExponentialHistogramIndexer indexer{-1};
+  const Base2ExpIndexer indexer{-1};
   auto compute_index = [indexer](double value) { return indexer.ComputeIndex(value); };
 
   EXPECT_EQ(compute_index(17.0), 2);
@@ -98,9 +98,9 @@ TEST(Base2ExponentialHistogramIndexerTest, ScaleNegativeOne)
   EXPECT_EQ(compute_index(0.06), -3);
 }
 
-TEST(Base2ExponentialHistogramIndexerTest, ScaleNegativeFour)
+TEST(Base2ExpIndexer, ScaleNegativeFour)
 {
-  const Base2ExponentialHistogramIndexer indexer{-4};
+  const Base2ExpIndexer indexer{-4};
   auto compute_index = [indexer](double value) { return indexer.ComputeIndex(value); };
 
   EXPECT_EQ(compute_index(strtod("0x1p0", nullptr)), -1);
