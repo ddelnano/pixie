@@ -107,7 +107,7 @@ class Buckets {
 
       LOG(INFO) << buckets_;
       auto size = 1 + end_index_ - start_index_;
-      int32_t inpos = 0;
+      int32_t inpos = 1;
       int32_t outpos = 0;
       auto shifts = 1 << change;
       for (auto down_pos = start_index_; down_pos < end_index_; ) {
