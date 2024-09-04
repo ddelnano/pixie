@@ -44,6 +44,7 @@ struct LowercaseHex {
   static inline constexpr int kSizePerByte = 2;
   static inline constexpr bool kKeepPrintableChars = false;
 };
+
 }  // namespace
 
 Status ElfReader::LocateDebugSymbols(const std::filesystem::path& debug_file_dir) {

@@ -68,6 +68,16 @@ TEST(IsGoExecutableTest, WorkingOnBasicGoBinary) {
   EXPECT_TRUE(IsGoExecutable(elf_reader.get()));
 }
 
+TEST(ElfGoSymTable, GetGoSymTable) {
+  const std::string kPath = px::testing::BazelRunfilePath(kTestGoBinaryPath);
+  ASSERT_OK_AND_ASSIGN(std::unique_ptr<ElfReader> elf_reader, ElfReader::Create(kPath));
+  ASSERT_OK_AND_ASSIGN(const auto sym_table, GetGoSymtab(elf_reader.get()));
+
+  EXPECT_GT(sym_table->syms.size(), 0);
+  /* EXPECT_THAT(sym_table[0].name, StrEq("main.main")); */
+  /* EXPECT_THAT(sym_table[1].name, StrEq("main.init")); */
+}
+
 TEST(ElfGolangItableTest, ExtractInterfaceTypes) {
   const std::string kPath = px::testing::BazelRunfilePath(kTestGoBinaryPath);
 

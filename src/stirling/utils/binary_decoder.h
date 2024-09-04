@@ -157,5 +157,36 @@ class BinaryDecoder {
   std::string_view buf_;
 };
 
+/* enum class Endianess { */
+/*     big, */
+/*     little, */
+/* }; */
+
+// Represents pointers stored within binaries.
+using uintptr_t = uint64_t;
+
+/* class ContextAwareDecoder : public BinaryDecoder { */
+    
+/*   ContextAwareDecoder(std::string_view buf, Endianess endianess, int ptr_size) */
+/*       : BinaryDecoder(buf), endianess_(endianess), ptr_size_(ptr_size) {} */
+
+/*   public: */
+/*     StatusOr<uintptr_t> ExtractUintptr() { */
+/*       if (endianess_ == Endianess::big) { */
+/*         if (ptr_size_ == 4) { */
+/*             return ExtractBEInt<uint32_t>(); */
+/*         } */
+/*         return ExtractBEInt<uint64_t>(); */
+/*       } */
+/*       if (ptr_size_ == 4) { */
+/*           return ExtractLEInt<uint32_t>(); */
+/*       } */
+/*       return ExtractLEInt<uint64_t>(); */
+/*     } */
+/*   private: */
+/*     Endianess endianess_; */
+/*     int ptr_size_; */
+/* }; */
+
 }  // namespace stirling
 }  // namespace px
