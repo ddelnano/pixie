@@ -70,6 +70,11 @@ StatusOr<std::string> ConvertMetadataRule::FindKeyColumn(std::shared_ptr<TableTy
       absl::StrJoin(parent_type->ColumnNames(), ","));
 }
 
+bool CheckBackupConversionAvailable(std::shared_ptr<TableType> parent_type,
+                                                         const std::string& func_name) {
+  return parent_type->HasColumn("local_addr") && func_name == "upid_to_pod_name";
+}
+
 StatusOr<bool> ConvertMetadataRule::Apply(IRNode* ir_node) {
   if (!Match(ir_node, Metadata())) {
     return false;
@@ -92,6 +97,7 @@ StatusOr<bool> ConvertMetadataRule::Apply(IRNode* ir_node) {
                       graph->CreateNode<ColumnIR>(ir_node->ast(), key_column_name, parent_op_idx));
 
   PX_ASSIGN_OR_RETURN(std::string func_name, md_property->UDFName(key_column_name));
+  auto backup_conversion_available = CheckBackupConversionAvailable(parent->resolved_table_type(), func_name);
   PX_ASSIGN_OR_RETURN(
       FuncIR * conversion_func,
       graph->CreateNode<FuncIR>(ir_node->ast(), FuncIR::Op{FuncIR::Opcode::non_op, "", func_name},
@@ -102,6 +108,39 @@ StatusOr<bool> ConvertMetadataRule::Apply(IRNode* ir_node) {
     PX_RETURN_IF_ERROR(UpdateMetadataContainer(graph->Get(parent_id), metadata, conversion_func));
   }
 
+  // TODO(ddelnano): Until the short lived process issue is resolved, use a backup UDF via local_addr
+  // in case the upid_to_pod_name fails to resolve the pod name
+  FuncIR* select_func = nullptr;
+  FuncIR* backup_conversion_func = nullptr;
+  if (backup_conversion_available) {
+    PX_ASSIGN_OR_RETURN(ColumnIR * local_addr_col,
+                        graph->CreateNode<ColumnIR>(ir_node->ast(), "local_addr", parent_op_idx));
+    PX_ASSIGN_OR_RETURN(
+        backup_conversion_func,
+        graph->CreateNode<FuncIR>(ir_node->ast(), FuncIR::Op{FuncIR::Opcode::non_op, "", "ip_to_pod_id"},
+                                  std::vector<ExpressionIR*>{static_cast<ExpressionIR *>(local_addr_col)}));
+    auto f = graph->CreateNode<FuncIR>(ir_node->ast(), FuncIR::Op{FuncIR::Opcode::non_op, "", "pod_id_to_pod_name"},
+                              std::vector<ExpressionIR*>{static_cast<ExpressionIR*>(backup_conversion_func)});
+    if (!f.ok()) {
+      return f.status();
+    }
+    auto empty_string = static_cast<ExpressionIR*>(graph->CreateNode<StringIR>(ir_node->ast(), "").ConsumeValueOrDie());
+    PX_ASSIGN_OR_RETURN(
+        FuncIR * select_expr,
+        graph->CreateNode<FuncIR>(ir_node->ast(), FuncIR::Op{FuncIR::Opcode::eq, "==", "equal"},
+                                  std::vector<ExpressionIR*>{static_cast<ExpressionIR*>(conversion_func), empty_string}));
+    /* auto default_value = static_cast<ExpressionIR*>(graph->CreateNode<StringIR>(ir_node->ast(), "default_value").ConsumeValueOrDie()); */
+    PX_ASSIGN_OR_RETURN(
+        select_func,
+        graph->CreateNode<FuncIR>(ir_node->ast(), FuncIR::Op{FuncIR::Opcode::non_op, "", "select"},
+                                  std::vector<ExpressionIR*>{static_cast<ExpressionIR*>(select_expr), backup_conversion_func, conversion_func}));
+    PX_RETURN_IF_ERROR(PropagateTypeChangesFromNode(graph, local_addr_col, compiler_state_));
+    PX_RETURN_IF_ERROR(PropagateTypeChangesFromNode(graph, backup_conversion_func, compiler_state_));
+    PX_RETURN_IF_ERROR(PropagateTypeChangesFromNode(graph, select_expr, compiler_state_));
+    PX_RETURN_IF_ERROR(PropagateTypeChangesFromNode(graph, select_func, compiler_state_));
+
+  }
+
   // Propagate type changes from the new conversion_func.
   PX_RETURN_IF_ERROR(PropagateTypeChangesFromNode(graph, conversion_func, compiler_state_));
 
@@ -109,6 +148,16 @@ StatusOr<bool> ConvertMetadataRule::Apply(IRNode* ir_node) {
       << "Expected the parent key column type and metadata property type to match.";
   conversion_func->set_annotations(ExpressionIR::Annotations(md_type));
 
+  // Propagate type changes from the new conversion_func.
+  if (select_func != nullptr) {
+    PX_RETURN_IF_ERROR(PropagateTypeChangesFromNode(graph, backup_conversion_func, compiler_state_));
+    /* PX_RETURN_IF_ERROR(PropagateTypeChangesFromNode(graph, select_func, compiler_state_)); */
+    /* DCHECK_EQ(backup_conversion_func->EvaluatedDataType(), column_type) */
+    /*     << "Expected the parent key column type and metadata property type to match."; */
+    /* DCHECK_EQ(select_func->EvaluatedDataType(), column_type) */
+    /*     << "Expected the parent key column type and metadata property type to match."; */
+    select_func->set_annotations(ExpressionIR::Annotations(md_type));
+  }
   return true;
 }
 

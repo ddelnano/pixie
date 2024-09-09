@@ -31,7 +31,7 @@ using table_store::schema::Relation;
 
 using ConvertMetadataRuleTest = RulesTest;
 
-TEST_F(ConvertMetadataRuleTest, multichild) {
+TEST_F(ConvertMetadataRuleTest, multichild_without_fallback_func) {
   auto relation = Relation(cpu_relation);
   MetadataType conversion_column = MetadataType::UPID;
   std::string conversion_column_str = MetadataProperty::GetMetadataString(conversion_column);
