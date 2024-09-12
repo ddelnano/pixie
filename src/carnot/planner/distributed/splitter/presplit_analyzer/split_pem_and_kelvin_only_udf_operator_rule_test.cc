@@ -18,6 +18,7 @@
 
 #include <gtest/gtest.h>
 
+#include "src/carnot/planner/compiler/analyzer/convert_metadata_rule.h"
 #include "src/carnot/planner/compiler/analyzer/resolve_types_rule.h"
 #include "src/carnot/planner/compiler/test_utils.h"
 #include "src/carnot/planner/distributed/splitter/presplit_analyzer/split_pem_and_kelvin_only_udf_operator_rule.h"
@@ -29,6 +30,7 @@ namespace planner {
 namespace distributed {
 
 using compiler::ResolveTypesRule;
+using compiler::ConvertMetadataRule;
 using ::testing::ElementsAre;
 
 using SplitPEMAndKelvinOnlyUDFOperatorRuleTest = testutils::DistributedRulesTest;
@@ -161,6 +163,40 @@ TEST_F(SplitPEMAndKelvinOnlyUDFOperatorRuleTest, name_collision) {
   EXPECT_THAT(inserted_map->Children(), ElementsAre(map2));
   auto expected_relation2 = Relation({types::STRING, types::STRING}, {"pem_only_0", "kelvin_only"});
   EXPECT_THAT(*map2->resolved_table_type(), IsTableType(expected_relation2));
+}
+
+TEST_F(SplitPEMAndKelvinOnlyUDFOperatorRuleTest, metadata_name_collision) {
+  auto metadata_name = "pod_name";
+  auto md_handler = MetadataHandler::Create();
+  MetadataProperty* property = md_handler->GetProperty(metadata_name).ValueOrDie();
+  MetadataIR* metadata_ir = MakeMetadataIR(metadata_name, /* parent_op_idx */ 0);
+  metadata_ir->set_property(property);
+
+  auto src = MakeMemSource("http_events");
+  MakeMap(src, {{"md", metadata_ir}});
+  MakeMap(src, {{"other_col", MakeInt(2)}, {"md", metadata_ir}});
+  MakeFilter(src, MakeEqualsFunc(metadata_ir, MakeString("pl/foobar")));
+
+  ResolveTypesRule type_rule(compiler_state_.get());
+  ASSERT_OK(type_rule.Execute(graph.get()));
+
+  ConvertMetadataRule convert_md_rule(compiler_state_.get());
+  ASSERT_OK(type_rule.Execute(graph.get()));
+
+  SplitPEMAndKelvinOnlyUDFOperatorRule rule(compiler_state_.get());
+  auto rule_or_s = rule.Execute(graph.get());
+  ASSERT_OK(rule_or_s);
+  /* ASSERT_TRUE(rule_or_s.ConsumeValueOrDie()); */
+
+  /* EXPECT_EQ(1, map1->Children().size()); */
+  /* EXPECT_MATCH(map1->Children()[0], Map()); */
+  /* auto inserted_map = static_cast<MapIR*>(map1->Children()[0]); */
+  /* auto expected_relation = Relation({types::STRING, types::STRING}, {"pem_only_1", "pem_only_0"}); */
+  /* EXPECT_THAT(*inserted_map->resolved_table_type(), IsTableType(expected_relation)); */
+
+  /* EXPECT_THAT(inserted_map->Children(), ElementsAre(map2)); */
+  /* auto expected_relation2 = Relation({types::STRING, types::STRING}, {"pem_only_0", "kelvin_only"}); */
+  /* EXPECT_THAT(*map2->resolved_table_type(), IsTableType(expected_relation2)); */
 }
 
 TEST_F(SplitPEMAndKelvinOnlyUDFOperatorRuleTest, filter) {
