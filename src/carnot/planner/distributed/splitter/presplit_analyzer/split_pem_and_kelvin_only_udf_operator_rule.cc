@@ -28,15 +28,14 @@ namespace carnot {
 namespace planner {
 namespace distributed {
 
-std::string SplitPEMAndKelvinOnlyUDFOperatorRule::GetUniqueOutputName(FuncIR* input_expr,
+std::string GetUniqueOutputName(FuncIR* input_expr,
                                 const absl::flat_hash_set<std::string>& used_column_names) {
   std::string output_name;
   auto idx = 0;
   while (used_column_names.contains(
-      output_name = absl::Substitute("$0_$1", input_expr->func_name(), idx++)) || generated_col_names_.contains(output_name)) {
+      output_name = absl::Substitute("$0_$1", input_expr->func_name(), idx++))) {
     // Keep incrementing idx until we get a unique name.
   }
-  generated_col_names_.insert(output_name);
   return output_name;
 }
 
@@ -105,7 +104,6 @@ SplitPEMAndKelvinOnlyUDFOperatorRule::OptionallyUpdateExpression(
 }
 
 StatusOr<bool> SplitPEMAndKelvinOnlyUDFOperatorRule::Apply(IRNode* node) {
-  LOG(INFO) << "SplitPEMAndKelvinOnlyUDFOperatorRule::Apply graph " << node->graph()->DebugString();
   if (!Match(node, Map()) && !Match(node, Filter())) {
     return false;
   }
@@ -159,7 +157,6 @@ StatusOr<bool> SplitPEMAndKelvinOnlyUDFOperatorRule::Apply(IRNode* node) {
   auto parent_col_names = parent_table_type->ColumnNames();
   absl::flat_hash_set<std::string> used_column_names(parent_col_names.begin(),
                                                      parent_col_names.end());
-  used_column_names.insert(generated_col_names_.begin(), generated_col_names_.end());
   for (ExpressionIR* operator_expression : operator_expressions) {
     PX_ASSIGN_OR_RETURN(auto new_col_names, OptionallyUpdateExpression(op, operator_expression,
                                                                        pem_map, used_column_names));

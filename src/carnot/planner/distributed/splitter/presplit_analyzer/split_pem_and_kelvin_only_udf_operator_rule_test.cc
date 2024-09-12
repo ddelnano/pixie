@@ -166,13 +166,20 @@ TEST_F(SplitPEMAndKelvinOnlyUDFOperatorRuleTest, name_collision) {
 }
 
 TEST_F(SplitPEMAndKelvinOnlyUDFOperatorRuleTest, metadata_name_collision) {
+  Relation relation;
+  /* auto relation = Relation({types::DataType::UINT128}, {"pem_only_1", "pem_only_0"}); */
+  MetadataType conversion_column = MetadataType::UPID;
+  std::string conversion_column_str = MetadataProperty::GetMetadataString(conversion_column);
+  relation.AddColumn(types::DataType::UINT128, conversion_column_str);
+  compiler_state_->relation_map()->emplace("http_events", relation);
+
   auto metadata_name = "pod_name";
   auto md_handler = MetadataHandler::Create();
   MetadataProperty* property = md_handler->GetProperty(metadata_name).ValueOrDie();
   MetadataIR* metadata_ir = MakeMetadataIR(metadata_name, /* parent_op_idx */ 0);
   metadata_ir->set_property(property);
 
-  auto src = MakeMemSource("http_events");
+  auto src = MakeMemSource("http_events", relation);
   MakeMap(src, {{"md", metadata_ir}});
   MakeMap(src, {{"other_col", MakeInt(2)}, {"md", metadata_ir}});
   MakeFilter(src, MakeEqualsFunc(metadata_ir, MakeString("pl/foobar")));
@@ -181,22 +188,12 @@ TEST_F(SplitPEMAndKelvinOnlyUDFOperatorRuleTest, metadata_name_collision) {
   ASSERT_OK(type_rule.Execute(graph.get()));
 
   ConvertMetadataRule convert_md_rule(compiler_state_.get());
-  ASSERT_OK(type_rule.Execute(graph.get()));
+  ASSERT_OK(convert_md_rule.Execute(graph.get()));
+  EXPECT_EQ(0, graph->FindNodesThatMatch(Metadata()).size());
 
   SplitPEMAndKelvinOnlyUDFOperatorRule rule(compiler_state_.get());
   auto rule_or_s = rule.Execute(graph.get());
   ASSERT_OK(rule_or_s);
-  /* ASSERT_TRUE(rule_or_s.ConsumeValueOrDie()); */
-
-  /* EXPECT_EQ(1, map1->Children().size()); */
-  /* EXPECT_MATCH(map1->Children()[0], Map()); */
-  /* auto inserted_map = static_cast<MapIR*>(map1->Children()[0]); */
-  /* auto expected_relation = Relation({types::STRING, types::STRING}, {"pem_only_1", "pem_only_0"}); */
-  /* EXPECT_THAT(*inserted_map->resolved_table_type(), IsTableType(expected_relation)); */
-
-  /* EXPECT_THAT(inserted_map->Children(), ElementsAre(map2)); */
-  /* auto expected_relation2 = Relation({types::STRING, types::STRING}, {"pem_only_0", "kelvin_only"}); */
-  /* EXPECT_THAT(*map2->resolved_table_type(), IsTableType(expected_relation2)); */
 }
 
 TEST_F(SplitPEMAndKelvinOnlyUDFOperatorRuleTest, filter) {
