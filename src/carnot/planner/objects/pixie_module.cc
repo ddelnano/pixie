@@ -68,6 +68,12 @@ StatusOr<QLObjectPtr> UDFHandler(IR* graph, std::string name, const pypa::AstPtr
 Status PixieModule::RegisterUDFFuncs() {
   auto func_names = compiler_state_->registry_info()->func_names();
   for (const auto& name : func_names) {
+    if (name.find("_pem_only") != std::string::npos) {
+      continue;
+    }
+    if (reserved_names_.contains(name)) {
+      return error::InvalidArgument("Function name '$0' is reserved", name);
+    }
     PX_ASSIGN_OR_RETURN(
         std::shared_ptr<FuncObject> fn_obj,
         FuncObject::Create(name, {}, {},

@@ -110,7 +110,7 @@ StatusOr<bool> ConvertMetadataRule::Apply(IRNode* ir_node) {
                         graph->CreateNode<ColumnIR>(ir_node->ast(), "local_addr", parent_op_idx));
     PX_ASSIGN_OR_RETURN(
         FuncIR *ip_conversion_func,
-        graph->CreateNode<FuncIR>(ir_node->ast(), FuncIR::Op{FuncIR::Opcode::non_op, "", "ip_to_pod_id"},
+        graph->CreateNode<FuncIR>(ir_node->ast(), FuncIR::Op{FuncIR::Opcode::non_op, "", "ip_to_pod_id_pem_only"},
                                   std::vector<ExpressionIR*>{static_cast<ExpressionIR *>(local_addr_col)}));
     PX_ASSIGN_OR_RETURN(
         FuncIR *backup_conversion_func,

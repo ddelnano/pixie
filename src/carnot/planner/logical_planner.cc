@@ -26,8 +26,6 @@
 #include "src/carnot/planner/parser/parser.h"
 #include "src/shared/scriptspb/scripts.pb.h"
 
-#include <google/protobuf/text_format.h>
-
 namespace px {
 namespace carnot {
 namespace planner {
@@ -140,11 +138,6 @@ StatusOr<std::unique_ptr<distributed::DistributedPlan>> LogicalPlanner::Plan(
   PX_ASSIGN_OR_RETURN(
       std::shared_ptr<IR> single_node_plan,
       compiler_.CompileToIR(query_request.query_str(), compiler_state.get(), exec_funcs));
-  auto pb = single_node_plan->ToProto().ConsumeValueOrDie();
-  LOG(INFO) << single_node_plan->DebugString();
-  std::string out;
-  google::protobuf::TextFormat::PrintToString(pb, &out);
-  LOG(INFO) << out;
   // Create the distributed plan.
   PX_ASSIGN_OR_RETURN(
       auto distributed_plan,

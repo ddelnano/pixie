@@ -185,7 +185,7 @@ TEST_F(ConvertMetadataRuleTest, multichild_with_fallback_func) {
   EXPECT_MATCH(fallback_func, ResolvedExpression());
 
   auto ip_func = static_cast<FuncIR*>(fallback_func->all_args()[0]);
-  EXPECT_EQ("ip_to_pod_id", ip_func->func_name());
+  EXPECT_EQ("ip_to_pod_id_pem_only", ip_func->func_name());
   EXPECT_EQ(1, ip_func->all_args().size());
   EXPECT_MATCH(ip_func->all_args()[0], ColumnNode("local_addr"));
   EXPECT_MATCH(ip_func, ResolvedExpression());
@@ -208,6 +208,7 @@ TEST_F(ConvertMetadataRuleTest, multichild_with_fallback_func) {
   auto type = std::static_pointer_cast<ValueType>(type_or_s.ConsumeValueOrDie());
   EXPECT_EQ(types::STRING, type->data_type());
   EXPECT_EQ(types::ST_POD_NAME, type->semantic_type());
+  LOG(INFO) << "graph: " << graph->DebugString();
 }
 
 }  // namespace compiler

@@ -2630,6 +2630,20 @@ TEST_F(CompilerTest, UndefinedFuncError) {
   EXPECT_THAT(graph_or_s.status(), HasCompilerError("dataframe has no method 'bar'"));
 }
 
+constexpr char kUndefinedNonDataFrameFuncError[] = R"pxl(
+import px
+df = px.DataFrame(table='cpu', select=['upid'])
+df.foo = px.non_existant_func_only_pem(df.upid)
+px.display(df, 'map')
+)pxl";
+
+TEST_F(CompilerTest, UndefinedNonDataFrameFuncError) {
+  auto graph_or_s = compiler_.CompileToIR(kUndefinedNonDataFrameFuncError, compiler_state_.get());
+  ASSERT_NOT_OK(graph_or_s);
+
+  EXPECT_THAT(graph_or_s.status(), HasCompilerError("'px' object has no attribute 'non_existant_func_only_pem'"));
+}
+
 TEST_F(CompilerTest, TestUnaryOperators) {
   std::string query = absl::StrJoin(
       {

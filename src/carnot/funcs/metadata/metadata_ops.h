@@ -123,6 +123,32 @@ class PodIDToPodNameUDF : public ScalarUDF {
   }
 };
 
+class PodIDToPodNamePEMOnlyUDF : public ScalarUDF {
+ public:
+  StringValue Exec(FunctionContext* ctx, StringValue pod_id) {
+    auto md = GetMetadataState(ctx);
+
+    const auto* pod_info = md->k8s_metadata_state().PodInfoByID(pod_id);
+    if (pod_info != nullptr) {
+      return absl::Substitute("$0/$1", pod_info->ns(), pod_info->name());
+    }
+
+    return "";
+  }
+  static udf::InfRuleVec SemanticInferenceRules() {
+    return {udf::ExplicitRule::Create<PodIDToPodNameUDF>(types::ST_POD_NAME, {types::ST_NONE})};
+  }
+  static udf::ScalarUDFDocBuilder Doc() {
+    return udf::ScalarUDFDocBuilder("Get the name of a pod from its pod ID.")
+        .Details("Gets the kubernetes name for the pod from its pod ID.")
+        .Example("df.pod_name = px.pod_id_to_pod_name(df.pod_id)")
+        .Arg("pod_id", "The pod ID of the pod to get the name for.")
+        .Returns("The k8s pod name for the pod ID passed in.");
+  }
+
+  static udfspb::UDFSourceExecutor Executor() { return udfspb::UDFSourceExecutor::UDF_PEM; }
+};
+
 class PodIDToPodLabelsUDF : public ScalarUDF {
  public:
   StringValue Exec(FunctionContext* ctx, StringValue pod_id) {
@@ -2975,6 +3001,37 @@ class IPToPodIDUDF : public ScalarUDF {
   // This UDF can currently only run on Kelvins, because only Kelvins have the IP to pod
   // information.
   static udfspb::UDFSourceExecutor Executor() { return udfspb::UDFSourceExecutor::UDF_KELVIN; }
+};
+
+class IPToPodIDPEMOnlyUDF : public ScalarUDF {
+ public:
+  /**
+   * @brief Gets the pod id of pod with given pod_ip
+   */
+  StringValue Exec(FunctionContext* ctx, StringValue pod_ip) {
+    auto md = GetMetadataState(ctx);
+    return md->k8s_metadata_state().PodIDByIP(pod_ip);
+  }
+  static udf::ScalarUDFDocBuilder Doc() {
+    return udf::ScalarUDFDocBuilder(
+               "Convert IP address to the kubernetes pod ID that runs the backing service.")
+        .Details(
+            "Converts the IP address into a kubernetes pod ID for that IP address if it exists, "
+            "otherwise returns an empty string. Converting to a pod ID means you can then extract "
+            "the corresponding service name using `px.pod_id_to_service_name`.\n"
+            "Note that this will not be able to convert IP addresses into DNS names generally as "
+            "this is limited to internal Kubernetes state.")
+        .Example(R"doc(
+        | # Convert to the Kubernetes pod ID.
+        | df.pod_id = px.ip_to_pod_id(df.remote_addr)
+        | # Convert the ID to a readable name.
+        | df.service = px.pod_id_to_service_name(df.pod_id)
+        )doc")
+        .Arg("pod_ip", "The IP of a pod to convert.")
+        .Returns("The Kubernetes ID of the pod if it exists, otherwise an empty string.");
+  }
+
+  static udfspb::UDFSourceExecutor Executor() { return udfspb::UDFSourceExecutor::UDF_PEM; }
 };
 
 class IPToPodIDAtTimeUDF : public ScalarUDF {

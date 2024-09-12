@@ -38,8 +38,6 @@
 #include "src/common/testing/protobuf.h"
 #include "src/common/testing/status.h"
 
-#include <google/protobuf/text_format.h>
-
 namespace px {
 namespace carnot {
 namespace planner {
@@ -767,9 +765,6 @@ TEST_F(LogicalPlannerTest, pod_name_fallback_conversion) {
   auto state = testutils::CreateTwoPEMsOneKelvinPlannerState(testutils::kHttpEventsSchema);
   ASSERT_OK_AND_ASSIGN(auto plan, planner->Plan(MakeQueryRequest(state, kPodNameFallbackConversion)));
   ASSERT_OK(plan->ToProto());
-  std::string out;
-  google::protobuf::TextFormat::PrintToString(plan->ToProto().ConsumeValueOrDie(), &out);
-  LOG(INFO) << out;
 }
 
 const char kPodNameFallbackConversionWithFilter[] = R"pxl(
@@ -785,9 +780,6 @@ TEST_F(LogicalPlannerTest, pod_name_fallback_conversion_with_filter) {
   auto state = testutils::CreateTwoPEMsOneKelvinPlannerState(testutils::kHttpEventsSchema);
   ASSERT_OK_AND_ASSIGN(auto plan, planner->Plan(MakeQueryRequest(state, kPodNameFallbackConversionWithFilter)));
   ASSERT_OK(plan->ToProto());
-  /* std::string out; */
-  /* google::protobuf::TextFormat::PrintToString(plan->ToProto().ConsumeValueOrDie(), &out); */
-  /* LOG(INFO) << out; */
 }
 
 const char kHttpDataScript[] = R"pxl(

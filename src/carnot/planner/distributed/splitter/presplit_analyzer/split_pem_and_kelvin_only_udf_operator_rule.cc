@@ -105,7 +105,6 @@ SplitPEMAndKelvinOnlyUDFOperatorRule::OptionallyUpdateExpression(
 }
 
 StatusOr<bool> SplitPEMAndKelvinOnlyUDFOperatorRule::Apply(IRNode* node) {
-  LOG(INFO) << "SplitPEMAndKelvinOnlyUDFOperatorRule::Apply graph " << node->graph()->DebugString();
   if (!Match(node, Map()) && !Match(node, Filter())) {
     return false;
   }

@@ -49,7 +49,6 @@ StatusOr<bool> PruneUnusedContainsRule::RemoveMatchingFilter(IRNode* ir_node) {
   auto parent_id = ir_graph->dag().ParentsOf(node_id)[0];
   auto parent_node = ir_graph->Get(parent_id);
 
-  LOG(INFO) << "Removing unused contains filter: " << ir_node->DebugString();
   PX_RETURN_IF_ERROR(ir_graph->DeleteNode(func->id()));
 
   // str and substr may be connected to other nodes in the
