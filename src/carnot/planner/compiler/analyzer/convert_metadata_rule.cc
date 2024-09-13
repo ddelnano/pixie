@@ -144,24 +144,6 @@ StatusOr<bool> ConvertMetadataRule::Apply(IRNode* ir_node) {
   DCHECK_EQ(conversion_func->EvaluatedDataType(), column_type)
       << "Expected the parent key column type and metadata property type to match.";
   conversion_func->set_annotations(ExpressionIR::Annotations(md_type));
-
-  // Propagate type changes from the new conversion_func.
-  /* if (select_func != nullptr) { */
-  /*   /1* PX_RETURN_IF_ERROR(PropagateTypeChangesFromNode(graph, local_addr_col, compiler_state_)); *1/ */
-  /*   PX_RETURN_IF_ERROR(PropagateTypeChangesFromNode(graph, backup_conversion_func, compiler_state_)); */
-  /*   /1* PX_RETURN_IF_ERROR(PropagateTypeChangesFromNode(graph, select_expr, compiler_state_)); *1/ */
-  /*   PX_RETURN_IF_ERROR(PropagateTypeChangesFromNode(graph, select_func, compiler_state_)); */
-  /*   for (auto map : maps_to_update) { */
-  /*     PX_RETURN_IF_ERROR(PropagateTypeChangesFromNode(graph, map, compiler_state_)); */
-  /*   } */
-  /*   /1* PX_RETURN_IF_ERROR(PropagateTypeChangesFromNode(graph, select_func, compiler_state_)); *1/ */
-  /*   DCHECK_EQ(backup_conversion_func->EvaluatedDataType(), column_type) */
-  /*       << "Expected the parent key column type and metadata property type to match."; */
-  /*   DCHECK_EQ(select_func->EvaluatedDataType(), column_type) */
-  /*       << "Expected the parent key column type and metadata property type to match."; */
-  /*   backup_conversion_func->set_annotations(ExpressionIR::Annotations(md_type)); */
-  /*   select_func->set_annotations(ExpressionIR::Annotations(md_type)); */
-  /* } */
   return true;
 }
 
