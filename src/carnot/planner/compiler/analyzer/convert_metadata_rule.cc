@@ -122,9 +122,12 @@ StatusOr<bool> ConvertMetadataRule::Apply(IRNode* ir_node) {
         graph->CreateNode<FuncIR>(ir_node->ast(), FuncIR::Op{FuncIR::Opcode::eq, "==", "equal"},
                                   std::vector<ExpressionIR*>{static_cast<ExpressionIR*>(conversion_func), empty_string}));
     PX_ASSIGN_OR_RETURN(
+        auto second_func,
+        graph->CopyNode<FuncIR>(conversion_func));
+    PX_ASSIGN_OR_RETURN(
         FuncIR *select_func,
         graph->CreateNode<FuncIR>(ir_node->ast(), FuncIR::Op{FuncIR::Opcode::non_op, "", "select"},
-                                  std::vector<ExpressionIR*>{static_cast<ExpressionIR*>(select_expr), backup_conversion_func, conversion_func}));
+                                  std::vector<ExpressionIR*>{static_cast<ExpressionIR*>(select_expr), backup_conversion_func, second_func}));
 
     conversion_func = select_func;
   }
