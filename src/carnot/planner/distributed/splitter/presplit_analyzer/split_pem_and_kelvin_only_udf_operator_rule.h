@@ -46,8 +46,13 @@ class SplitPEMAndKelvinOnlyUDFOperatorRule : public Rule {
   StatusOr<bool> Apply(IRNode* node) override;
 
  private:
+  absl::flat_hash_set<std::string> generated_col_names_;
+
   StatusOr<absl::flat_hash_set<std::string>> OptionallyUpdateExpression(
       IRNode* expr_parent, ExpressionIR* expr, MapIR* pem_only_map,
+      const absl::flat_hash_set<std::string>& used_column_names);
+
+  std::string GetUniqueOutputName(FuncIR* input_expr,
       const absl::flat_hash_set<std::string>& used_column_names);
 };
 

@@ -41,7 +41,8 @@ class ConvertMetadataRule : public Rule {
   StatusOr<bool> Apply(IRNode* ir_node) override;
   Status AddOptimisticPodNameConversionMap(IR* graph,
                                            IRNode* container,
-                                           ExpressionIR* metadata_expr) const;
+                                           ExpressionIR* metadata_expr,
+                                           ExpressionIR* metadata_expr_with_fallback) const;
   /**
    * @brief Updates any parents of the metadata node to point to the new metadata expression.
    */
@@ -49,7 +50,8 @@ class ConvertMetadataRule : public Rule {
                                  IRNode* container,
                                  MetadataIR* metadata,
                                  ExpressionIR* metadata_expr,
-                                 ExpressionIR* metadata_expr_with_fallback) const;
+                                 ExpressionIR* metadata_expr_with_fallback,
+                                 ExpressionIR* expr) const;
   StatusOr<std::string> FindKeyColumn(std::shared_ptr<TableType> parent_type,
                                       MetadataProperty* property, IRNode* node_for_error) const;
 };

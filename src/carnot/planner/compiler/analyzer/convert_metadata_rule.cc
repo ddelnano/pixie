@@ -33,11 +33,12 @@ namespace compiler {
 
 Status ConvertMetadataRule::AddOptimisticPodNameConversionMap(IR* graph,
                                                               IRNode* container,
-                                                              ExpressionIR* metadata_expr) const {
+                                                              ExpressionIR* metadata_expr,
+                                                              ExpressionIR* metadata_expr_with_fallback) const {
   if (Match(container, Func())) {
     for (int64_t parent_id : graph->dag().ParentsOf(container->id())) {
 
-        PX_RETURN_IF_ERROR(AddOptimisticPodNameConversionMap(graph, graph->Get(parent_id), metadata_expr));
+        PX_RETURN_IF_ERROR(AddOptimisticPodNameConversionMap(graph, graph->Get(parent_id), metadata_expr, metadata_expr_with_fallback));
     }
   } else if (Match(container, Operator())) {
     for (int64_t parent_id : graph->dag().ParentsOf(container->id())) {
@@ -51,19 +52,22 @@ Status ConvertMetadataRule::AddOptimisticPodNameConversionMap(IR* graph,
       PX_ASSIGN_OR_RETURN(
         auto map_ir,
         graph->CreateNode<MapIR>(container->ast(), parent_op, std::vector<ColumnExpression>{ColumnExpression("pn_0", metadata_expr)}, true));
+      PX_ASSIGN_OR_RETURN(
+        auto child_map_ir,
+        graph->CreateNode<MapIR>(container->ast(), static_cast<OperatorIR*>(map_ir), std::vector<ColumnExpression>{ColumnExpression("pod_name_result_0", metadata_expr_with_fallback)}, true));
       for (int64_t dep_id : graph->dag().DependenciesOf(parent_id)) {
         if (dep_id == container->id() || dep_id == map_ir->id()) {
           continue;
         }
-        /* graph->dag().ReplaceParentEdge(dep_id, parent_id, map_ir->id()); */
         if (Match(graph->Get(dep_id), Operator())) {
           auto dep_op = static_cast<OperatorIR*>(graph->Get(dep_id));
           PX_RETURN_IF_ERROR(dep_op->ReplaceParent(parent_op, map_ir));
         }
       }
-      PX_RETURN_IF_ERROR(container_op->ReplaceParent(parent_op, map_ir));
+      PX_RETURN_IF_ERROR(container_op->ReplaceParent(parent_op, child_map_ir));
 
       PX_RETURN_IF_ERROR(PropagateTypeChangesFromNode(graph, map_ir, compiler_state_));
+      PX_RETURN_IF_ERROR(PropagateTypeChangesFromNode(graph, child_map_ir, compiler_state_));
     }
   }
 
@@ -74,25 +78,26 @@ Status ConvertMetadataRule::UpdateMetadataContainer(IR* graph,
                                                     IRNode* container,
                                                     MetadataIR* metadata,
                                                     ExpressionIR* metadata_expr,
-                                                    ExpressionIR* metadata_expr_with_fallback) const {
+                                                    ExpressionIR* metadata_expr_with_fallback,
+                                                    ExpressionIR* expr) const {
   bool container_updated = false;
   if (Match(container, Func())) {
     auto func = static_cast<FuncIR*>(container);
-    PX_RETURN_IF_ERROR(func->UpdateArg(metadata, metadata_expr_with_fallback));
+    PX_RETURN_IF_ERROR(func->UpdateArg(metadata, expr));
     container_updated = true;
   }
   if (Match(container, Map())) {
     auto map = static_cast<MapIR*>(container);
-    for (const auto& expr : map->col_exprs()) {
-      if (expr.node == metadata) {
-        PX_RETURN_IF_ERROR(map->UpdateColExpr(expr.name, metadata_expr_with_fallback));
+    for (const auto& col_expr : map->col_exprs()) {
+      if (col_expr.node == metadata) {
+        PX_RETURN_IF_ERROR(map->UpdateColExpr(col_expr.name, expr));
       }
     }
     container_updated = true;
   }
   if (Match(container, Filter())) {
     auto filter = static_cast<FilterIR*>(container);
-    PX_RETURN_IF_ERROR(filter->SetFilterExpr(metadata_expr_with_fallback));
+    PX_RETURN_IF_ERROR(filter->SetFilterExpr(expr));
     container_updated = true;
   }
   if (!container_updated) {
@@ -103,7 +108,7 @@ Status ConvertMetadataRule::UpdateMetadataContainer(IR* graph,
     return Status::OK();
   }
 
-  PX_RETURN_IF_ERROR(AddOptimisticPodNameConversionMap(graph, container, metadata_expr));
+  PX_RETURN_IF_ERROR(AddOptimisticPodNameConversionMap(graph, container, metadata_expr, metadata_expr_with_fallback));
 
   return Status::OK();
 }
@@ -156,6 +161,7 @@ StatusOr<bool> ConvertMetadataRule::Apply(IRNode* ir_node) {
       graph->CreateNode<FuncIR>(ir_node->ast(), FuncIR::Op{FuncIR::Opcode::non_op, "", func_name},
                                 std::vector<ExpressionIR*>{key_column}));
   FuncIR* orig_conversion_func = conversion_func;
+  ExpressionIR* col_conversion_func = static_cast<ExpressionIR*>(conversion_func);
 
   // TODO(ddelnano): Until the short lived process issue (gh#1638) is resolved, use a backup UDF via local_addr
   // in case the upid_to_pod_name fails to resolve the pod name
@@ -189,12 +195,14 @@ StatusOr<bool> ConvertMetadataRule::Apply(IRNode* ir_node) {
                                   std::vector<ExpressionIR*>{static_cast<ExpressionIR*>(select_expr), backup_conversion_func, second_func}));
 
     conversion_func = select_func;
+    PX_ASSIGN_OR_RETURN(col_conversion_func,
+                        graph->CreateNode<ColumnIR>(ir_node->ast(), "pod_name_result_0", parent_op_idx));
   }
 
   for (int64_t parent_id : graph->dag().ParentsOf(metadata->id())) {
     // For each container node of the metadata expression, update it to point to the
     // new conversion func instead.
-    PX_RETURN_IF_ERROR(UpdateMetadataContainer(graph, graph->Get(parent_id), metadata, orig_conversion_func, conversion_func));
+    PX_RETURN_IF_ERROR(UpdateMetadataContainer(graph, graph->Get(parent_id), metadata, orig_conversion_func, conversion_func, col_conversion_func));
   }
 
   // Propagate type changes from the new conversion_func.
@@ -204,6 +212,7 @@ StatusOr<bool> ConvertMetadataRule::Apply(IRNode* ir_node) {
       << "Expected the parent key column type and metadata property type to match.";
   conversion_func->set_annotations(ExpressionIR::Annotations(md_type));
   orig_conversion_func->set_annotations(ExpressionIR::Annotations(md_type));
+  col_conversion_func->set_annotations(ExpressionIR::Annotations(md_type));
   return true;
 }
 
