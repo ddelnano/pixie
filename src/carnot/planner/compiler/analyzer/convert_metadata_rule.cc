@@ -70,6 +70,11 @@ StatusOr<std::string> ConvertMetadataRule::FindKeyColumn(std::shared_ptr<TableTy
       absl::StrJoin(parent_type->ColumnNames(), ","));
 }
 
+bool CheckBackupConversionAvailable(std::shared_ptr<TableType> parent_type,
+                                                         const std::string& func_name) {
+  return parent_type->HasColumn("time_") && parent_type->HasColumn("local_addr") && func_name == "upid_to_pod_name";
+}
+
 StatusOr<bool> ConvertMetadataRule::Apply(IRNode* ir_node) {
   if (!Match(ir_node, Metadata())) {
     return false;
@@ -96,6 +101,39 @@ StatusOr<bool> ConvertMetadataRule::Apply(IRNode* ir_node) {
       FuncIR * conversion_func,
       graph->CreateNode<FuncIR>(ir_node->ast(), FuncIR::Op{FuncIR::Opcode::non_op, "", func_name},
                                 std::vector<ExpressionIR*>{key_column}));
+
+  // TODO(ddelnano): Until the short lived process issue (gh#1638) is resolved, use a backup UDF via local_addr
+  // in case the upid_to_pod_name fails to resolve the pod name
+  auto backup_conversion_available = CheckBackupConversionAvailable(parent->resolved_table_type(), func_name);
+  if (backup_conversion_available) {
+    PX_ASSIGN_OR_RETURN(ColumnIR * local_addr_col,
+                        graph->CreateNode<ColumnIR>(ir_node->ast(), "local_addr", parent_op_idx));
+    PX_ASSIGN_OR_RETURN(ColumnIR * time_col,
+                        graph->CreateNode<ColumnIR>(ir_node->ast(), "time_", parent_op_idx));
+    PX_ASSIGN_OR_RETURN(
+        FuncIR *ip_conversion_func,
+        graph->CreateNode<FuncIR>(ir_node->ast(), FuncIR::Op{FuncIR::Opcode::non_op, "", "_ip_to_pod_id_pem_exec"},
+                                  std::vector<ExpressionIR*>{local_addr_col, time_col}));
+    PX_ASSIGN_OR_RETURN(
+        FuncIR *backup_conversion_func,
+        graph->CreateNode<FuncIR>(ir_node->ast(), FuncIR::Op{FuncIR::Opcode::non_op, "", "pod_id_to_pod_name"},
+                              std::vector<ExpressionIR*>{static_cast<ExpressionIR*>(ip_conversion_func)}));
+    auto empty_string = static_cast<ExpressionIR*>(graph->CreateNode<StringIR>(ir_node->ast(), "").ConsumeValueOrDie());
+    PX_ASSIGN_OR_RETURN(
+        FuncIR *select_expr,
+        graph->CreateNode<FuncIR>(ir_node->ast(), FuncIR::Op{FuncIR::Opcode::eq, "==", "equal"},
+                                  std::vector<ExpressionIR*>{static_cast<ExpressionIR*>(conversion_func), empty_string}));
+    PX_ASSIGN_OR_RETURN(
+        auto second_func,
+        graph->CopyNode<FuncIR>(conversion_func));
+    PX_ASSIGN_OR_RETURN(
+        FuncIR *select_func,
+        graph->CreateNode<FuncIR>(ir_node->ast(), FuncIR::Op{FuncIR::Opcode::non_op, "", "select"},
+                                  std::vector<ExpressionIR*>{static_cast<ExpressionIR*>(select_expr), backup_conversion_func, second_func}));
+
+    conversion_func = select_func;
+  }
+
   for (int64_t parent_id : graph->dag().ParentsOf(metadata->id())) {
     // For each container node of the metadata expression, update it to point to the
     // new conversion func instead.
@@ -108,7 +146,6 @@ StatusOr<bool> ConvertMetadataRule::Apply(IRNode* ir_node) {
   DCHECK_EQ(conversion_func->EvaluatedDataType(), column_type)
       << "Expected the parent key column type and metadata property type to match.";
   conversion_func->set_annotations(ExpressionIR::Annotations(md_type));
-
   return true;
 }
 
