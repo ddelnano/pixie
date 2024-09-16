@@ -103,6 +103,16 @@ relation_map {
       column_semantic_type: ST_UPID
     }
     columns {
+      column_name: "local_addr"
+      column_type: STRING
+      column_semantic_type: ST_NONE
+    }
+    columns {
+      column_name: "local_port"
+      column_type: INT64
+      column_semantic_type: ST_NONE
+    }
+    columns {
       column_name: "remote_addr"
       column_type: STRING
       column_semantic_type: ST_NONE

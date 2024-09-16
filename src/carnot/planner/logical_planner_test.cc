@@ -770,6 +770,36 @@ TEST_F(LogicalPlannerTest, filter_pushdown_bug) {
   ASSERT_OK(plan->ToProto());
 }
 
+const char kPodNameFallbackConversion[] = R"pxl(
+import px
+
+df = px.DataFrame(table='http_events', start_time='-6m')
+df.pod = df.ctx['pod']
+
+px.display(df)
+)pxl";
+TEST_F(LogicalPlannerTest, pod_name_fallback_conversion) {
+  auto planner = LogicalPlanner::Create(info_).ConsumeValueOrDie();
+  auto state = testutils::CreateTwoPEMsOneKelvinPlannerState(testutils::kHttpEventsSchema);
+  ASSERT_OK_AND_ASSIGN(auto plan, planner->Plan(MakeQueryRequest(state, kPodNameFallbackConversion)));
+  ASSERT_OK(plan->ToProto());
+}
+
+const char kPodNameFallbackConversionWithFilter[] = R"pxl(
+import px
+
+df = px.DataFrame(table='http_events', start_time='-6m')
+df[df.ctx['pod'] != ""]
+
+px.display(df)
+)pxl";
+TEST_F(LogicalPlannerTest, pod_name_fallback_conversion_with_filter) {
+  auto planner = LogicalPlanner::Create(info_).ConsumeValueOrDie();
+  auto state = testutils::CreateTwoPEMsOneKelvinPlannerState(testutils::kHttpEventsSchema);
+  ASSERT_OK_AND_ASSIGN(auto plan, planner->Plan(MakeQueryRequest(state, kPodNameFallbackConversionWithFilter)));
+  ASSERT_OK(plan->ToProto());
+}
+
 const char kHttpDataScript[] = R"pxl(
 import px
 
