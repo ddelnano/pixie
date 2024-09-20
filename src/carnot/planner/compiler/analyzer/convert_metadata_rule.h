@@ -39,21 +39,25 @@ class ConvertMetadataRule : public Rule {
 
  protected:
   StatusOr<bool> Apply(IRNode* ir_node) override;
-  Status AddOptimisticPodNameConversionMap(IR* graph,
-                                           IRNode* container,
-                                           ExpressionIR* metadata_expr,
-                                           ExpressionIR* metadata_expr_with_fallback) const;
   /**
    * @brief Updates any parents of the metadata node to point to the new metadata expression.
    */
-  Status UpdateMetadataContainer(IR* graph,
-                                 IRNode* container,
+  Status UpdateMetadataContainer(IRNode* container,
                                  MetadataIR* metadata,
-                                 ExpressionIR* metadata_expr,
-                                 ExpressionIR* metadata_expr_with_fallback,
-                                 ExpressionIR* expr) const;
+                                 ExpressionIR* metadata_expr) const;
+
+  Status AddMetadataMapToRootAncestor(IR* graph,
+                                       int64_t parent_id,
+                                       std::pair<std::string, std::string>& col_names,
+                                       ExpressionIR* metadata_expr,
+                                       ExpressionIR* fallback_expr);
+
   StatusOr<std::string> FindKeyColumn(std::shared_ptr<TableType> parent_type,
                                       MetadataProperty* property, IRNode* node_for_error) const;
+
+  std::string GetUniquePodNameCol(std::shared_ptr<TableType> parent_type);
+
+  uint64_t col_name_counter_ = 0;
 };
 
 }  // namespace compiler

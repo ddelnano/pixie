@@ -31,86 +31,75 @@ namespace carnot {
 namespace planner {
 namespace compiler {
 
-Status ConvertMetadataRule::AddOptimisticPodNameConversionMap(IR* graph,
-                                                              IRNode* container,
-                                                              ExpressionIR* metadata_expr,
-                                                              ExpressionIR* metadata_expr_with_fallback) const {
-  if (Match(container, Func())) {
-    for (int64_t parent_id : graph->dag().ParentsOf(container->id())) {
-
-        PX_RETURN_IF_ERROR(AddOptimisticPodNameConversionMap(graph, graph->Get(parent_id), metadata_expr, metadata_expr_with_fallback));
+std::string ConvertMetadataRule::GetUniquePodNameCol(std::shared_ptr<TableType> parent_type) {
+  do {
+    auto new_col = absl::StrCat("pod_name_", col_name_counter_++);
+    if (!parent_type->HasColumn(new_col)) {
+      return new_col;
     }
-  } else if (Match(container, Operator())) {
-    for (int64_t parent_id : graph->dag().ParentsOf(container->id())) {
-      auto parent = graph->Get(parent_id);
-      if (!Match(parent, Operator())) {
-        continue;
-      }
-      auto parent_op = static_cast<OperatorIR*>(parent);
-      auto container_op = static_cast<OperatorIR*>(container);
-
-      PX_ASSIGN_OR_RETURN(
-        auto map_ir,
-        graph->CreateNode<MapIR>(container->ast(), parent_op, std::vector<ColumnExpression>{ColumnExpression("pn_0", metadata_expr)}, true));
-      PX_ASSIGN_OR_RETURN(
-        auto child_map_ir,
-        graph->CreateNode<MapIR>(container->ast(), static_cast<OperatorIR*>(map_ir), std::vector<ColumnExpression>{ColumnExpression("pod_name_result_0", metadata_expr_with_fallback)}, true));
-      for (int64_t dep_id : graph->dag().DependenciesOf(parent_id)) {
-        if (dep_id == container->id() || dep_id == map_ir->id()) {
-          continue;
-        }
-        if (Match(graph->Get(dep_id), Operator())) {
-          auto dep_op = static_cast<OperatorIR*>(graph->Get(dep_id));
-          PX_RETURN_IF_ERROR(dep_op->ReplaceParent(parent_op, map_ir));
-        }
-      }
-      PX_RETURN_IF_ERROR(container_op->ReplaceParent(parent_op, child_map_ir));
-
-      PX_RETURN_IF_ERROR(PropagateTypeChangesFromNode(graph, map_ir, compiler_state_));
-      PX_RETURN_IF_ERROR(PropagateTypeChangesFromNode(graph, child_map_ir, compiler_state_));
-    }
-  }
-
-  return Status::OK();
+  } while (true);
 }
 
-Status ConvertMetadataRule::UpdateMetadataContainer(IR* graph,
-                                                    IRNode* container,
+Status ConvertMetadataRule::AddMetadataMapToRootAncestor(IR* graph,
+                                                         int64_t parent_id,
+                                                         std::pair<std::string, std::string>& col_names,
+                                                         ExpressionIR* metadata_expr,
+                                                         ExpressionIR* fallback_expr) {
+    auto root_id = parent_id;
+    auto parents = graph->dag().ParentsOf(parent_id);
+    while (parents.size() > 0) {
+      root_id = parents[0];
+      parents = graph->dag().ParentsOf(root_id);
+    }
+    auto root_node = graph->Get(root_id);
+    DCHECK(Match(root_node, Operator()));
+
+    auto root_op = static_cast<OperatorIR*>(graph->Get(root_id));
+
+    auto table_type = root_op->resolved_table_type();
+    PX_ASSIGN_OR_RETURN(
+      auto map_ir,
+      graph->CreateNode<MapIR>(root_node->ast(), root_op, std::vector<ColumnExpression>{ColumnExpression(col_names.first, metadata_expr)}, true));
+    PX_ASSIGN_OR_RETURN(
+      auto child_map_ir,
+      graph->CreateNode<MapIR>(root_node->ast(), static_cast<OperatorIR*>(map_ir), std::vector<ColumnExpression>{ColumnExpression(col_names.second, fallback_expr)}, true));
+    for (int64_t dep_id : graph->dag().DependenciesOf(root_id)) {
+      if (dep_id == map_ir->id()) {
+        continue;
+      }
+      if (Match(graph->Get(dep_id), Operator())) {
+        auto dep_op = static_cast<OperatorIR*>(graph->Get(dep_id));
+        PX_RETURN_IF_ERROR(dep_op->ReplaceParent(root_op, child_map_ir));
+      }
+    }
+
+    PX_RETURN_IF_ERROR(PropagateTypeChangesFromNode(graph, map_ir, compiler_state_));
+    PX_RETURN_IF_ERROR(PropagateTypeChangesFromNode(graph, child_map_ir, compiler_state_));
+    return Status::OK();
+}
+
+Status ConvertMetadataRule::UpdateMetadataContainer(IRNode* container,
                                                     MetadataIR* metadata,
-                                                    ExpressionIR* metadata_expr,
-                                                    ExpressionIR* metadata_expr_with_fallback,
-                                                    ExpressionIR* expr) const {
-  bool container_updated = false;
+                                                    ExpressionIR* metadata_expr) const {
   if (Match(container, Func())) {
     auto func = static_cast<FuncIR*>(container);
-    PX_RETURN_IF_ERROR(func->UpdateArg(metadata, expr));
-    container_updated = true;
+    PX_RETURN_IF_ERROR(func->UpdateArg(metadata, metadata_expr));
+    return Status::OK();
   }
   if (Match(container, Map())) {
     auto map = static_cast<MapIR*>(container);
-    for (const auto& col_expr : map->col_exprs()) {
-      if (col_expr.node == metadata) {
-        PX_RETURN_IF_ERROR(map->UpdateColExpr(col_expr.name, expr));
+    for (const auto& expr : map->col_exprs()) {
+      if (expr.node == metadata) {
+        PX_RETURN_IF_ERROR(map->UpdateColExpr(expr.name, metadata_expr));
       }
     }
-    container_updated = true;
+    return Status::OK();
   }
   if (Match(container, Filter())) {
     auto filter = static_cast<FilterIR*>(container);
-    PX_RETURN_IF_ERROR(filter->SetFilterExpr(expr));
-    container_updated = true;
+    return filter->SetFilterExpr(metadata_expr);
   }
-  if (!container_updated) {
-    return error::Internal("Unsupported IRNode container for metadata: $0", container->DebugString());
-  }
-
-  if (metadata_expr == metadata_expr_with_fallback) {
-    return Status::OK();
-  }
-
-  PX_RETURN_IF_ERROR(AddOptimisticPodNameConversionMap(graph, container, metadata_expr, metadata_expr_with_fallback));
-
-  return Status::OK();
+  return error::Internal("Unsupported IRNode container for metadata: $0", container->DebugString());
 }
 
 StatusOr<std::string> ConvertMetadataRule::FindKeyColumn(std::shared_ptr<TableType> parent_type,
@@ -149,8 +138,9 @@ StatusOr<bool> ConvertMetadataRule::Apply(IRNode* ir_node) {
   PX_ASSIGN_OR_RETURN(auto parent, metadata->ReferencedOperator());
   PX_ASSIGN_OR_RETURN(auto containing_ops, metadata->ContainingOperators());
 
+  auto resolved_table_type = parent->resolved_table_type();
   PX_ASSIGN_OR_RETURN(std::string key_column_name,
-                      FindKeyColumn(parent->resolved_table_type(), md_property, ir_node));
+                      FindKeyColumn(resolved_table_type, md_property, ir_node));
 
   PX_ASSIGN_OR_RETURN(ColumnIR * key_column,
                       graph->CreateNode<ColumnIR>(ir_node->ast(), key_column_name, parent_op_idx));
@@ -166,13 +156,17 @@ StatusOr<bool> ConvertMetadataRule::Apply(IRNode* ir_node) {
   // TODO(ddelnano): Until the short lived process issue (gh#1638) is resolved, use a backup UDF via local_addr
   // in case the upid_to_pod_name fails to resolve the pod name
   auto backup_conversion_available = CheckBackupConversionAvailable(parent->resolved_table_type(), func_name);
+  std::pair<std::string, std::string> col_names;
   if (backup_conversion_available) {
+    col_names = std::make_pair(GetUniquePodNameCol(resolved_table_type), GetUniquePodNameCol(resolved_table_type));
+
     PX_ASSIGN_OR_RETURN(ColumnIR * local_addr_col,
                         graph->CreateNode<ColumnIR>(ir_node->ast(), "local_addr", parent_op_idx));
     PX_ASSIGN_OR_RETURN(ColumnIR * time_col,
                         graph->CreateNode<ColumnIR>(ir_node->ast(), "time_", parent_op_idx));
     PX_ASSIGN_OR_RETURN(ColumnIR * pod_name_col,
-                        graph->CreateNode<ColumnIR>(ir_node->ast(), "pn_0", parent_op_idx));
+                        graph->CreateNode<ColumnIR>(ir_node->ast(), col_names.first, parent_op_idx));
+
     PX_ASSIGN_OR_RETURN(
         FuncIR *ip_conversion_func,
         graph->CreateNode<FuncIR>(ir_node->ast(), FuncIR::Op{FuncIR::Opcode::non_op, "", "_ip_to_pod_id_pem_exec"},
@@ -196,13 +190,17 @@ StatusOr<bool> ConvertMetadataRule::Apply(IRNode* ir_node) {
 
     conversion_func = select_func;
     PX_ASSIGN_OR_RETURN(col_conversion_func,
-                        graph->CreateNode<ColumnIR>(ir_node->ast(), "pod_name_result_0", parent_op_idx));
+                        graph->CreateNode<ColumnIR>(ir_node->ast(), col_names.second, parent_op_idx));
   }
 
-  for (int64_t parent_id : graph->dag().ParentsOf(metadata->id())) {
+  auto md_parents = graph->dag().ParentsOf(metadata->id());
+  if (orig_conversion_func != conversion_func && md_parents.size() > 0) {
+    PX_RETURN_IF_ERROR(AddMetadataMapToRootAncestor(graph, md_parents[0], col_names, orig_conversion_func, conversion_func));
+  }
+  for (int64_t parent_id : md_parents) {
     // For each container node of the metadata expression, update it to point to the
     // new conversion func instead.
-    PX_RETURN_IF_ERROR(UpdateMetadataContainer(graph, graph->Get(parent_id), metadata, orig_conversion_func, conversion_func, col_conversion_func));
+    PX_RETURN_IF_ERROR(UpdateMetadataContainer(graph->Get(parent_id), metadata, col_conversion_func));
   }
 
   // Propagate type changes from the new conversion_func.

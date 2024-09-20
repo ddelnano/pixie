@@ -142,12 +142,10 @@ TEST_F(ConvertMetadataRuleTest, multichild_with_fallback_func) {
   EXPECT_EQ(0, graph->FindNodesThatMatch(Metadata()).size());
 
   // Check the contents of the new func.
-  EXPECT_MATCH(filter->filter_expr(), Equals(Func(), String()));
+  EXPECT_MATCH(filter->filter_expr(), Equals(ColumnNode("pod_name_1"), String()));
+  EXPECT_MATCH(filter->filter_expr(), ResolvedExpression());
   auto converted_md = static_cast<FuncIR*>(filter->filter_expr())->all_args()[0];
   EXPECT_EQ(ExpressionIR::Annotations(MetadataType::POD_NAME), converted_md->annotations());
-  EXPECT_MATCH(converted_md, Func());
-  auto converted_md_func = static_cast<FuncIR*>(converted_md);
-  EXPECT_MATCH(converted_md_func, ResolvedExpression());
 
   // When the fallback is provided, the compiler will make the following transfomation (pseudo code):
   // Before:
@@ -156,47 +154,67 @@ TEST_F(ConvertMetadataRuleTest, multichild_with_fallback_func) {
   // After:
   //   fallback_func = px.pod_id_to_pod_name(px.ip_to_pod_id(df.ctx["local_addr"]))
   //   px.select(px.upid_to_pod_name(df.upid) == "", fallback_func, px.upid_to_pod_name(df.upid))
-  EXPECT_EQ("select", converted_md_func->func_name());
-  EXPECT_EQ(3, converted_md_func->all_args().size());
 
-  auto orig_func_check = converted_md_func->all_args()[0];
-  EXPECT_MATCH(orig_func_check, Func());
-  auto equals_func = static_cast<FuncIR*>(orig_func_check);
-  EXPECT_EQ("equal", equals_func->func_name());
-  EXPECT_EQ(2, equals_func->all_args().size());
-  EXPECT_MATCH(equals_func->all_args()[0], Func());
-  EXPECT_MATCH(orig_func_check, ResolvedExpression());
+  // Find child map of MemSource
+  EXPECT_EQ(src->Children().size(), 1);
+  EXPECT_MATCH(src->Children()[0], Map());
+  auto map = static_cast<MapIR*>(src->Children()[0]);
+  bool found = false;
+  for (const auto& [idx, expr] : Enumerate(map->col_exprs())) {
+    if (expr.name == "pod_name_0") {
+      found = true;
 
-  auto upid_to_pod_name = static_cast<FuncIR*>(equals_func->all_args()[0]);
-  EXPECT_EQ(absl::Substitute("upid_to_$0", metadata_name), upid_to_pod_name->func_name());
-  EXPECT_EQ(1, upid_to_pod_name->all_args().size());
-  auto input_col = upid_to_pod_name->all_args()[0];
-  EXPECT_MATCH(input_col, ColumnNode("upid"));
-  EXPECT_MATCH(upid_to_pod_name, ResolvedExpression());
-  EXPECT_MATCH(input_col, ResolvedExpression());
+      EXPECT_MATCH(expr.node, Func());
+      auto upid_to_pod_name = static_cast<FuncIR*>(expr.node);
+      EXPECT_EQ(absl::Substitute("upid_to_$0", metadata_name), upid_to_pod_name->func_name());
+      EXPECT_EQ(1, upid_to_pod_name->all_args().size());
+      auto input_col = upid_to_pod_name->all_args()[0];
+      EXPECT_MATCH(input_col, ColumnNode("upid"));
+      EXPECT_MATCH(upid_to_pod_name, ResolvedExpression());
+      EXPECT_MATCH(input_col, ResolvedExpression());
+    }
+  }
+  EXPECT_TRUE(found);
 
-  EXPECT_MATCH(equals_func->all_args()[1], String(""));
+  EXPECT_EQ(map->Children().size(), 1);
+  EXPECT_MATCH(map->Children()[0], Map());
 
-  EXPECT_MATCH(converted_md_func->all_args()[1], Func());
-  auto fallback_func = static_cast<FuncIR*>(converted_md_func->all_args()[1]);
-  EXPECT_EQ("pod_id_to_pod_name", fallback_func->func_name());
-  EXPECT_EQ(1, fallback_func->all_args().size());
-  EXPECT_MATCH(fallback_func->all_args()[0], Func());
-  EXPECT_MATCH(fallback_func, ResolvedExpression());
+  found = false;
+  auto child_map = static_cast<MapIR*>(map->Children()[0]);
+  for (const auto& [idx, expr] : Enumerate(child_map->col_exprs())) {
+    if (expr.name == "pod_name_1") {
+      found = true;
 
-  auto ip_func = static_cast<FuncIR*>(fallback_func->all_args()[0]);
-  EXPECT_EQ("_ip_to_pod_id_pem_exec", ip_func->func_name());
-  EXPECT_EQ(2, ip_func->all_args().size());
-  EXPECT_MATCH(ip_func->all_args()[0], ColumnNode("local_addr"));
-  EXPECT_MATCH(ip_func->all_args()[1], ColumnNode("time_"));
-  EXPECT_MATCH(ip_func, ResolvedExpression());
+      EXPECT_MATCH(expr.node, Func());
+      auto converted_md_func = static_cast<FuncIR*>(expr.node);
+      EXPECT_EQ("select", converted_md_func->func_name());
+      EXPECT_EQ(3, converted_md_func->all_args().size());
 
-  EXPECT_MATCH(converted_md_func->all_args()[2], Func());
-  auto default_func = static_cast<FuncIR*>(converted_md_func->all_args()[2]);
-  EXPECT_EQ(absl::Substitute("upid_to_$0", metadata_name), default_func->func_name());
-  EXPECT_EQ(1, default_func->all_args().size());
-  EXPECT_MATCH(default_func->all_args()[0], ColumnNode("upid"));
-  EXPECT_MATCH(default_func, ResolvedExpression());
+      auto orig_func_check = converted_md_func->all_args()[0];
+      EXPECT_MATCH(orig_func_check, Func());
+
+      auto equals_func = static_cast<FuncIR*>(orig_func_check);
+      EXPECT_EQ("equal", equals_func->func_name());
+      EXPECT_EQ(2, equals_func->all_args().size());
+      EXPECT_MATCH(equals_func->all_args()[0], ColumnNode("pod_name_0"));
+      EXPECT_MATCH(equals_func->all_args()[1], String(""));
+
+      EXPECT_MATCH(converted_md_func->all_args()[1], Func());
+      auto fallback_func = static_cast<FuncIR*>(converted_md_func->all_args()[1]);
+      EXPECT_EQ("_pod_id_to_pod_name_pem_exec", fallback_func->func_name());
+      EXPECT_EQ(1, fallback_func->all_args().size());
+      EXPECT_MATCH(fallback_func->all_args()[0], Func());
+      EXPECT_MATCH(fallback_func, ResolvedExpression());
+
+      auto ip_func = static_cast<FuncIR*>(fallback_func->all_args()[0]);
+      EXPECT_EQ("_ip_to_pod_id_pem_exec", ip_func->func_name());
+      EXPECT_EQ(2, ip_func->all_args().size());
+      EXPECT_MATCH(ip_func->all_args()[0], ColumnNode("local_addr"));
+      EXPECT_MATCH(ip_func->all_args()[1], ColumnNode("time_"));
+      EXPECT_MATCH(ip_func, ResolvedExpression());
+    }
+  }
+  EXPECT_TRUE(found);
 
   // Check to make sure that all of the operators and expressions depending on the metadata
   // now have an updated reference to the func.
