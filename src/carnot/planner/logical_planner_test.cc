@@ -752,6 +752,22 @@ TEST_F(LogicalPlannerTest, filter_pushdown_bug) {
   ASSERT_OK(plan->ToProto());
 }
 
+const char kDuplicateColNameError[] = R"pxl(
+import px
+
+df = px.DataFrame(table='http_events', start_time='-6m')
+df.pod_name = px.select(df.ctx['pod'] != "", df.ctx['pod'], "pod")
+
+px.display(df)
+)pxl";
+TEST_F(LogicalPlannerTest, duplicate_col_error) {
+  auto planner = LogicalPlanner::Create(info_).ConsumeValueOrDie();
+  auto state = testutils::CreateTwoPEMsOneKelvinPlannerState(testutils::kHttpEventsSchema);
+  ASSERT_OK_AND_ASSIGN(auto plan,
+                       planner->Plan(MakeQueryRequest(state, kDuplicateColNameError)));
+  ASSERT_OK(plan->ToProto());
+}
+
 const char kPodNameFallbackConversion[] = R"pxl(
 import px
 

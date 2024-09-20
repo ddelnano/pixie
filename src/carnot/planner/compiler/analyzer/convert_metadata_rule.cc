@@ -148,6 +148,18 @@ StatusOr<bool> ConvertMetadataRule::Apply(IRNode* ir_node) {
                       graph->CreateNode<ColumnIR>(ir_node->ast(), key_column_name, parent_op_idx));
 
   PX_ASSIGN_OR_RETURN(std::string func_name, md_property->UDFName(key_column_name));
+
+  // Reuse the conversion function if it has already been applied to the metadata expression.
+  if (applied_md_exprs_.find(func_name) != applied_md_exprs_.end()) {
+    for (int64_t parent_id : graph->dag().ParentsOf(metadata->id())) {
+      PX_ASSIGN_OR_RETURN(
+        auto md_expr,
+        graph->CopyNode(applied_md_exprs_[func_name]));
+      PX_RETURN_IF_ERROR(
+          UpdateMetadataContainer(graph->Get(parent_id), metadata, md_expr));
+    }
+    return true;
+  }
   PX_ASSIGN_OR_RETURN(
       FuncIR * conversion_func,
       graph->CreateNode<FuncIR>(ir_node->ast(), FuncIR::Op{FuncIR::Opcode::non_op, "", func_name},
@@ -212,6 +224,7 @@ StatusOr<bool> ConvertMetadataRule::Apply(IRNode* ir_node) {
     PX_RETURN_IF_ERROR(
         UpdateMetadataContainer(graph->Get(parent_id), metadata, col_conversion_func));
   }
+  applied_md_exprs_[func_name] = col_conversion_func;
 
   // Propagate type changes from the new conversion_func.
   PX_RETURN_IF_ERROR(PropagateTypeChangesFromNode(graph, conversion_func, compiler_state_));

@@ -56,6 +56,7 @@ class ConvertMetadataRule : public Rule {
   std::string GetUniquePodNameCol(std::shared_ptr<TableType> parent_type);
 
   uint64_t col_name_counter_ = 0;
+  std::map<std::string, ExpressionIR*> applied_md_exprs_;
 };
 
 }  // namespace compiler
