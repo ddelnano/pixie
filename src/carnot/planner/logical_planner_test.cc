@@ -763,8 +763,7 @@ px.display(df)
 TEST_F(LogicalPlannerTest, duplicate_col_error) {
   auto planner = LogicalPlanner::Create(info_).ConsumeValueOrDie();
   auto state = testutils::CreateTwoPEMsOneKelvinPlannerState(testutils::kHttpEventsSchema);
-  ASSERT_OK_AND_ASSIGN(auto plan,
-                       planner->Plan(MakeQueryRequest(state, kDuplicateColNameError)));
+  ASSERT_OK_AND_ASSIGN(auto plan, planner->Plan(MakeQueryRequest(state, kDuplicateColNameError)));
   ASSERT_OK(plan->ToProto());
 }
 

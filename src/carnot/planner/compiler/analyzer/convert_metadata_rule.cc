@@ -152,11 +152,8 @@ StatusOr<bool> ConvertMetadataRule::Apply(IRNode* ir_node) {
   // Reuse the conversion function if it has already been applied to the metadata expression.
   if (applied_md_exprs_.find(func_name) != applied_md_exprs_.end()) {
     for (int64_t parent_id : graph->dag().ParentsOf(metadata->id())) {
-      PX_ASSIGN_OR_RETURN(
-        auto md_expr,
-        graph->CopyNode(applied_md_exprs_[func_name]));
-      PX_RETURN_IF_ERROR(
-          UpdateMetadataContainer(graph->Get(parent_id), metadata, md_expr));
+      PX_ASSIGN_OR_RETURN(auto md_expr, graph->CopyNode(applied_md_exprs_[func_name]));
+      PX_RETURN_IF_ERROR(UpdateMetadataContainer(graph->Get(parent_id), metadata, md_expr));
     }
     return true;
   }
