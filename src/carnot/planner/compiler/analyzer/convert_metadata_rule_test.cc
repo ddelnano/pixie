@@ -147,8 +147,8 @@ TEST_F(ConvertMetadataRuleTest, multichild_with_fallback_func) {
   auto converted_md = static_cast<FuncIR*>(filter->filter_expr())->all_args()[0];
   EXPECT_EQ(ExpressionIR::Annotations(MetadataType::POD_NAME), converted_md->annotations());
 
-  // When the fallback is provided, the compiler will make the following transfomation (pseudo code):
-  // Before:
+  // When the fallback is provided, the compiler will make the following transfomation (pseudo
+  // code): Before:
   //   df.ctx["pod"]
   //
   // After:

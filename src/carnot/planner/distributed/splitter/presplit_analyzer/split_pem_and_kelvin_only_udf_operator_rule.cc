@@ -28,12 +28,13 @@ namespace carnot {
 namespace planner {
 namespace distributed {
 
-std::string SplitPEMAndKelvinOnlyUDFOperatorRule::GetUniqueOutputName(FuncIR* input_expr,
-                                const absl::flat_hash_set<std::string>& used_column_names) {
+std::string SplitPEMAndKelvinOnlyUDFOperatorRule::GetUniqueOutputName(
+    FuncIR* input_expr, const absl::flat_hash_set<std::string>& used_column_names) {
   std::string output_name;
   auto idx = 0;
   while (used_column_names.contains(
-      output_name = absl::Substitute("$0_$1", input_expr->func_name(), idx++)) || generated_col_names_.contains(output_name)) {
+             output_name = absl::Substitute("$0_$1", input_expr->func_name(), idx++)) ||
+         generated_col_names_.contains(output_name)) {
     // Keep incrementing idx until we get a unique name.
   }
   generated_col_names_.insert(output_name);

@@ -53,7 +53,7 @@ class SplitPEMAndKelvinOnlyUDFOperatorRule : public Rule {
       const absl::flat_hash_set<std::string>& used_column_names);
 
   std::string GetUniqueOutputName(FuncIR* input_expr,
-      const absl::flat_hash_set<std::string>& used_column_names);
+                                  const absl::flat_hash_set<std::string>& used_column_names);
 };
 
 }  // namespace distributed

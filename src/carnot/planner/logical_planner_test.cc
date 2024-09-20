@@ -763,7 +763,8 @@ px.display(df)
 TEST_F(LogicalPlannerTest, pod_name_fallback_conversion) {
   auto planner = LogicalPlanner::Create(info_).ConsumeValueOrDie();
   auto state = testutils::CreateTwoPEMsOneKelvinPlannerState(testutils::kHttpEventsSchema);
-  ASSERT_OK_AND_ASSIGN(auto plan, planner->Plan(MakeQueryRequest(state, kPodNameFallbackConversion)));
+  ASSERT_OK_AND_ASSIGN(auto plan,
+                       planner->Plan(MakeQueryRequest(state, kPodNameFallbackConversion)));
   ASSERT_OK(plan->ToProto());
 }
 
@@ -778,7 +779,8 @@ px.display(df)
 TEST_F(LogicalPlannerTest, pod_name_fallback_conversion_with_filter) {
   auto planner = LogicalPlanner::Create(info_).ConsumeValueOrDie();
   auto state = testutils::CreateTwoPEMsOneKelvinPlannerState(testutils::kHttpEventsSchema);
-  ASSERT_OK_AND_ASSIGN(auto plan, planner->Plan(MakeQueryRequest(state, kPodNameFallbackConversionWithFilter)));
+  ASSERT_OK_AND_ASSIGN(
+      auto plan, planner->Plan(MakeQueryRequest(state, kPodNameFallbackConversionWithFilter)));
   ASSERT_OK(plan->ToProto());
 }
 

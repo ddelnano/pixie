@@ -40,46 +40,47 @@ std::string ConvertMetadataRule::GetUniquePodNameCol(std::shared_ptr<TableType> 
   } while (true);
 }
 
-Status ConvertMetadataRule::AddMetadataMapToRootAncestor(IR* graph,
-                                                         int64_t parent_id,
-                                                         std::pair<std::string, std::string>& col_names,
-                                                         ExpressionIR* metadata_expr,
-                                                         ExpressionIR* fallback_expr) {
-    auto root_id = parent_id;
-    auto parents = graph->dag().ParentsOf(parent_id);
-    while (parents.size() > 0) {
-      root_id = parents[0];
-      parents = graph->dag().ParentsOf(root_id);
-    }
-    auto root_node = graph->Get(root_id);
-    DCHECK(Match(root_node, Operator()));
+Status ConvertMetadataRule::AddMetadataMapToRootAncestor(
+    IR* graph, int64_t parent_id, const std::pair<std::string, std::string>& col_names,
+    ExpressionIR* metadata_expr, ExpressionIR* fallback_expr) {
+  auto root_id = parent_id;
+  auto parents = graph->dag().ParentsOf(parent_id);
+  while (parents.size() > 0) {
+    root_id = parents[0];
+    parents = graph->dag().ParentsOf(root_id);
+  }
+  auto root_node = graph->Get(root_id);
+  DCHECK(Match(root_node, Operator()));
 
-    auto root_op = static_cast<OperatorIR*>(graph->Get(root_id));
+  auto root_op = static_cast<OperatorIR*>(graph->Get(root_id));
 
-    auto table_type = root_op->resolved_table_type();
-    PX_ASSIGN_OR_RETURN(
+  auto table_type = root_op->resolved_table_type();
+  PX_ASSIGN_OR_RETURN(
       auto map_ir,
-      graph->CreateNode<MapIR>(root_node->ast(), root_op, std::vector<ColumnExpression>{ColumnExpression(col_names.first, metadata_expr)}, true));
-    PX_ASSIGN_OR_RETURN(
+      graph->CreateNode<MapIR>(
+          root_node->ast(), root_op,
+          std::vector<ColumnExpression>{ColumnExpression(col_names.first, metadata_expr)}, true));
+  PX_ASSIGN_OR_RETURN(
       auto child_map_ir,
-      graph->CreateNode<MapIR>(root_node->ast(), static_cast<OperatorIR*>(map_ir), std::vector<ColumnExpression>{ColumnExpression(col_names.second, fallback_expr)}, true));
-    for (int64_t dep_id : graph->dag().DependenciesOf(root_id)) {
-      if (dep_id == map_ir->id()) {
-        continue;
-      }
-      if (Match(graph->Get(dep_id), Operator())) {
-        auto dep_op = static_cast<OperatorIR*>(graph->Get(dep_id));
-        PX_RETURN_IF_ERROR(dep_op->ReplaceParent(root_op, child_map_ir));
-      }
+      graph->CreateNode<MapIR>(
+          root_node->ast(), static_cast<OperatorIR*>(map_ir),
+          std::vector<ColumnExpression>{ColumnExpression(col_names.second, fallback_expr)}, true));
+  for (int64_t dep_id : graph->dag().DependenciesOf(root_id)) {
+    if (dep_id == map_ir->id()) {
+      continue;
     }
+    if (Match(graph->Get(dep_id), Operator())) {
+      auto dep_op = static_cast<OperatorIR*>(graph->Get(dep_id));
+      PX_RETURN_IF_ERROR(dep_op->ReplaceParent(root_op, child_map_ir));
+    }
+  }
 
-    PX_RETURN_IF_ERROR(PropagateTypeChangesFromNode(graph, map_ir, compiler_state_));
-    PX_RETURN_IF_ERROR(PropagateTypeChangesFromNode(graph, child_map_ir, compiler_state_));
-    return Status::OK();
+  PX_RETURN_IF_ERROR(PropagateTypeChangesFromNode(graph, map_ir, compiler_state_));
+  PX_RETURN_IF_ERROR(PropagateTypeChangesFromNode(graph, child_map_ir, compiler_state_));
+  return Status::OK();
 }
 
-Status ConvertMetadataRule::UpdateMetadataContainer(IRNode* container,
-                                                    MetadataIR* metadata,
+Status ConvertMetadataRule::UpdateMetadataContainer(IRNode* container, MetadataIR* metadata,
                                                     ExpressionIR* metadata_expr) const {
   if (Match(container, Func())) {
     auto func = static_cast<FuncIR*>(container);
@@ -119,8 +120,9 @@ StatusOr<std::string> ConvertMetadataRule::FindKeyColumn(std::shared_ptr<TableTy
 }
 
 bool CheckBackupConversionAvailable(std::shared_ptr<TableType> parent_type,
-                                                         const std::string& func_name) {
-  return parent_type->HasColumn("time_") && parent_type->HasColumn("local_addr") && func_name == "upid_to_pod_name";
+                                    const std::string& func_name) {
+  return parent_type->HasColumn("time_") && parent_type->HasColumn("local_addr") &&
+         func_name == "upid_to_pod_name";
 }
 
 StatusOr<bool> ConvertMetadataRule::Apply(IRNode* ir_node) {
@@ -153,54 +155,62 @@ StatusOr<bool> ConvertMetadataRule::Apply(IRNode* ir_node) {
   FuncIR* orig_conversion_func = conversion_func;
   ExpressionIR* col_conversion_func = static_cast<ExpressionIR*>(conversion_func);
 
-  // TODO(ddelnano): Until the short lived process issue (gh#1638) is resolved, use a backup UDF via local_addr
-  // in case the upid_to_pod_name fails to resolve the pod name
-  auto backup_conversion_available = CheckBackupConversionAvailable(parent->resolved_table_type(), func_name);
+  // TODO(ddelnano): Until the short lived process issue (gh#1638) is resolved, use a backup UDF via
+  // local_addr in case the upid_to_pod_name fails to resolve the pod name
+  auto backup_conversion_available =
+      CheckBackupConversionAvailable(parent->resolved_table_type(), func_name);
   std::pair<std::string, std::string> col_names;
   if (backup_conversion_available) {
-    col_names = std::make_pair(GetUniquePodNameCol(resolved_table_type), GetUniquePodNameCol(resolved_table_type));
+    col_names = std::make_pair(GetUniquePodNameCol(resolved_table_type),
+                               GetUniquePodNameCol(resolved_table_type));
 
     PX_ASSIGN_OR_RETURN(ColumnIR * local_addr_col,
                         graph->CreateNode<ColumnIR>(ir_node->ast(), "local_addr", parent_op_idx));
     PX_ASSIGN_OR_RETURN(ColumnIR * time_col,
                         graph->CreateNode<ColumnIR>(ir_node->ast(), "time_", parent_op_idx));
-    PX_ASSIGN_OR_RETURN(ColumnIR * pod_name_col,
-                        graph->CreateNode<ColumnIR>(ir_node->ast(), col_names.first, parent_op_idx));
+    PX_ASSIGN_OR_RETURN(
+        ColumnIR * pod_name_col,
+        graph->CreateNode<ColumnIR>(ir_node->ast(), col_names.first, parent_op_idx));
 
     PX_ASSIGN_OR_RETURN(
-        FuncIR *ip_conversion_func,
-        graph->CreateNode<FuncIR>(ir_node->ast(), FuncIR::Op{FuncIR::Opcode::non_op, "", "_ip_to_pod_id_pem_exec"},
+        FuncIR * ip_conversion_func,
+        graph->CreateNode<FuncIR>(ir_node->ast(),
+                                  FuncIR::Op{FuncIR::Opcode::non_op, "", "_ip_to_pod_id_pem_exec"},
                                   std::vector<ExpressionIR*>{local_addr_col, time_col}));
     PX_ASSIGN_OR_RETURN(
-        FuncIR *backup_conversion_func,
-        graph->CreateNode<FuncIR>(ir_node->ast(), FuncIR::Op{FuncIR::Opcode::non_op, "", "_pod_id_to_pod_name_pem_exec"},
-                              std::vector<ExpressionIR*>{static_cast<ExpressionIR*>(ip_conversion_func)}));
-    auto empty_string = static_cast<ExpressionIR*>(graph->CreateNode<StringIR>(ir_node->ast(), "").ConsumeValueOrDie());
+        FuncIR * backup_conversion_func,
+        graph->CreateNode<FuncIR>(
+            ir_node->ast(), FuncIR::Op{FuncIR::Opcode::non_op, "", "_pod_id_to_pod_name_pem_exec"},
+            std::vector<ExpressionIR*>{static_cast<ExpressionIR*>(ip_conversion_func)}));
+    auto empty_string = static_cast<ExpressionIR*>(
+        graph->CreateNode<StringIR>(ir_node->ast(), "").ConsumeValueOrDie());
     PX_ASSIGN_OR_RETURN(
-        FuncIR *select_expr,
-        graph->CreateNode<FuncIR>(ir_node->ast(), FuncIR::Op{FuncIR::Opcode::eq, "==", "equal"},
-                                  std::vector<ExpressionIR*>{static_cast<ExpressionIR*>(pod_name_col), empty_string}));
-    PX_ASSIGN_OR_RETURN(
-        auto second_func,
-        graph->CopyNode<ColumnIR>(pod_name_col));
-    PX_ASSIGN_OR_RETURN(
-        FuncIR *select_func,
-        graph->CreateNode<FuncIR>(ir_node->ast(), FuncIR::Op{FuncIR::Opcode::non_op, "", "select"},
-                                  std::vector<ExpressionIR*>{static_cast<ExpressionIR*>(select_expr), backup_conversion_func, second_func}));
+        FuncIR * select_expr,
+        graph->CreateNode<FuncIR>(
+            ir_node->ast(), FuncIR::Op{FuncIR::Opcode::eq, "==", "equal"},
+            std::vector<ExpressionIR*>{static_cast<ExpressionIR*>(pod_name_col), empty_string}));
+    PX_ASSIGN_OR_RETURN(auto second_func, graph->CopyNode<ColumnIR>(pod_name_col));
+    PX_ASSIGN_OR_RETURN(FuncIR * select_func,
+                        graph->CreateNode<FuncIR>(
+                            ir_node->ast(), FuncIR::Op{FuncIR::Opcode::non_op, "", "select"},
+                            std::vector<ExpressionIR*>{static_cast<ExpressionIR*>(select_expr),
+                                                       backup_conversion_func, second_func}));
 
     conversion_func = select_func;
-    PX_ASSIGN_OR_RETURN(col_conversion_func,
-                        graph->CreateNode<ColumnIR>(ir_node->ast(), col_names.second, parent_op_idx));
+    PX_ASSIGN_OR_RETURN(col_conversion_func, graph->CreateNode<ColumnIR>(
+                                                 ir_node->ast(), col_names.second, parent_op_idx));
   }
 
   auto md_parents = graph->dag().ParentsOf(metadata->id());
   if (orig_conversion_func != conversion_func && md_parents.size() > 0) {
-    PX_RETURN_IF_ERROR(AddMetadataMapToRootAncestor(graph, md_parents[0], col_names, orig_conversion_func, conversion_func));
+    PX_RETURN_IF_ERROR(AddMetadataMapToRootAncestor(graph, md_parents[0], col_names,
+                                                    orig_conversion_func, conversion_func));
   }
   for (int64_t parent_id : md_parents) {
     // For each container node of the metadata expression, update it to point to the
     // new conversion func instead.
-    PX_RETURN_IF_ERROR(UpdateMetadataContainer(graph->Get(parent_id), metadata, col_conversion_func));
+    PX_RETURN_IF_ERROR(
+        UpdateMetadataContainer(graph->Get(parent_id), metadata, col_conversion_func));
   }
 
   // Propagate type changes from the new conversion_func.
