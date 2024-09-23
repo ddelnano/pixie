@@ -54,6 +54,18 @@ class LogicalPlannerTest : public ::testing::Test {
     *query_request.mutable_logical_planner_state() = state;
     return query_request;
   }
+  plannerpb::QueryRequest MakeQueryRequestWithExecArgs(const distributedpb::LogicalPlannerState& state,
+                                           const std::string& query, const std::vector<std::string>& exec_funcs) {
+    plannerpb::QueryRequest query_request;
+    query_request.set_query_str(query);
+    *query_request.mutable_logical_planner_state() = state;
+    for (const auto& exec_func : exec_funcs) {
+      auto f = query_request.add_exec_funcs();
+      f->set_func_name(exec_func);
+      f->set_output_table_prefix(exec_func);
+    }
+    return query_request;
+  }
   udfspb::UDFInfo info_;
 };
 
@@ -796,6 +808,38 @@ TEST_F(LogicalPlannerTest, pod_name_fallback_conversion_with_filter) {
   auto state = testutils::CreateTwoPEMsOneKelvinPlannerState(testutils::kHttpEventsSchema);
   ASSERT_OK_AND_ASSIGN(
       auto plan, planner->Plan(MakeQueryRequest(state, kPodNameFallbackConversionWithFilter)));
+  ASSERT_OK(plan->ToProto());
+}
+
+const char kPodNameMissingCol[] = R"pxl(
+import px
+
+def cql_flow_graph():
+    df = px.DataFrame('cql_events', start_time='-5m')
+    df.pod = df.ctx['pod']
+
+    df.ra_pod = px.pod_id_to_pod_name(px.ip_to_pod_id(df.remote_addr))
+    df.is_ra_pod = df.ra_pod != ''
+    df.ra_name = px.select(df.is_ra_pod, df.ra_pod, df.remote_addr)
+
+    df.is_server_tracing = df.trace_role == 2
+
+    df.source = px.select(df.is_server_tracing, df.ra_name, df.pod)
+    df.destination = px.select(df.is_server_tracing, df.pod, df.ra_name)
+
+    return df
+
+
+def cql_summary_with_links():
+    df = cql_flow_graph()
+
+    return df
+)pxl";
+TEST_F(LogicalPlannerTest, pod_name_missing_cal) {
+  auto planner = LogicalPlanner::Create(info_).ConsumeValueOrDie();
+  auto state = testutils::CreateTwoPEMsOneKelvinPlannerState(testutils::kHttpEventsSchema);
+  ASSERT_OK_AND_ASSIGN(
+      auto plan, planner->Plan(MakeQueryRequestWithExecArgs(state, kPodNameMissingCol, {"cql_flow_graph", "cql_summary_with_links"})));
   ASSERT_OK(plan->ToProto());
 }
 
