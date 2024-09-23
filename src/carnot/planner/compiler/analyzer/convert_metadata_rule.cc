@@ -41,10 +41,10 @@ std::string ConvertMetadataRule::GetUniquePodNameCol(std::shared_ptr<TableType> 
 }
 
 Status ConvertMetadataRule::AddMetadataMapToRootAncestor(
-    IR* graph, int64_t parent_id, const std::pair<std::string, std::string>& col_names,
+    IR* graph, std::vector<int64_t> parents_in, const std::pair<std::string, std::string>& col_names,
     ExpressionIR* metadata_expr, ExpressionIR* fallback_expr) {
-  auto root_id = parent_id;
-  auto parents = graph->dag().ParentsOf(parent_id);
+  auto root_id = parents_in[0];
+  auto parents = graph->dag().ParentsOf(parents_in[0]);
   while (parents.size() > 0) {
     root_id = parents[0];
     parents = graph->dag().ParentsOf(root_id);
@@ -148,11 +148,14 @@ StatusOr<bool> ConvertMetadataRule::Apply(IRNode* ir_node) {
                       graph->CreateNode<ColumnIR>(ir_node->ast(), key_column_name, parent_op_idx));
 
   PX_ASSIGN_OR_RETURN(std::string func_name, md_property->UDFName(key_column_name));
+  auto backup_conversion_available =
+      CheckBackupConversionAvailable(parent->resolved_table_type(), func_name);
 
   // Reuse the conversion function if it has already been applied to the metadata expression.
-  if (applied_md_exprs_.find(func_name) != applied_md_exprs_.end()) {
+  if (backup_conversion_available && applied_md_exprs_.find(func_name) != applied_md_exprs_.end()) {
     for (int64_t parent_id : graph->dag().ParentsOf(metadata->id())) {
-      PX_ASSIGN_OR_RETURN(auto md_expr, graph->CopyNode(applied_md_exprs_[func_name]));
+      PX_ASSIGN_OR_RETURN(auto md_expr, graph->CreateNode<ColumnIR>(
+                                                 ir_node->ast(), applied_md_exprs_[func_name], parent_op_idx));
       PX_RETURN_IF_ERROR(UpdateMetadataContainer(graph->Get(parent_id), metadata, md_expr));
     }
     return true;
@@ -166,8 +169,6 @@ StatusOr<bool> ConvertMetadataRule::Apply(IRNode* ir_node) {
 
   // TODO(ddelnano): Until the short lived process issue (gh#1638) is resolved, use a backup UDF via
   // local_addr in case the upid_to_pod_name fails to resolve the pod name
-  auto backup_conversion_available =
-      CheckBackupConversionAvailable(parent->resolved_table_type(), func_name);
   std::pair<std::string, std::string> col_names;
   if (backup_conversion_available) {
     col_names = std::make_pair(GetUniquePodNameCol(resolved_table_type),
@@ -208,11 +209,12 @@ StatusOr<bool> ConvertMetadataRule::Apply(IRNode* ir_node) {
     conversion_func = select_func;
     PX_ASSIGN_OR_RETURN(col_conversion_func, graph->CreateNode<ColumnIR>(
                                                  ir_node->ast(), col_names.second, parent_op_idx));
+    applied_md_exprs_[func_name] = col_names.second;
   }
 
   auto md_parents = graph->dag().ParentsOf(metadata->id());
   if (orig_conversion_func != conversion_func && md_parents.size() > 0) {
-    PX_RETURN_IF_ERROR(AddMetadataMapToRootAncestor(graph, md_parents[0], col_names,
+    PX_RETURN_IF_ERROR(AddMetadataMapToRootAncestor(graph, md_parents, col_names,
                                                     orig_conversion_func, conversion_func));
   }
   for (int64_t parent_id : md_parents) {
@@ -220,8 +222,8 @@ StatusOr<bool> ConvertMetadataRule::Apply(IRNode* ir_node) {
     // new conversion func instead.
     PX_RETURN_IF_ERROR(
         UpdateMetadataContainer(graph->Get(parent_id), metadata, col_conversion_func));
+    PX_RETURN_IF_ERROR(PropagateTypeChangesFromNode(graph, graph->Get(parent_id), compiler_state_));
   }
-  applied_md_exprs_[func_name] = col_conversion_func;
 
   // Propagate type changes from the new conversion_func.
   PX_RETURN_IF_ERROR(PropagateTypeChangesFromNode(graph, conversion_func, compiler_state_));

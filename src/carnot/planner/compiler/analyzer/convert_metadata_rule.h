@@ -47,7 +47,7 @@ class ConvertMetadataRule : public Rule {
   Status UpdateMetadataContainer(IRNode* container, MetadataIR* metadata,
                                  ExpressionIR* metadata_expr) const;
 
-  Status AddMetadataMapToRootAncestor(IR* graph, int64_t parent_id,
+  Status AddMetadataMapToRootAncestor(IR* graph, std::vector<int64_t> parent_in,
                                       const std::pair<std::string, std::string>& col_names,
                                       ExpressionIR* metadata_expr, ExpressionIR* fallback_expr);
 
@@ -57,7 +57,7 @@ class ConvertMetadataRule : public Rule {
   std::string GetUniquePodNameCol(std::shared_ptr<TableType> parent_type);
 
   uint64_t col_name_counter_ = 0;
-  std::map<std::string, ExpressionIR*> applied_md_exprs_;
+  std::map<std::string, std::string> applied_md_exprs_;
 };
 
 }  // namespace compiler
