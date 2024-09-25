@@ -811,6 +811,35 @@ TEST_F(LogicalPlannerTest, pod_name_fallback_conversion_with_filter) {
   ASSERT_OK(plan->ToProto());
 }
 
+const char kPodNameMissingColWithoutExecArgs[] = R"pxl(
+import px
+
+def cql_flow_graph():
+    df = px.DataFrame('cql_events', start_time='-5m')
+    df.pod = df.ctx['pod']
+
+    df.ra_pod = px.pod_id_to_pod_name(px.ip_to_pod_id(df.remote_addr))
+    df.is_ra_pod = df.ra_pod != ''
+    df.ra_name = px.select(df.is_ra_pod, df.ra_pod, df.remote_addr)
+
+    df.is_server_tracing = df.trace_role == 2
+
+    df.source = px.select(df.is_server_tracing, df.ra_name, df.pod)
+    df.destination = px.select(df.is_server_tracing, df.pod, df.ra_name)
+
+    return df
+
+df = cql_flow_graph()
+px.display(df)
+)pxl";
+TEST_F(LogicalPlannerTest, pod_name_missing_col_without_exec_args) {
+  auto planner = LogicalPlanner::Create(info_).ConsumeValueOrDie();
+  auto state = testutils::CreateTwoPEMsOneKelvinPlannerState(testutils::kHttpEventsSchema);
+  ASSERT_OK_AND_ASSIGN(
+      auto plan, planner->Plan(MakeQueryRequest(state, kPodNameMissingColWithoutExecArgs)));
+  ASSERT_OK(plan->ToProto());
+}
+
 const char kPodNameMissingCol[] = R"pxl(
 import px
 
@@ -835,11 +864,33 @@ def cql_summary_with_links():
 
     return df
 )pxl";
-TEST_F(LogicalPlannerTest, pod_name_missing_cal) {
+TEST_F(LogicalPlannerTest, pod_name_missing_col) {
   auto planner = LogicalPlanner::Create(info_).ConsumeValueOrDie();
   auto state = testutils::CreateTwoPEMsOneKelvinPlannerState(testutils::kHttpEventsSchema);
   ASSERT_OK_AND_ASSIGN(
       auto plan, planner->Plan(MakeQueryRequestWithExecArgs(state, kPodNameMissingCol, {"cql_flow_graph", "cql_summary_with_links"})));
+  ASSERT_OK(plan->ToProto());
+}
+
+const char kBrokenUpidToPodNameQuery[] = R"pxl(
+import px
+def dns_flow_graph():
+  df = px.DataFrame('http_events', start_time='-5m')
+  df.pod = df.ctx['pod']
+  
+  # Create table in drawer.
+  px.debug(df, "dns_events")
+  
+  df.to_entity = px.select(df.remote_addr == '127.0.0.1',
+                           px.upid_to_pod_name(df.upid),
+                           px.Service(px.nslookup(df.remote_addr)))
+  return df
+)pxl";
+TEST_F(LogicalPlannerTest, broken_upid_to_pod_name_query) {
+  auto planner = LogicalPlanner::Create(info_).ConsumeValueOrDie();
+  auto state = testutils::CreateTwoPEMsOneKelvinPlannerState(testutils::kHttpEventsSchema);
+  ASSERT_OK_AND_ASSIGN(
+      auto plan, planner->Plan(MakeQueryRequestWithExecArgs(state, kBrokenUpidToPodNameQuery, {"dns_flow_graph"})));
   ASSERT_OK(plan->ToProto());
 }
 
