@@ -165,6 +165,7 @@ StatusOr<bool> ConvertMetadataRule::Apply(IRNode* ir_node) {
 
   // TODO(ddelnano): Until the short lived process issue (gh#1638) is resolved, use a backup UDF via local_addr
   // in case the upid_to_pod_name fails to resolve the pod name
+  FuncIR* backup_conversion_func = nullptr;
   auto backup_conversion_available = CheckBackupConversionAvailable(parent->resolved_table_type(), func_name);
   if (backup_conversion_available) {
     PX_ASSIGN_OR_RETURN(ColumnIR * local_addr_col,
@@ -178,7 +179,7 @@ StatusOr<bool> ConvertMetadataRule::Apply(IRNode* ir_node) {
         graph->CreateNode<FuncIR>(ir_node->ast(), FuncIR::Op{FuncIR::Opcode::non_op, "", "_ip_to_pod_id_pem_exec"},
                                   std::vector<ExpressionIR*>{local_addr_col, time_col}));
     PX_ASSIGN_OR_RETURN(
-        FuncIR *backup_conversion_func,
+        backup_conversion_func,
         graph->CreateNode<FuncIR>(ir_node->ast(), FuncIR::Op{FuncIR::Opcode::non_op, "", "_pod_id_to_pod_name_pem_exec"},
                               std::vector<ExpressionIR*>{static_cast<ExpressionIR*>(ip_conversion_func)}));
     auto empty_string = static_cast<ExpressionIR*>(graph->CreateNode<StringIR>(ir_node->ast(), "").ConsumeValueOrDie());
@@ -210,9 +211,11 @@ StatusOr<bool> ConvertMetadataRule::Apply(IRNode* ir_node) {
 
   DCHECK_EQ(conversion_func->EvaluatedDataType(), column_type)
       << "Expected the parent key column type and metadata property type to match.";
-  conversion_func->set_annotations(ExpressionIR::Annotations(md_type));
+  if (backup_conversion_func != nullptr) {
+    backup_conversion_func->set_annotations(ExpressionIR::Annotations(md_type));
+  }
   orig_conversion_func->set_annotations(ExpressionIR::Annotations(md_type));
-  col_conversion_func->set_annotations(ExpressionIR::Annotations(md_type));
+  /* col_conversion_func->set_annotations(ExpressionIR::Annotations(md_type)); */
   return true;
 }
 

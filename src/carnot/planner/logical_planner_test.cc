@@ -54,6 +54,18 @@ class LogicalPlannerTest : public ::testing::Test {
     *query_request.mutable_logical_planner_state() = state;
     return query_request;
   }
+  plannerpb::QueryRequest MakeQueryRequestWithExecArgs(const distributedpb::LogicalPlannerState& state,
+                                           const std::string& query, const std::vector<std::string>& exec_funcs) {
+    plannerpb::QueryRequest query_request;
+    query_request.set_query_str(query);
+    *query_request.mutable_logical_planner_state() = state;
+    for (const auto& exec_func : exec_funcs) {
+      auto f = query_request.add_exec_funcs();
+      f->set_func_name(exec_func);
+      f->set_output_table_prefix(exec_func);
+    }
+    return query_request;
+  }
   udfspb::UDFInfo info_;
 };
 
@@ -770,6 +782,21 @@ TEST_F(LogicalPlannerTest, filter_pushdown_bug) {
   ASSERT_OK(plan->ToProto());
 }
 
+const char kDuplicateColNameError[] = R"pxl(
+import px
+
+df = px.DataFrame(table='http_events', start_time='-6m')
+df.pod_name = px.select(df.ctx['pod'] != "", df.ctx['pod'], "pod")
+
+px.display(df)
+)pxl";
+TEST_F(LogicalPlannerTest, duplicate_col_error) {
+  auto planner = LogicalPlanner::Create(info_).ConsumeValueOrDie();
+  auto state = testutils::CreateTwoPEMsOneKelvinPlannerState(testutils::kHttpEventsSchema);
+  ASSERT_OK_AND_ASSIGN(auto plan, planner->Plan(MakeQueryRequest(state, kDuplicateColNameError)));
+  ASSERT_OK(plan->ToProto());
+}
+
 const char kPodNameFallbackConversion[] = R"pxl(
 import px
 
@@ -781,7 +808,8 @@ px.display(df)
 TEST_F(LogicalPlannerTest, pod_name_fallback_conversion) {
   auto planner = LogicalPlanner::Create(info_).ConsumeValueOrDie();
   auto state = testutils::CreateTwoPEMsOneKelvinPlannerState(testutils::kHttpEventsSchema);
-  ASSERT_OK_AND_ASSIGN(auto plan, planner->Plan(MakeQueryRequest(state, kPodNameFallbackConversion)));
+  ASSERT_OK_AND_ASSIGN(auto plan,
+                       planner->Plan(MakeQueryRequest(state, kPodNameFallbackConversion)));
   ASSERT_OK(plan->ToProto());
 }
 
@@ -796,7 +824,62 @@ px.display(df)
 TEST_F(LogicalPlannerTest, pod_name_fallback_conversion_with_filter) {
   auto planner = LogicalPlanner::Create(info_).ConsumeValueOrDie();
   auto state = testutils::CreateTwoPEMsOneKelvinPlannerState(testutils::kHttpEventsSchema);
-  ASSERT_OK_AND_ASSIGN(auto plan, planner->Plan(MakeQueryRequest(state, kPodNameFallbackConversionWithFilter)));
+  ASSERT_OK_AND_ASSIGN(
+      auto plan, planner->Plan(MakeQueryRequest(state, kPodNameFallbackConversionWithFilter)));
+  ASSERT_OK(plan->ToProto());
+}
+
+const char kPodNameMissingCol[] = R"pxl(
+import px
+
+def cql_flow_graph():
+    df = px.DataFrame('cql_events', start_time='-5m')
+    df.pod = df.ctx['pod']
+
+    df.ra_pod = px.pod_id_to_pod_name(px.ip_to_pod_id(df.remote_addr))
+    df.is_ra_pod = df.ra_pod != ''
+    df.ra_name = px.select(df.is_ra_pod, df.ra_pod, df.remote_addr)
+
+    df.is_server_tracing = df.trace_role == 2
+
+    df.source = px.select(df.is_server_tracing, df.ra_name, df.pod)
+    df.destination = px.select(df.is_server_tracing, df.pod, df.ra_name)
+
+    return df
+
+
+def cql_summary_with_links():
+    df = cql_flow_graph()
+
+    return df
+)pxl";
+TEST_F(LogicalPlannerTest, pod_name_missing_cal) {
+  auto planner = LogicalPlanner::Create(info_).ConsumeValueOrDie();
+  auto state = testutils::CreateTwoPEMsOneKelvinPlannerState(testutils::kHttpEventsSchema);
+  ASSERT_OK_AND_ASSIGN(
+      auto plan, planner->Plan(MakeQueryRequestWithExecArgs(state, kPodNameMissingCol, {"cql_flow_graph", "cql_summary_with_links"})));
+  ASSERT_OK(plan->ToProto());
+}
+
+const char kBrokenUpidToPodNameQuery[] = R"pxl(
+import px
+def dns_flow_graph():
+  df = px.DataFrame('http_events', start_time='-5m')
+  df.pod = df.ctx['pod']
+  
+  # Create table in drawer.
+  px.debug(df, "dns_events")
+  
+  df.to_entity = px.select(df.remote_addr == '127.0.0.1',
+                           px.upid_to_pod_name(df.upid),
+                           px.Service(px.nslookup(df.remote_addr)))
+  return df
+)pxl";
+TEST_F(LogicalPlannerTest, broken_upid_to_pod_name_query) {
+  auto planner = LogicalPlanner::Create(info_).ConsumeValueOrDie();
+  auto state = testutils::CreateTwoPEMsOneKelvinPlannerState(testutils::kHttpEventsSchema);
+  ASSERT_OK_AND_ASSIGN(
+      auto plan, planner->Plan(MakeQueryRequestWithExecArgs(state, kBrokenUpidToPodNameQuery, {"dns_flow_graph"})));
   ASSERT_OK(plan->ToProto());
 }
 
