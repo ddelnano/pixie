@@ -764,6 +764,55 @@ TEST_F(LogicalPlannerTest, filter_pushdown_bug) {
   ASSERT_OK(plan->ToProto());
 }
 
+const char kIssuesWithMissingCol[] = R"pxl(
+import px
+
+
+def dns_requests(start_time: str, query_name_filter: str):
+
+    # The dns_events table pairs DNS requests with their responses.
+    df = px.DataFrame(table='http_events', start_time=start_time)
+
+    # Add context.
+    df.pod = df.ctx['pod']
+
+    # Convert DNS IP to string.
+    df.dns_server = px.nslookup(df.remote_addr)
+
+    # Parse the DNS response to determine if it was successfully resolved.
+    df.resp_body = px.pluck(df.resp_body, 'answers')
+    df.request_resolved = px.contains(df.resp_body, 'name')
+
+    # Parse the DNS request for query name.
+    # TODO: cleanup this logic when we support object types.
+    df.req_body = px.pluck(df.req_body, 'queries')
+    df.idx1 = px.find(df.req_body, '\"name\":')
+    df.idz = px.length(df.req_body) - (df.idx1 + 8) - 3
+    df.query_name_partial = px.substring(df.req_body, df.idx1 + 8, df.idz)
+    df.idx2 = px.find(df.query_name_partial, ',')
+    df.dns_query_name = px.substring(df.query_name_partial, 0, df.idx2 - 1)
+    df = df.drop(['idx1', 'idx2'])
+
+    # Group all unique pod / dns_server pairings containing query_name_filter as substring.
+    df = df[px.contains(df.dns_query_name, query_name_filter)]
+    df = df.groupby(['pod', 'dns_server', 'dns_query_name']).agg(
+        num_requests=('request_resolved', px.count),
+        resolved=('request_resolved', px.mean),
+        latency=('resp_latency_ns', px.quantiles)
+    )
+
+    df.resolved = px.Percent(df.resolved)
+
+    return df[['pod', 'dns_server', 'dns_query_name', 'num_requests', 'resolved', 'latency']]
+px.display(dns_requests('-5m', 'google.com'))
+)pxl";
+TEST_F(LogicalPlannerTest, issues_with_missing_col) {
+  auto planner = LogicalPlanner::Create(info_).ConsumeValueOrDie();
+  auto state = testutils::CreateTwoPEMsOneKelvinPlannerState(testutils::kHttpEventsSchema);
+  ASSERT_OK_AND_ASSIGN(auto plan, planner->Plan(MakeQueryRequest(state, kIssuesWithMissingCol)));
+  ASSERT_OK(plan->ToProto());
+}
+
 const char kDuplicateColNameError[] = R"pxl(
 import px
 
@@ -881,6 +930,10 @@ def dns_flow_graph():
   # Create table in drawer.
   px.debug(df, "dns_events")
   
+  # This should be pulled up to the PEM because it will inherit the pod column
+  # from the previous Map
+  # I20240925 17:28:45.475548    12 splitter.cc:219] Found metadata in map expr: Column(id=80, name=pod)
+
   df.to_entity = px.select(df.remote_addr == '127.0.0.1',
                            px.upid_to_pod_name(df.upid),
                            px.Service(px.nslookup(df.remote_addr)))

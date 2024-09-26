@@ -49,15 +49,14 @@ class ConvertMetadataRule : public Rule {
 
   Status AddMetadataMapToRootAncestor(IR* graph, std::vector<int64_t> parent_in,
                                       const std::pair<std::string, std::string>& col_names,
-                                      ExpressionIR* metadata_expr, ExpressionIR* fallback_expr);
+                                      ExpressionIR* metadata_expr, ExpressionIR* fallback_expr, std::string func_name);
 
   StatusOr<std::string> FindKeyColumn(std::shared_ptr<TableType> parent_type,
                                       MetadataProperty* property, IRNode* node_for_error) const;
 
   std::string GetUniquePodNameCol(std::shared_ptr<TableType> parent_type);
 
-  uint64_t col_name_counter_ = 0;
-  std::map<std::pair<std::string, MemorySourceIR*>, std::string> applied_md_exprs_;
+  std::map<std::pair<std::string, OperatorIR*>, std::string> applied_md_exprs_;
   /* absl::flat_hash_set<OperatorIR*> visited_root_ops_; */
 };
 

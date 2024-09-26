@@ -41,13 +41,15 @@ namespace {
     auto graph = node->graph();
     auto node_id = node->id();
     auto parents = graph->dag().ParentsOf(node_id);
+    /* LOG(INFO) << "Parents size: " << parents.size(); */
     while (parents.size() > 0) {
       node_id = parents[0];
       /* LOG(INFO) << "Node debug string: " << graph->Get(node_id)->DebugString(); */
       parents = graph->dag().ParentsOf(node_id);
     }
-    if (Match(graph->Get(node_id), MemorySource())) {
-      return static_cast<MemorySourceIR*>(node);
+    auto root_node = graph->Get(node_id);
+    if (Match(root_node, MemorySource())) {
+      return static_cast<MemorySourceIR*>(root_node);
     }
     return error::Internal("Could not find root memory source for node: $0", node->DebugString());
   }
@@ -55,7 +57,8 @@ namespace {
 
 std::string ConvertMetadataRule::GetUniquePodNameCol(std::shared_ptr<TableType> parent_type) {
   do {
-    auto new_col = absl::StrCat("pod_name_", col_name_counter_++);
+    auto col_name_counter = 0;
+    auto new_col = absl::StrCat("pod_name_", col_name_counter++);
     if (!parent_type->HasColumn(new_col)) {
       return new_col;
     }
@@ -64,7 +67,7 @@ std::string ConvertMetadataRule::GetUniquePodNameCol(std::shared_ptr<TableType> 
 
 Status ConvertMetadataRule::AddMetadataMapToRootAncestor(
     IR* graph, std::vector<int64_t> parents_in, const std::pair<std::string, std::string>& col_names,
-    ExpressionIR* metadata_expr, ExpressionIR* fallback_expr) {
+    ExpressionIR* metadata_expr, ExpressionIR* fallback_expr, std::string func_name) {
   auto root_id = parents_in[0];
   auto parents = graph->dag().ParentsOf(parents_in[0]);
   while (parents.size() > 0) {
@@ -99,7 +102,7 @@ Status ConvertMetadataRule::AddMetadataMapToRootAncestor(
       PX_RETURN_IF_ERROR(dep_op->ReplaceParent(root_op, child_map_ir));
     }
   }
-  /* visited_root_ops_.insert(std::make_pair(col_names.second, root_op}); */
+  applied_md_exprs_.insert({std::make_pair(func_name, root_op), col_names.second});
 
   PX_RETURN_IF_ERROR(PropagateTypeChangesFromNode(graph, map_ir, compiler_state_));
   PX_RETURN_IF_ERROR(PropagateTypeChangesFromNode(graph, child_map_ir, compiler_state_));
@@ -162,6 +165,8 @@ StatusOr<bool> ConvertMetadataRule::Apply(IRNode* ir_node) {
   auto parent_op_idx = metadata->container_op_parent_idx();
   auto column_type = md_property->column_type();
   auto md_type = md_property->metadata_type();
+  /* LOG(INFO) << "Applying ConvertMetadataRule to node: " << ir_node->DebugString(); */
+  /* LOG(INFO) << "Graph before: " << graph->DebugString(); */
 
   PX_ASSIGN_OR_RETURN(auto parent, metadata->ReferencedOperator());
   PX_ASSIGN_OR_RETURN(auto containing_ops, metadata->ContainingOperators());
@@ -178,15 +183,18 @@ StatusOr<bool> ConvertMetadataRule::Apply(IRNode* ir_node) {
       CheckBackupConversionAvailable(parent->resolved_table_type(), func_name);
 
   PX_ASSIGN_OR_RETURN(auto parent_mem_src, FindRootMemSrc(metadata));
+  /* LOG(INFO) << "Parent mem src: " << parent_mem_src->DebugString(); */
+  /* LOG(INFO) << "applied_md_exprs_ size: " << applied_md_exprs_.size(); */
   // Reuse the conversion function if it has already been applied to the metadata expression.
-  auto applied_md_exprs_key = std::make_pair(func_name, parent_mem_src);
+  auto applied_md_exprs_key = std::make_pair(func_name, static_cast<OperatorIR*>(parent_mem_src));
   if (backup_conversion_available && applied_md_exprs_.find(applied_md_exprs_key) != applied_md_exprs_.end()) {
     for (int64_t parent_id : graph->dag().ParentsOf(metadata->id())) {
       PX_ASSIGN_OR_RETURN(auto md_expr, graph->CreateNode<ColumnIR>(
                                                  ir_node->ast(), applied_md_exprs_[applied_md_exprs_key], parent_op_idx));
       PX_RETURN_IF_ERROR(UpdateMetadataContainer(graph->Get(parent_id), metadata, md_expr));
+      md_expr->set_annotations(ExpressionIR::Annotations(md_type));
     }
-    LOG(INFO) << "Applied already applied md conversion: " << graph->DebugString();
+    /* LOG(INFO) << "Applied already applied md conversion: " << graph->DebugString(); */
     return true;
   }
   PX_ASSIGN_OR_RETURN(
@@ -210,7 +218,7 @@ StatusOr<bool> ConvertMetadataRule::Apply(IRNode* ir_node) {
     PX_ASSIGN_OR_RETURN(ColumnIR * time_col,
                         graph->CreateNode<ColumnIR>(ir_node->ast(), "time_", parent_op_idx));
     PX_ASSIGN_OR_RETURN(
-        ColumnIR * pod_name_col,
+        ColumnIR* pod_name_col,
         graph->CreateNode<ColumnIR>(ir_node->ast(), col_names.first, parent_op_idx));
 
     PX_ASSIGN_OR_RETURN(
@@ -245,8 +253,9 @@ StatusOr<bool> ConvertMetadataRule::Apply(IRNode* ir_node) {
   auto md_parents = graph->dag().ParentsOf(metadata->id());
   if (orig_conversion_func != conversion_func && md_parents.size() > 0) {
     for (int64_t parent_id : md_parents) {
+      /* LOG(INFO) << "Adding map to Parent id ancestors: " << parent_id; */
       PX_RETURN_IF_ERROR(AddMetadataMapToRootAncestor(graph, {parent_id}, col_names, orig_conversion_func,
-                                                      conversion_func));
+                                                      conversion_func, func_name));
     }
     /* PX_RETURN_IF_ERROR(AddMetadataMapToRootAncestor(graph, md_parents, col_names, */
     /*                                                 orig_conversion_func, conversion_func)); */
@@ -265,11 +274,13 @@ StatusOr<bool> ConvertMetadataRule::Apply(IRNode* ir_node) {
   DCHECK_EQ(conversion_func->EvaluatedDataType(), column_type)
       << "Expected the parent key column type and metadata property type to match.";
   if (backup_conversion_available) {
-    ip_conversion_func->set_annotations(ExpressionIR::Annotations(md_type));
-    backup_conversion_func->set_annotations(ExpressionIR::Annotations(md_type));
+    /* ip_conversion_func->set_annotations(ExpressionIR::Annotations(md_type)); */
+    /* backup_conversion_func->set_annotations(ExpressionIR::Annotations(md_type)); */
+    col_conversion_func->set_annotations(ExpressionIR::Annotations(md_type));
   }
   orig_conversion_func->set_annotations(ExpressionIR::Annotations(md_type));
-  LOG(INFO) << "Graph after md conversion: " << graph->DebugString();
+  /* LOG(INFO) << "After conversion applied_md_exprs_ size: " << applied_md_exprs_.size(); */
+  /* LOG(INFO) << "Graph after md conversion: " << graph->DebugString(); */
   return true;
 }
 
