@@ -216,6 +216,7 @@ bool MustBeOnPemMap(OperatorIR* op) {
   MapIR* map = static_cast<MapIR*>(op);
   for (const auto& expr : map->col_exprs()) {
     if (MatchMetadataOrSubExpression(expr.node)) {
+      /* LOG(INFO) << "Map matched for on PEM: " << expr.node->DebugString(); */
       return true;
     }
   }

@@ -54,7 +54,7 @@ class ConvertMetadataRule : public Rule {
   StatusOr<std::string> FindKeyColumn(std::shared_ptr<TableType> parent_type,
                                       MetadataProperty* property, IRNode* node_for_error) const;
 
-  std::string GetUniquePodNameCol(std::shared_ptr<TableType> parent_type);
+  std::string GetUniquePodNameCol(std::shared_ptr<TableType> parent_type, absl::flat_hash_set<std::string>& used_column_names);
 
   std::map<std::pair<std::string, OperatorIR*>, std::string> applied_md_exprs_;
   /* absl::flat_hash_set<OperatorIR*> visited_root_ops_; */

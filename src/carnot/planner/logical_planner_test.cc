@@ -832,6 +832,7 @@ const char kPodNameFallbackConversion[] = R"pxl(
 import px
 
 df = px.DataFrame(table='http_events', start_time='-6m')
+df = df.drop(['content_type'])
 df.pod = df.ctx['pod']
 
 px.display(df)

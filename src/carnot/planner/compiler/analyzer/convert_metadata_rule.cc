@@ -33,18 +33,11 @@ namespace compiler {
 
 namespace {
   StatusOr<MemorySourceIR*> FindRootMemSrc(IRNode* node) {
-    /* auto parents = node->parents(); */
-    /* while (parents.size() > 0) { */
-    /*   node = parents[0]; */
-    /*   parents = node->parents(); */
-    /* } */
     auto graph = node->graph();
     auto node_id = node->id();
     auto parents = graph->dag().ParentsOf(node_id);
-    /* LOG(INFO) << "Parents size: " << parents.size(); */
     while (parents.size() > 0) {
       node_id = parents[0];
-      /* LOG(INFO) << "Node debug string: " << graph->Get(node_id)->DebugString(); */
       parents = graph->dag().ParentsOf(node_id);
     }
     auto root_node = graph->Get(node_id);
@@ -55,11 +48,12 @@ namespace {
   }
 }
 
-std::string ConvertMetadataRule::GetUniquePodNameCol(std::shared_ptr<TableType> parent_type) {
+std::string ConvertMetadataRule::GetUniquePodNameCol(std::shared_ptr<TableType> parent_type, absl::flat_hash_set<std::string>& used_column_names) {
+  auto col_name_counter = 0;
   do {
-    auto col_name_counter = 0;
     auto new_col = absl::StrCat("pod_name_", col_name_counter++);
-    if (!parent_type->HasColumn(new_col)) {
+    if (!used_column_names.contains(new_col) && !parent_type->HasColumn(new_col)) {
+      used_column_names.insert(new_col);
       return new_col;
     }
   } while (true);
@@ -78,10 +72,8 @@ Status ConvertMetadataRule::AddMetadataMapToRootAncestor(
   DCHECK(Match(root_node, Operator()));
 
   auto root_op = static_cast<OperatorIR*>(graph->Get(root_id));
-  /* if (visited_root_ops_.find(root_op) != visited_root_ops_.end()) { */
-  /*   return Status::OK(); */
-  /* } */
 
+  /* LOG(INFO) << "Adding map to root ancestor: " << root_op->DebugString(); */
   auto table_type = root_op->resolved_table_type();
   PX_ASSIGN_OR_RETURN(
       auto map_ir,
@@ -210,8 +202,9 @@ StatusOr<bool> ConvertMetadataRule::Apply(IRNode* ir_node) {
   FuncIR* backup_conversion_func = nullptr;
   FuncIR* ip_conversion_func = nullptr;
   if (backup_conversion_available) {
-    col_names = std::make_pair(GetUniquePodNameCol(resolved_table_type),
-                               GetUniquePodNameCol(resolved_table_type));
+    absl::flat_hash_set<std::string> used_column_names;
+    col_names = std::make_pair(GetUniquePodNameCol(resolved_table_type, used_column_names),
+                               GetUniquePodNameCol(resolved_table_type, used_column_names));
 
     PX_ASSIGN_OR_RETURN(ColumnIR * local_addr_col,
                         graph->CreateNode<ColumnIR>(ir_node->ast(), "local_addr", parent_op_idx));
@@ -257,19 +250,27 @@ StatusOr<bool> ConvertMetadataRule::Apply(IRNode* ir_node) {
       PX_RETURN_IF_ERROR(AddMetadataMapToRootAncestor(graph, {parent_id}, col_names, orig_conversion_func,
                                                       conversion_func, func_name));
     }
+    /* LOG(INFO) << "Finished AddMetadataMapToRootAncestor"; */
+    /* LOG(INFO) << "Graph after AddMetadataMapToRootAncestor: " << graph->DebugString(); */
     /* PX_RETURN_IF_ERROR(AddMetadataMapToRootAncestor(graph, md_parents, col_names, */
     /*                                                 orig_conversion_func, conversion_func)); */
   }
   for (int64_t parent_id : md_parents) {
     // For each container node of the metadata expression, update it to point to the
     // new conversion func instead.
+    /* LOG(INFO) << "Updating metadata container parent: " << graph->Get(parent_id)->DebugString(); */
     PX_RETURN_IF_ERROR(
         UpdateMetadataContainer(graph->Get(parent_id), metadata, col_conversion_func));
-    PX_RETURN_IF_ERROR(PropagateTypeChangesFromNode(graph, graph->Get(parent_id), compiler_state_));
+    /* PX_RETURN_IF_ERROR(PropagateTypeChangesFromNode(graph, col_conversion_func, compiler_state_)); */
+    /* LOG(INFO) << "Finished UpdateMetadataContainer"; */
   }
 
   // Propagate type changes from the new conversion_func.
   PX_RETURN_IF_ERROR(PropagateTypeChangesFromNode(graph, conversion_func, compiler_state_));
+  for (auto containing_op : containing_ops) {
+    PX_RETURN_IF_ERROR(PropagateTypeChangesFromNode(graph, containing_op, compiler_state_));
+  }
+  /* LOG(INFO) << "Finished PropagateTypeChangesFromNode"; */
 
   DCHECK_EQ(conversion_func->EvaluatedDataType(), column_type)
       << "Expected the parent key column type and metadata property type to match.";

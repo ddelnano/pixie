@@ -125,7 +125,8 @@ Status ColumnIR::ResolveType(CompilerState* /* compiler_state */,
   auto parent_table = std::static_pointer_cast<TableType>(parent_types[container_op_parent_idx_]);
   auto type_or_s = parent_table->GetColumnType(col_name_);
   if (!type_or_s.ok()) {
-    return CreateIRNodeError("Column '$0' not found in parent dataframe", col_name_);
+    LOG(INFO) << "Happening on parent: " << parent_table->DebugString() << " with size=" << parent_types.size() << " and child: " << DebugString();
+    return CreateIRNodeError("Column '$0' not found in parent dataframe...", col_name_);
   }
   auto type = type_or_s.ConsumeValueOrDie();
   return SetResolvedType(type->Copy());
