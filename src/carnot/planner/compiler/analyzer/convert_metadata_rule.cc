@@ -231,11 +231,12 @@ StatusOr<bool> ConvertMetadataRule::Apply(IRNode* ir_node) {
 
   DCHECK_EQ(conversion_func->EvaluatedDataType(), column_type)
       << "Expected the parent key column type and metadata property type to match.";
-  if (backup_conversion_func != nullptr) {
+  if (backup_conversion_available) {
+    // These annotations ensure that the OperatorIRs will run on PEMs
     backup_conversion_func->set_annotations(ExpressionIR::Annotations(md_type));
+    col_conversion_func->set_annotations(ExpressionIR::Annotations(md_type));
   }
   orig_conversion_func->set_annotations(ExpressionIR::Annotations(md_type));
-  /* col_conversion_func->set_annotations(ExpressionIR::Annotations(md_type)); */
   return true;
 }
 

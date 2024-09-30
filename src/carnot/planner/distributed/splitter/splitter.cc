@@ -255,7 +255,7 @@ void Splitter::ConstructGRPCBridgeTree(
   for (OperatorIR* child : op->Children()) {
     if (ignore_children.contains(child)) {
       if (MustBeOnPem(child)) {
-        LOG(ERROR) << "must be on PEM, but not found: " << child->DebugString();
+        /* LOG(ERROR) << "must be on PEM, but not found: " << child->DebugString(); */
       }
       continue;
     }
