@@ -20,6 +20,7 @@
 
 #include <memory>
 #include <string>
+#include <utility>
 
 #include "src/carnot/planner/compiler_state/compiler_state.h"
 #include "src/carnot/planner/rules/rules.h"
@@ -39,20 +40,16 @@ class ConvertMetadataRule : public Rule {
 
  protected:
   StatusOr<bool> Apply(IRNode* ir_node) override;
-  Status AddOptimisticPodNameConversionMap(IR* graph,
-                                           IRNode* container,
+  Status AddOptimisticPodNameConversionMap(IR* graph, IRNode* container,
                                            ExpressionIR* metadata_expr,
                                            ExpressionIR* metadata_expr_with_fallback,
                                            std::pair<std::string, std::string> col_names) const;
   /**
    * @brief Updates any parents of the metadata node to point to the new metadata expression.
    */
-  Status UpdateMetadataContainer(IR* graph,
-                                 IRNode* container,
-                                 MetadataIR* metadata,
+  Status UpdateMetadataContainer(IR* graph, IRNode* container, MetadataIR* metadata,
                                  ExpressionIR* metadata_expr,
-                                 ExpressionIR* metadata_expr_with_fallback,
-                                 ExpressionIR* expr,
+                                 ExpressionIR* metadata_expr_with_fallback, ExpressionIR* expr,
                                  std::pair<std::string, std::string> col_names) const;
   StatusOr<std::string> FindKeyColumn(std::shared_ptr<TableType> parent_type,
                                       MetadataProperty* property, IRNode* node_for_error) const;

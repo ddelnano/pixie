@@ -861,8 +861,8 @@ class RulesTest : public OperatorTests {
                                       types::DataType::FLOAT64, types::DataType::FLOAT64}),
         std::vector<std::string>({"count", "cpu0", "cpu1", "cpu2"}));
     http_events_relation = table_store::schema::Relation(
-        std::vector<types::DataType>({types::DataType::TIME64NS, types::DataType::STRING,
-                                      types::DataType::INT64}),
+        std::vector<types::DataType>(
+            {types::DataType::TIME64NS, types::DataType::STRING, types::DataType::INT64}),
         std::vector<std::string>({"time_", "local_addr", "local_port"}));
     semantic_rel =
         Relation({types::INT64, types::FLOAT64, types::STRING}, {"bytes", "cpu", "str_col"},
