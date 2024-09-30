@@ -149,8 +149,8 @@ TEST_F(ConvertMetadataRuleTest, multichild_with_fallback_func) {
   auto converted_md_func = static_cast<FuncIR*>(converted_md);
   EXPECT_MATCH(converted_md_func, ResolvedExpression());
 
-  // When the fallback is provided, the compiler will make the following transfomation (pseudo code):
-  // Before:
+  // When the fallback is provided, the compiler will make the following transfomation (pseudo
+  // code): Before:
   //   df.ctx["pod"]
   //
   // After:

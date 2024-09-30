@@ -54,8 +54,9 @@ class LogicalPlannerTest : public ::testing::Test {
     *query_request.mutable_logical_planner_state() = state;
     return query_request;
   }
-  plannerpb::QueryRequest MakeQueryRequestWithExecArgs(const distributedpb::LogicalPlannerState& state,
-                                           const std::string& query, const std::vector<std::string>& exec_funcs) {
+  plannerpb::QueryRequest MakeQueryRequestWithExecArgs(
+      const distributedpb::LogicalPlannerState& state, const std::string& query,
+      const std::vector<std::string>& exec_funcs) {
     plannerpb::QueryRequest query_request;
     query_request.set_query_str(query);
     *query_request.mutable_logical_planner_state() = state;
@@ -857,7 +858,8 @@ TEST_F(LogicalPlannerTest, pod_name_missing_cal) {
   auto planner = LogicalPlanner::Create(info_).ConsumeValueOrDie();
   auto state = testutils::CreateTwoPEMsOneKelvinPlannerState(testutils::kHttpEventsSchema);
   ASSERT_OK_AND_ASSIGN(
-      auto plan, planner->Plan(MakeQueryRequestWithExecArgs(state, kPodNameMissingCol, {"cql_flow_graph", "cql_summary_with_links"})));
+      auto plan, planner->Plan(MakeQueryRequestWithExecArgs(
+                     state, kPodNameMissingCol, {"cql_flow_graph", "cql_summary_with_links"})));
   ASSERT_OK(plan->ToProto());
 }
 
@@ -866,10 +868,10 @@ import px
 def dns_flow_graph():
   df = px.DataFrame('http_events', start_time='-5m')
   df.pod = df.ctx['pod']
-  
+
   # Create table in drawer.
   px.debug(df, "dns_events")
-  
+
   df.to_entity = px.select(df.remote_addr == '127.0.0.1',
                            px.upid_to_pod_name(df.upid),
                            px.Service(px.nslookup(df.remote_addr)))
@@ -878,8 +880,8 @@ def dns_flow_graph():
 TEST_F(LogicalPlannerTest, broken_upid_to_pod_name_query) {
   auto planner = LogicalPlanner::Create(info_).ConsumeValueOrDie();
   auto state = testutils::CreateTwoPEMsOneKelvinPlannerState(testutils::kHttpEventsSchema);
-  ASSERT_OK_AND_ASSIGN(
-      auto plan, planner->Plan(MakeQueryRequestWithExecArgs(state, kBrokenUpidToPodNameQuery, {"dns_flow_graph"})));
+  ASSERT_OK_AND_ASSIGN(auto plan, planner->Plan(MakeQueryRequestWithExecArgs(
+                                      state, kBrokenUpidToPodNameQuery, {"dns_flow_graph"})));
   ASSERT_OK(plan->ToProto());
 }
 
