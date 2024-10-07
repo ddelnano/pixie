@@ -1,0 +1,20 @@
++--------------------+-----+
+|        service_name|count|
++--------------------+-----+
+|         {front-end}| 6173|
+|{["pl-nats","pl-n...|   18|
+|          {kube-dns}|  110|
+|      {queue-master}|   80|
+|{vizier-metadata-...|   45|
+|          {shipping}|  604|
+|            {orders}|  769|
+|              {user}| 4765|
+|             {carts}| 2908|
+|         {catalogue}| 1403|
+|                  {}|  246|
+|           {payment}|  789|
+|{["pl-nats-mgmt",...|   12|
+|      {gmp-operator}|   10|
+|{default-http-bac...|    5|
++--------------------+-----+
+
