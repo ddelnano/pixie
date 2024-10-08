@@ -21,14 +21,18 @@ def compute_authz_service_mapping(df):
     file and awss3 exporters are two examples of this.
     """
     resources_df = df.select(explode(col("resourceSpans")))
-    resources_df = resources_df.select("*").withColumn("resource_attrs", explode(col("col.resource.attributes"))).filter(col("resource_attrs.key") == "service.name").withColumn("service_name", col("resource_attrs.value.stringValue"))
+    resources_df = resources_df.withColumn("resource_attrs", explode(col("col.resource.attributes"))).filter(col("resource_attrs.key") == "service.name").withColumn("service_name", col("resource_attrs.value.stringValue"))
     resources_df.drop("resource_attrs")
 
-    df_exploded_scopespans = resources_df.withColumn("scopespans_exploded", explode("col.scopeSpans"))
-    df_exploded_spans = (df_exploded_scopespans.withColumn("spans_exploded", explode("scopespans_exploded.spans"))
+    df_exploded_scopespans = (resources_df
+        .withColumn("scopespans_exploded", explode("col.scopeSpans")))
+
+    df_exploded_spans = (df_exploded_scopespans
+        .withColumn("spans_exploded", explode("scopespans_exploded.spans"))
         .drop("scopespans_exploded"))
 
-    df_exploded_attributes = (df_exploded_spans.withColumn("span_attributes", explode("spans_exploded.attributes"))
+    df_exploded_attributes = (df_exploded_spans
+        .withColumn("span_attributes", explode("spans_exploded.attributes"))
         .withColumn("spanId", col("spans_exploded.spanId"))
         .drop("spans_exploded"))
 
