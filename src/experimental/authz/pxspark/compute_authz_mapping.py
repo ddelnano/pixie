@@ -1,5 +1,11 @@
 from pyspark.sql.dataframe import DataFrame
-from pyspark.sql.functions import col, collect_set, explode, first, first_value, lower, when
+from pyspark.sql.functions import col, collect_set, explode, first, first_value, lower, udf, when
+from pyspark.sql.types import StringType
+
+# More complex URL clustering/prefix matching can be done to scope L7 authz rules
+# more tightly. An example of how to extend this would be to use your services' OpenAPI
+# (Swagger) specs to extract route information from the URL and use that as the prefix.
+from pxspark.udfs import extract_url_prefix
 
 IGNORE_REQ_SUBSTRS = [
     "metrics", # Ignore /metrics requests
@@ -8,6 +14,12 @@ IGNORE_REQ_SUBSTRS = [
 ]
 
 def compute_authz_service_mapping(df):
+    """
+    compute_authz_service_mapping expects a Dataframe created from OpenTelemetry's
+    opentelemetry.proto.trace.v1.ResourceSpan protobuf message type. The OTel collector
+    exports this type for trace data when using a variety of its collectors. The
+    file and awss3 exporters are two examples of this.
+    """
     resources_df = df.select(explode(col("resourceSpans")))
     resources_df = resources_df.select("*").withColumn("resource_attrs", explode(col("col.resource.attributes"))).filter(col("resource_attrs.key") == "service.name").withColumn("service_name", col("resource_attrs.value.stringValue"))
     resources_df.drop("resource_attrs")
@@ -27,7 +39,7 @@ def compute_authz_service_mapping(df):
         .groupBy("spanId")
         .agg(
             first(when(col("span_attributes.key") == "client.k8s.deployment.name", col("span_attributes.value.stringValue")), ignorenulls=True).alias("client_name"),
-            first(when(col("span_attributes.key") == "http.target", col("span_attributes.value.stringValue")), ignorenulls=True).alias("http_target"),
+            first(when(col("span_attributes.key") == "http.target", extract_url_prefix(col("span_attributes.value.stringValue"))), ignorenulls=True).alias("http_target"),
             first(when(col("span_attributes.key") == "http.method", col("span_attributes.value.stringValue")), ignorenulls=True).alias("http_method"),
             first(col("service_name")).alias("service_name"),
         )

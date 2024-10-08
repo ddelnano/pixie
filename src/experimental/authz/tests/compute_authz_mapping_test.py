@@ -2,7 +2,7 @@ import pytest
 
 from pyspark.testing.utils import assertDataFrameEqual
 
-from compute_authz_mapping import compute_authz_service_mapping
+from pxspark.compute_authz_mapping import compute_authz_service_mapping
 
 @pytest.fixture
 def spark_fixture():
