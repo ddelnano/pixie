@@ -132,7 +132,10 @@ KERNEL_BUILD_VERSIONS := 4.14.254 \
 	5.10.224 \
 	5.15.165 \
 	6.1.106 \
-	6.8.12
+	6.8.12 \
+	6.9.12 \
+	6.10.12 \
+	6.11.1
 
 KERNEL_BUILD_TEMPLATE := linux-build-%.tar.gz
 KERNEL_BUILD_TARGETS = $(addprefix $(KERNEL_BUILD_DIR)/, $(patsubst %,$(KERNEL_BUILD_TEMPLATE), $(KERNEL_BUILD_VERSIONS)))
@@ -234,8 +237,8 @@ $(LINUX_HEADERS_ARM64_MERGED_FILE): $(LINUX_HEADER_ARM64_TARGETS)
 
 .PHONY: upload_linux_headers
 upload_linux_headers:  $(LINUX_HEADERS_X86_64_MERGED_FILE) $(LINUX_HEADERS_ARM64_MERGED_FILE) ## Target to build and upload linux headers image
-	gsutil cp $^ $(LINUX_HEADERS_GS_PATH)
-	$(GH_RELEASE_UPLOAD) linux-headers $(LINUX_HEADERS_REV) $^
+	# gsutil cp $^ $(LINUX_HEADERS_GS_PATH)
+	# $(GH_RELEASE_UPLOAD) linux-headers $(LINUX_HEADERS_REV) $^
 	sha256sum $^
 
 ##############################################
@@ -285,8 +288,8 @@ $(KERNEL_BUILD_DIR)/linux-build-%.tar.gz: kernel_builder/Dockerfile kernel_build
 	$(DOCKER) run --rm -v $(PWD)/$(KERNEL_BUILD_DIR):/output "$${kernel_builder_image_tag}"
 
 .PHONY: upload_kernel_build
-upload_kernel_build:  $(KERNEL_BUILD_TARGETS)
-	$(GH_RELEASE_UPLOAD) kernel-build $(KERNEL_BUILD_TS) $^
+upload_kernel_build:
+	$(GH_RELEASE_UPLOAD) kernel-build $(KERNEL_BUILD_TS) $$(find  .build/kernel_build/ -type f | paste -sd " ")
 	@echo "Add this to the qemu bzl file:"
 	@echo "============================="
 	@echo "kernel_build_date = ${KERNEL_BUILD_TS}"

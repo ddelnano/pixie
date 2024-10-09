@@ -16,15 +16,12 @@
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_file")
 
-kernel_build_date = 20240826223635
+kernel_build_date = 20241003053613
 kernel_catalog = {
-    "4.14.254": "007c1d9d7385c7aa9df8434b3c2a2c38963c88391d9f4b88d5ac67bbccbbccef",
-    "4.19.254": "946d914990ae5b2f6dae6ac0ecbc81c1f63df84832ecd7563c18e7dc99986d2f",
-    "5.4.254": "fbae23c3da8af04c2a039bff7a5926f71041506cd150d02209f1b1b10cd38329",
-    "5.10.224": "d5b3cd7282f0533fe1e2574a73f9164bc90fae1098fe0284cf37a2995ce0e762",
-    "5.15.165": "0b70925e4497d74d99fd43544b259c5ed2dbc4c91c4cf702f872698a2bf7d80d",
-    "6.1.106": "fa03bd44bd6a5a7e1dcf1ee6a1790add4f2297d85cfffdc61b52f123eda27dc7",
-    "6.8.12": "06db1941423384c4b956d1e7a46a888a5647d15504ee31fe8ae8bdff264f1678",
+    # "6.8.12": "06db1941423384c4b956d1e7a46a888a5647d15504ee31fe8ae8bdff264f1678",
+    # "6.9.12": "c4defd2a18b8678040659b7c9674b276b845213a0874a7276de76e72327a5768",
+    # "6.10.12": "fd3f99d8b3d30327d94c38d7f8fe014c265b9ad93f41e463e01201d05423faa3",
+    "6.11.1": "e72d94a5353063325abdeecebadb6fd109eb035c1c30a0bbade34bddf5564890",
 }
 
 
@@ -36,7 +33,7 @@ def qemu_kernel_deps():
         http_file(
             name = kernel_version_to_name(version),
             urls = [
-                "https://github.com/pixie-io/dev-artifacts/releases/download/kernel-build%2F{}/linux-build-{}.tar.gz".format(kernel_build_date, version),
+                "https://github.com/ddelnano/dev-artifacts/releases/download/kernel-build%2F{}/linux-build-{}.tar.gz".format(kernel_build_date, version),
             ],
             sha256 = sha,
             downloaded_file_path = "linux-build.tar.gz",

@@ -28,11 +28,10 @@ def linux_headers():
     http_file(
         name = "linux_headers_merged_x86_64_tar_gz",
         urls = [
-            "https://github.com/pixie-io/dev-artifacts/releases/download/linux-headers%2Fpl6/linux-headers-merged-x86_64-pl6.tar.gz",
-            "https://storage.googleapis.com/pixie-dev-public/linux-headers/pl6/linux-headers-merged-x86_64-pl6.tar.gz",
+            "https://github.com/ddelnano/dev-artifacts/releases/download/linux-headers%2Fp7/linux-headers-merged-x86_64-pl7.tar.gz",
         ],
-        sha256 = "b99ac9def26c0c1ef03f34583a1e62b96b3b5f8b038428fa582ed28aacbe0ac3",
-        downloaded_file_path = "linux-headers-merged-x86_64.tar.gz",
+        sha256 = "6b922a58d170b2360f072d6f35bf30d3e2acff621ddb16a2c5eaad4c31f65f7c",
+        downloaded_file_path = "linux-headers-merged-x86_64-pl8.tar.gz",
     )
     http_file(
         name = "linux_headers_merged_arm64_tar_gz",
