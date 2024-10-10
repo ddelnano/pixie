@@ -49,6 +49,7 @@
 #include "src/stirling/source_connectors/socket_tracer/protocols/http2/grpc.h"
 #include "src/stirling/utils/linux_headers.h"
 #include "src/stirling/utils/proc_path_tools.h"
+#include "src/stirling/obj_tools/address_converter.h"
 
 // 50 X less often than the normal sampling frequency. Based on the conn_stats_table.h's
 // sampling period of 5 seconds, and other tables' 100 milliseconds.
@@ -186,6 +187,7 @@ DEFINE_uint32(stirling_bpf_chunk_limit, 4,
               "This applies to messages that are over MAX_MSG_SIZE.");
 
 OBJ_STRVIEW(socket_trace_bcc_script, socket_trace);
+OBJ_STRVIEW(insn_limit_probe_bcc_script, insn_probe);
 
 namespace px {
 namespace stirling {
@@ -194,6 +196,7 @@ using px::stirling::bpf_tools::WrappedBCCPerCPUArrayTable;
 using px::system::ProcPath;
 using px::system::ProcPidPath;
 using px::utils::ToJSONString;
+using ::px::stirling::bpf_tools::UProbeSpec;
 
 // Most HTTP servers support 8K headers, so we truncate after that.
 // https://stackoverflow.com/questions/686217/maximum-on-http-header-values
@@ -457,18 +460,43 @@ auto SocketTraceConnector::InitPerfBufferSpecs() {
   return specs;
 }
 
+extern "C" {
+NO_OPT_ATTR void StirlingFeatureProbe() { return; }
+}
+
 Status SocketTraceConnector::InitBPF() {
   // set BPF loop limit and chunk limit based on kernel version
-  auto kernel = system::GetCachedKernelVersion();
-  if (kernel.version >= 5 || (kernel.version == 5 && kernel.major_rev >= 1)) {
+  auto insn_check = bcc_->InitBPFProgram(insn_limit_probe_bcc_script, {});
+  PX_ASSIGN_OR_RETURN(std::filesystem::path self_path, GetSelfPath());
+  PX_ASSIGN_OR_RETURN(auto elf_reader, obj_tools::ElfReader::Create(self_path.string()));
+  const int64_t pid = getpid();
+  PX_ASSIGN_OR_RETURN(auto converter,
+                      obj_tools::ElfAddressConverter::Create(elf_reader.get(), pid));
+  uint64_t symbol_addr =
+      converter->VirtualAddrToBinaryAddr(reinterpret_cast<uint64_t>(&StirlingFeatureProbe));
+  if (!insn_check.ok()) {
+    PX_RETURN_IF_ERROR(insn_check.status());
+  }
+  auto attach = bcc_->AttachUProbe(UProbeSpec{
+    .binary_path = "/proc/self/exe",
+    .symbol = {}, // Keep GCC happy.
+    .address = symbol_addr,
+    .attach_type = ProbeType::kEntry,
+    .probe_fn = "func",
+  });
+  if (attach.ok()) {
     // Kernels >= 5.1 have higher BPF instruction limits (1 million for verifier).
     // This enables a 21x increase to our loop and chunk limits
     FLAGS_stirling_bpf_loop_limit = 882;
     FLAGS_stirling_bpf_chunk_limit = 84;
+    auto kernel = system::GetCachedKernelVersion();
     LOG(INFO) << absl::Substitute(
         "Kernel version greater than V5.1 detected ($0), raised loop limit to $1 and chunk limit "
         "to $2",
         kernel.ToString(), FLAGS_stirling_bpf_loop_limit, FLAGS_stirling_bpf_chunk_limit);
+  } else {
+    LOG(INFO) << absl::Substitute(
+            "Probing for 1M instruction limit failed, using default loop limit of $0 and chunk limit $1. Error=$2", FLAGS_stirling_bpf_loop_limit, FLAGS_stirling_bpf_chunk_limit, insn_check.msg());
   }
   // PROTOCOL_LIST: Requires update on new protocols.
   std::vector<std::string> defines = {
@@ -488,6 +516,7 @@ Status SocketTraceConnector::InitBPF() {
       absl::StrCat("-DBPF_CHUNK_LIMIT=", FLAGS_stirling_bpf_chunk_limit),
   };
   PX_RETURN_IF_ERROR(bcc_->InitBPFProgram(socket_trace_bcc_script, defines));
+  LOG(INFO) << "BPF program initialized.";
 
   PX_RETURN_IF_ERROR(bcc_->AttachKProbes(kProbeSpecs));
   LOG(INFO) << absl::Substitute("Number of kprobes deployed = $0", kProbeSpecs.size());

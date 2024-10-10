@@ -269,6 +269,13 @@ class BCCWrapper {
 class BCCWrapperImpl : public BCCWrapper {
  public:
   int CommonPerfBufferSetup(const PerfBufferSpec& perf_buffer_spec);
+  /* BCCWrapperImpl() : bpf_(ebpf::DEBUG_BPF | ebpf::DEBUG_SOURCE) { } */
+  //   DEBUG_LLVM_IR = 0x1,
+  //   DEBUG_BPF = 0x2,
+  //   DEBUG_PREPROCESSOR = 0x4,
+  //   DEBUG_SOURCE = 0x8,
+  //   DEBUG_BPF_REGISTER_STATE = 0x10,
+  //   DEBUG_BTF = 0x20,
 
   virtual ~BCCWrapperImpl() {
     // Not really required, because BPF destructor handles these.

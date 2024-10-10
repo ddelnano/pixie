@@ -63,6 +63,11 @@ pl_bpf_cc_resource(
     ],
 )
 
+pl_bpf_cc_resource(
+    name = "insn_probe",
+    src = "feature_probe.c",
+)
+
 pl_cc_test(
     name = "protocol_inference_test",
     srcs = [
