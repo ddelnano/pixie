@@ -1,0 +1,24 @@
+{
+    "variables": [
+        {
+            "name": "pod",
+            "type": "PX_STRING",
+            "description": "Name of the pod to request the pprof from",
+            "defaultValue": "-5m"
+        }
+    ],
+   "globalFuncs": [
+        {
+            "outputName": "export_flame_graph",
+            "func": {
+                "name": "export_flame_graph",
+                "args": [
+                    {
+                        "name": "pod",
+                        "variable": "pod"
+                    }
+                ]
+            }
+        }
+    ]
+}
