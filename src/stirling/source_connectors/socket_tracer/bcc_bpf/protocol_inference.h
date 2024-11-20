@@ -60,6 +60,33 @@ static __inline enum message_type_t infer_http_message(const char* buf, size_t c
   return kUnknown;
 }
 
+static __inline enum message_type_t infer_tls_message(const char* buf, size_t count) {
+  if (count < 6) {
+    return kUnknown;
+  }
+
+  uint8_t content_type = buf[0];
+  if (content_type != 0x14 && content_type != 0x15 && content_type != 0x16 &&
+      content_type != 0x17 && content_type != 0x18) {
+    return kUnknown;
+  }
+
+  uint16_t legacy_version = buf[1] << 8 | buf[2];
+  if (legacy_version < 0x0300 || legacy_version > 0x0304) {
+    return kUnknown;
+  }
+
+  uint8_t handshake_type = buf[5];
+  if (handshake_type == 0 || handshake_type == 2) {
+    return kResponse;
+  }
+  if (handshake_type == 1) {
+    return kRequest;
+  }
+
+  return kUnknown;
+}
+
 // Cassandra frame:
 //      0         8        16        24        32         40
 //      +---------+---------+---------+---------+---------+
@@ -699,7 +726,10 @@ static __inline struct protocol_message_t infer_protocol(const char* buf, size_t
   //               role by considering which side called accept() vs connect(). Once the clean-up
   //               above is done, the code below can be turned into a chained ternary.
   // PROTOCOL_LIST: Requires update on new protocols.
-  if (ENABLE_HTTP_TRACING && (inferred_message.type = infer_http_message(buf, count)) != kUnknown) {
+  if (ENABLE_TLS_TRACING && (inferred_message.type = infer_tls_message(buf, count)) != kUnknown) {
+    inferred_message.protocol = kProtocolTLS;
+  } else if (ENABLE_HTTP_TRACING &&
+             (inferred_message.type = infer_http_message(buf, count)) != kUnknown) {
     inferred_message.protocol = kProtocolHTTP;
   } else if (ENABLE_CQL_TRACING &&
              (inferred_message.type = infer_cql_message(buf, count)) != kUnknown) {
