@@ -186,6 +186,8 @@ struct Frame : public FrameBase {
   std::string session_id;
   std::vector<std::string> server_names;
 
+  bool consumed = false;
+
   size_t ByteSize() const override { return sizeof(Frame); }
 
   std::string ToString() const override { return absl::Substitute("TLS Frame [len=$0]", length); }
