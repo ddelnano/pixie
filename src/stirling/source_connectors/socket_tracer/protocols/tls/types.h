@@ -30,11 +30,11 @@ namespace protocols {
 namespace tls {
 
 enum class ContentType : uint8_t {
-  kChangeCipherSpec = 20,
-  kAlert = 21,
-  kHandshake = 22,
-  kApplicationData = 23,
-  kHeartbeat = 24,
+  kChangeCipherSpec = 0x14,
+  kAlert = 0x15,
+  kHandshake = 0x16,
+  kApplicationData = 0x17,
+  kHeartbeat = 0x18,
 };
 
 enum class LegacyVersion : uint16_t {
@@ -202,10 +202,12 @@ struct Record {
   }
 };
 
+using stream_id_t = uint16_t;
 struct ProtocolTraits : public BaseProtocolTraits<Record> {
   using frame_type = Frame;
   using record_type = Record;
   using state_type = NoState;
+  using key_type = stream_id_t;
 };
 
 }  // namespace tls

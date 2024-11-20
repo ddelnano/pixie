@@ -36,14 +36,6 @@ namespace stirling {
 namespace protocols {
 namespace tls {
 
-ParseState ParseFullFrame(BinaryDecoder* decoder, Frame* frame) {
-  PX_UNUSED(decoder);
-  PX_UNUSED(frame);
-  return ParseState::kSuccess;
-}
-
-}  // namespace tls
-
 constexpr size_t kTLSRecordHeaderLength = 5;
 constexpr size_t kExtensionMinimumLength = 4;
 constexpr size_t kSNIExtensionMinimumLength = 3;
@@ -72,46 +64,35 @@ StatusOr<ParseState> ExtractSNIExtension(std::vector<std::string>* server_names,
   return ParseState::kSuccess;
 }
 
-template <>
-ParseState ParseFrame(message_type_t, std::string_view* buf, tls::Frame* frame, NoState*) {
-  // TLS record header is 5 bytes. The size of the record is in bytes 4 and 5.
-  if (buf->length() < kTLSRecordHeaderLength) {
-    return ParseState::kNeedsMoreData;
-  }
-  uint16_t length = static_cast<uint16_t>((*buf)[3]) << 8 | static_cast<uint16_t>((*buf)[4]);
-  if (buf->length() < length + kTLSRecordHeaderLength) {
-    return ParseState::kNeedsMoreData;
-  }
+ParseState ParseFullFrame(BinaryDecoder* decoder, Frame* frame) {
 
-  BinaryDecoder decoder(*buf);
-
-  PX_ASSIGN_OR(auto raw_content_type, decoder.ExtractBEInt<uint8_t>(), return ParseState::kInvalid);
+  PX_ASSIGN_OR(auto raw_content_type, decoder->ExtractBEInt<uint8_t>(), return ParseState::kInvalid);
   auto content_type = magic_enum::enum_cast<tls::ContentType>(raw_content_type);
   if (!content_type.has_value()) {
     return ParseState::kInvalid;
   }
   frame->content_type = content_type.value();
 
-  PX_ASSIGN_OR(auto legacy_version, decoder.ExtractBEInt<uint16_t>(), return ParseState::kInvalid);
+  PX_ASSIGN_OR(auto legacy_version, decoder->ExtractBEInt<uint16_t>(), return ParseState::kInvalid);
   auto lv = magic_enum::enum_cast<tls::LegacyVersion>(legacy_version);
   if (!lv.has_value()) {
     return ParseState::kInvalid;
   }
   frame->legacy_version = lv.value();
 
-  PX_ASSIGN_OR(frame->length, decoder.ExtractBEInt<uint16_t>(), return ParseState::kInvalid);
+  PX_ASSIGN_OR(frame->length, decoder->ExtractBEInt<uint16_t>(), return ParseState::kInvalid);
 
   if (frame->content_type == tls::ContentType::kApplicationData ||
       frame->content_type == tls::ContentType::kChangeCipherSpec ||
       frame->content_type == tls::ContentType::kAlert ||
       frame->content_type == tls::ContentType::kHeartbeat) {
-    if (!decoder.ExtractBufIgnore(length).ok()) {
+    if (!decoder->ExtractBufIgnore(frame->length).ok()) {
       return ParseState::kInvalid;
     }
     return ParseState::kSuccess;
   }
 
-  PX_ASSIGN_OR(auto raw_handshake_type, decoder.ExtractBEInt<uint8_t>(),
+  PX_ASSIGN_OR(auto raw_handshake_type, decoder->ExtractBEInt<uint8_t>(),
                return ParseState::kInvalid);
   auto handshake_type = magic_enum::enum_cast<tls::HandshakeType>(raw_handshake_type);
   if (!handshake_type.has_value()) {
@@ -119,11 +100,11 @@ ParseState ParseFrame(message_type_t, std::string_view* buf, tls::Frame* frame, 
   }
   frame->handshake_type = handshake_type.value();
 
-  PX_ASSIGN_OR(auto handshake_length, decoder.ExtractBEInt<uint24_t>(),
+  PX_ASSIGN_OR(auto handshake_length, decoder->ExtractBEInt<uint24_t>(),
                return ParseState::kInvalid);
   frame->handshake_length = handshake_length;
 
-  PX_ASSIGN_OR(auto raw_handshake_version, decoder.ExtractBEInt<uint16_t>(),
+  PX_ASSIGN_OR(auto raw_handshake_version, decoder->ExtractBEInt<uint16_t>(),
                return ParseState::kInvalid);
   auto handshake_version = magic_enum::enum_cast<tls::LegacyVersion>(raw_handshake_version);
   if (!handshake_version.has_value()) {
@@ -132,47 +113,47 @@ ParseState ParseFrame(message_type_t, std::string_view* buf, tls::Frame* frame, 
   frame->handshake_version = handshake_version.value();
 
   // Skip the random struct.
-  if (!decoder.ExtractBufIgnore(kRandomStructLength).ok()) {
+  if (!decoder->ExtractBufIgnore(kRandomStructLength).ok()) {
     return ParseState::kInvalid;
   }
 
-  PX_ASSIGN_OR(auto session_id_len, decoder.ExtractBEInt<uint8_t>(), return ParseState::kInvalid);
+  PX_ASSIGN_OR(auto session_id_len, decoder->ExtractBEInt<uint8_t>(), return ParseState::kInvalid);
   if (session_id_len > 32) {
     return ParseState::kInvalid;
   }
 
-  PX_ASSIGN_OR(frame->session_id, decoder.ExtractString(session_id_len),
+  PX_ASSIGN_OR(frame->session_id, decoder->ExtractString(session_id_len),
                return ParseState::kInvalid);
 
-  PX_ASSIGN_OR(auto cipher_suite_length, decoder.ExtractBEInt<uint16_t>(),
+  PX_ASSIGN_OR(auto cipher_suite_length, decoder->ExtractBEInt<uint16_t>(),
                return ParseState::kInvalid);
-  decoder.ExtractString(cipher_suite_length);
+  decoder->ExtractString(cipher_suite_length);
 
-  PX_ASSIGN_OR(auto compression_methods_length, decoder.ExtractBEInt<uint8_t>(),
+  PX_ASSIGN_OR(auto compression_methods_length, decoder->ExtractBEInt<uint8_t>(),
                return ParseState::kInvalid);
-  if (!decoder.ExtractBufIgnore(compression_methods_length).ok()) {
+  if (!decoder->ExtractBufIgnore(compression_methods_length).ok()) {
     return ParseState::kInvalid;
   }
 
   // TODO(ddelnano): Test TLS 1.2 and earlier where extensions are not present
-  PX_ASSIGN_OR(auto extensions_length, decoder.ExtractBEInt<uint16_t>(),
+  PX_ASSIGN_OR(auto extensions_length, decoder->ExtractBEInt<uint16_t>(),
                return ParseState::kInvalid);
   if (extensions_length == 0) {
     return ParseState::kSuccess;
   }
 
   while (extensions_length > 0) {
-    PX_ASSIGN_OR(auto extension_type, decoder.ExtractBEInt<uint16_t>(),
+    PX_ASSIGN_OR(auto extension_type, decoder->ExtractBEInt<uint16_t>(),
                  return ParseState::kInvalid);
-    PX_ASSIGN_OR(auto extension_length, decoder.ExtractBEInt<uint16_t>(),
+    PX_ASSIGN_OR(auto extension_length, decoder->ExtractBEInt<uint16_t>(),
                  return ParseState::kInvalid);
 
     if (extension_type == 0x00) {
-      if (!ExtractSNIExtension(&frame->server_names, &decoder).ok()) {
+      if (!ExtractSNIExtension(&frame->server_names, decoder).ok()) {
         return ParseState::kInvalid;
       }
     } else {
-      if (!decoder.ExtractBufIgnore(extension_length).ok()) {
+      if (!decoder->ExtractBufIgnore(extension_length).ok()) {
         return ParseState::kInvalid;
       }
     }
@@ -181,6 +162,27 @@ ParseState ParseFrame(message_type_t, std::string_view* buf, tls::Frame* frame, 
   }
 
   return ParseState::kSuccess;
+}
+
+}  // namespace tls
+
+template <>
+ParseState ParseFrame(message_type_t, std::string_view* buf, tls::Frame* frame, NoState*) {
+  // TLS record header is 5 bytes. The size of the record is in bytes 4 and 5.
+  if (buf->length() < tls::kTLSRecordHeaderLength) {
+    return ParseState::kNeedsMoreData;
+  }
+  uint16_t length = static_cast<uint16_t>((*buf)[3]) << 8 | static_cast<uint16_t>((*buf)[4]);
+  if (buf->length() < length + tls::kTLSRecordHeaderLength) {
+    return ParseState::kNeedsMoreData;
+  }
+
+  BinaryDecoder decoder(*buf);
+  auto parse_result = tls::ParseFullFrame(&decoder, frame);
+  if (parse_result == ParseState::kSuccess) {
+    buf->remove_prefix(length + tls::kTLSRecordHeaderLength);
+  }
+  return parse_result;
 }
 
 template <>
