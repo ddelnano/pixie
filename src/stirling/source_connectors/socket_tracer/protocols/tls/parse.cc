@@ -65,8 +65,8 @@ StatusOr<ParseState> ExtractSNIExtension(std::vector<std::string>* server_names,
 }
 
 ParseState ParseFullFrame(BinaryDecoder* decoder, Frame* frame) {
-
-  PX_ASSIGN_OR(auto raw_content_type, decoder->ExtractBEInt<uint8_t>(), return ParseState::kInvalid);
+  PX_ASSIGN_OR(auto raw_content_type, decoder->ExtractBEInt<uint8_t>(),
+               return ParseState::kInvalid);
   auto content_type = magic_enum::enum_cast<tls::ContentType>(raw_content_type);
   if (!content_type.has_value()) {
     return ParseState::kInvalid;
@@ -172,7 +172,7 @@ ParseState ParseFrame(message_type_t, std::string_view* buf, tls::Frame* frame, 
   if (buf->length() < tls::kTLSRecordHeaderLength) {
     return ParseState::kNeedsMoreData;
   }
-  uint16_t length = static_cast<uint16_t>((*buf)[3]) << 8 | static_cast<uint16_t>((*buf)[4]);
+  uint16_t length = static_cast<uint8_t>((*buf)[3]) << 8 | static_cast<uint8_t>((*buf)[4]);
   if (buf->length() < length + tls::kTLSRecordHeaderLength) {
     return ParseState::kNeedsMoreData;
   }

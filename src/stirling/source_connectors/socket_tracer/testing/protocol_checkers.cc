@@ -28,6 +28,7 @@ namespace testing {
 namespace http = protocols::http;
 namespace mux = protocols::mux;
 namespace mongodb = protocols::mongodb;
+namespace tls = protocols::tls;
 
 //-----------------------------------------------------------------------------
 // HTTP Checkers
@@ -103,6 +104,20 @@ std::vector<mongodb::Record> GetTargetRecords(const types::ColumnWrapperRecordBa
   std::vector<size_t> target_record_indices =
       FindRecordIdxMatchesPID(record_batch, kMongoDBUPIDIdx, pid);
   return ToRecordVector<mongodb::Record>(record_batch, target_record_indices);
+}
+
+template <>
+std::vector<tls::Record> ToRecordVector(const types::ColumnWrapperRecordBatch& rb,
+                                        const std::vector<size_t>& indices) {
+  std::vector<tls::Record> result;
+
+  PX_UNUSED(rb);
+  for (const auto& idx : indices) {
+    PX_UNUSED(idx);
+    tls::Record r;
+    result.push_back(r);
+  }
+  return result;
 }
 
 }  // namespace testing

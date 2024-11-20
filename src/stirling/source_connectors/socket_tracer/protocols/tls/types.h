@@ -190,7 +190,7 @@ struct Frame : public FrameBase {
 
   size_t ByteSize() const override { return sizeof(Frame); }
 
-  std::string ToString() const override { return absl::Substitute("TLS Frame [len=$0]", length); }
+  std::string ToString() const override { return absl::Substitute("TLS Frame [len=$0 content_type=$1 legacy_version=$2 handshake_version=$3 handshake_type=$4]", length, content_type, legacy_version, handshake_version, handshake_type); }
 };
 
 struct Record {

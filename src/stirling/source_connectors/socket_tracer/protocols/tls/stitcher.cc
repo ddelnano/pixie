@@ -18,6 +18,8 @@
 
 #include "src/stirling/source_connectors/socket_tracer/protocols/tls/stitcher.h"
 
+#include <utility>
+
 #include "src/stirling/source_connectors/socket_tracer/protocols/common/interface.h"
 #include "src/stirling/source_connectors/socket_tracer/protocols/tls/parse.h"
 #include "src/stirling/source_connectors/socket_tracer/protocols/tls/types.h"
@@ -74,7 +76,6 @@ RecordsWithErrorCount<tls::Record> StitchFrames(std::deque<tls::Frame>* reqs,
   }
   reqs->erase(reqs->begin(), erase_until_iter);
   resps->clear();
-
   return {records, error_count};
 }
 
