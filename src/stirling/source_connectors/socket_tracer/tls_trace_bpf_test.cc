@@ -134,7 +134,10 @@ class TLSVersionParameterizedTest
   NginxOpenSSL_3_0_8_ContainerWrapper server_;
 };
 
-INSTANTIATE_TEST_SUITE_P(TLSVersions, TLSVersionParameterizedTest, ::testing::Values("1.2"));
+INSTANTIATE_TEST_SUITE_P(TLSVersions, TLSVersionParameterizedTest,
+                         // TODO(ddelnano): Testing earlier versions will require making the
+                         // server test container support compatible cihpers.
+                         ::testing::Values("1.2", "1.3"));
 
 TEST_P(TLSVersionParameterizedTest, TestTLSVersions) {
   const std::string& tls_version = GetParam();
