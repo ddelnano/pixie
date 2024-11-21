@@ -21,6 +21,7 @@
 #include <string>
 #include <vector>
 
+#include "src/common/json/json.h"
 #include "src/stirling/source_connectors/socket_tracer/protocols/common/event_parser.h"
 #include "src/stirling/utils/utils.h"
 
@@ -28,6 +29,8 @@ namespace px {
 namespace stirling {
 namespace protocols {
 namespace tls {
+
+using ::px::utils::ToJSONString;
 
 enum class ContentType : uint8_t {
   kChangeCipherSpec = 0x14,
@@ -104,7 +107,7 @@ enum class HandshakeType : uint8_t {
 
 // Defined from
 // https://www.iana.org/assignments/tls-extensiontype-values/tls-extensiontype-values.xhtml#tls-extensiontype-values-1
-enum class ExtenstionType : uint16_t {
+enum class ExtensionType : uint16_t {
   kServerName = 0,
   kMaxFragmentLength = 1,
   kClientCertificateURL = 2,
@@ -184,7 +187,7 @@ struct Frame : public FrameBase {
   LegacyVersion handshake_version;
 
   std::string session_id;
-  std::vector<std::string> server_names;
+  std::map<std::string, std::string> extensions;
 
   bool consumed = false;
 
@@ -193,8 +196,8 @@ struct Frame : public FrameBase {
   std::string ToString() const override {
     return absl::Substitute(
         "TLS Frame [len=$0 content_type=$1 legacy_version=$2 handshake_version=$3 "
-        "handshake_type=$4]",
-        length, content_type, legacy_version, handshake_version, handshake_type);
+        "handshake_type=$4 extensions=$5]",
+        length, content_type, legacy_version, handshake_version, handshake_type, ToJSONString(extensions));
   }
 };
 

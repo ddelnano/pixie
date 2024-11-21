@@ -44,23 +44,28 @@ constexpr size_t kSNIExtensionMinimumLength = 3;
 // In TLS 1.2 and earlier, gmt_unix_time is 4 bytes and Random is 28 bytes.
 constexpr size_t kRandomStructLength = 32;
 
-StatusOr<ParseState> ExtractSNIExtension(std::vector<std::string>* server_names,
+StatusOr<ParseState> ExtractSNIExtension(std::map<std::string, std::string>* exts,
                                          BinaryDecoder* decoder) {
   PX_ASSIGN_OR(auto server_name_list_length, decoder->ExtractBEInt<uint16_t>(),
                return ParseState::kInvalid);
+  std::vector<std::string> server_names;
   while (server_name_list_length > 0) {
     PX_ASSIGN_OR(auto server_name_type, decoder->ExtractBEInt<uint8_t>(),
                  return error::Internal("Failed to extract server name type"));
+
     // This is the only valid value for server_name_type and corresponds to host_name.
     DCHECK_EQ(server_name_type, 0);
+
     PX_ASSIGN_OR(auto server_name_length, decoder->ExtractBEInt<uint16_t>(),
                  return error::Internal("Failed to extract server name length"));
     PX_ASSIGN_OR(auto server_name, decoder->ExtractString(server_name_length),
                  return error::Internal("Failed to extract server name"));
 
-    server_names->push_back(std::string(server_name));
+
+    server_names.push_back(std::string(server_name));
     server_name_list_length -= kSNIExtensionMinimumLength + server_name_length;
   }
+  exts->insert({"server_name", ToJSONString(server_names)});
   return ParseState::kSuccess;
 }
 
@@ -122,17 +127,25 @@ ParseState ParseFullFrame(BinaryDecoder* decoder, Frame* frame) {
     return ParseState::kInvalid;
   }
 
-  PX_ASSIGN_OR(frame->session_id, decoder->ExtractString(session_id_len),
-               return ParseState::kInvalid);
+  if (session_id_len > 0) {
+    PX_ASSIGN_OR(frame->session_id, decoder->ExtractString(session_id_len),
+                 return ParseState::kInvalid);
+  }
 
   PX_ASSIGN_OR(auto cipher_suite_length, decoder->ExtractBEInt<uint16_t>(),
                return ParseState::kInvalid);
-  decoder->ExtractString(cipher_suite_length);
+  if (frame->handshake_type == HandshakeType::kClientHello) {
+    if (!decoder->ExtractBufIgnore(cipher_suite_length).ok()) {
+      return ParseState::kInvalid;
+    }
+  }
 
   PX_ASSIGN_OR(auto compression_methods_length, decoder->ExtractBEInt<uint8_t>(),
                return ParseState::kInvalid);
-  if (!decoder->ExtractBufIgnore(compression_methods_length).ok()) {
-    return ParseState::kInvalid;
+  if (frame->handshake_type == HandshakeType::kClientHello) {
+    if (!decoder->ExtractBufIgnore(compression_methods_length).ok()) {
+      return ParseState::kInvalid;
+    }
   }
 
   // TODO(ddelnano): Test TLS 1.2 and earlier where extensions are not present
@@ -148,13 +161,15 @@ ParseState ParseFullFrame(BinaryDecoder* decoder, Frame* frame) {
     PX_ASSIGN_OR(auto extension_length, decoder->ExtractBEInt<uint16_t>(),
                  return ParseState::kInvalid);
 
-    if (extension_type == 0x00) {
-      if (!ExtractSNIExtension(&frame->server_names, decoder).ok()) {
-        return ParseState::kInvalid;
-      }
-    } else {
-      if (!decoder->ExtractBufIgnore(extension_length).ok()) {
-        return ParseState::kInvalid;
+    if (extension_length > 0) {
+      if (extension_type == 0x00) {
+        if (!ExtractSNIExtension(&frame->extensions, decoder).ok()) {
+          return ParseState::kInvalid;
+        }
+      } else {
+        if (!decoder->ExtractBufIgnore(extension_length).ok()) {
+          return ParseState::kInvalid;
+        }
       }
     }
 
