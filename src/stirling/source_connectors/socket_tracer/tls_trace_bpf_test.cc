@@ -46,7 +46,6 @@ using ::px::stirling::testing::ToRecordVector;
 using ::testing::IsTrue;
 using ::testing::SizeIs;
 using ::testing::StrEq;
-using ::testing::Types;
 using ::testing::UnorderedElementsAre;
 
 struct TraceRecords {
@@ -71,10 +70,20 @@ bool Init() {
   return true;
 }
 
-template <typename TServerContainer>
-class TLSTraceTest : public SocketTraceBPFTestFixture</* TClientSideTracing */ false> {
+//-----------------------------------------------------------------------------
+// Test Scenarios
+//-----------------------------------------------------------------------------
+
+tls::Record GetExpectedTLSRecord() {
+  tls::Record expected_record;
+  return expected_record;
+}
+
+class TLSVersionParameterizedTest
+    : public SocketTraceBPFTestFixture</* TClientSideTracing */ false>,
+      public ::testing::WithParamInterface<std::string> {
  protected:
-  TLSTraceTest() {
+  TLSVersionParameterizedTest() {
     Init();
 
     // Run the nginx HTTPS server.
@@ -86,6 +95,27 @@ class TLSTraceTest : public SocketTraceBPFTestFixture</* TClientSideTracing */ f
 
     // Sleep an additional second, just to be safe.
     sleep(1);
+  }
+
+  void TestTLSVersion(const std::string& tls_version, const std::string& tls_max_version) {
+    FLAGS_stirling_conn_trace_pid = this->server_.PID();
+
+    this->StartTransferDataThread();
+
+    // Make an SSL request with curl.
+    ::px::stirling::testing::CurlContainer client;
+    constexpr bool kHostPid = false;
+    ASSERT_OK(
+        client.Run(std::chrono::seconds{60},
+                   {absl::Substitute("--network=container:$0", this->server_.container_name())},
+                   {"--insecure", "-s", "-S", absl::Substitute("--tlsv$0", tls_version),
+                    "--tls-max", tls_max_version, "https://127.0.0.1:443/index.html"},
+                   kHostPid));
+    client.Wait();
+    this->StopTransferDataThread();
+
+    TraceRecords records = this->GetTraceRecords(this->server_.PID());
+    EXPECT_THAT(records.tls_records, SizeIs(1));
   }
 
   // Returns the trace records of the process specified by the input pid.
@@ -103,70 +133,17 @@ class TLSTraceTest : public SocketTraceBPFTestFixture</* TClientSideTracing */ f
     return {std::move(tls_records)};
   }
 
-  TServerContainer server_;
+  NginxOpenSSL_3_0_8_ContainerWrapper server_;
 };
 
-//-----------------------------------------------------------------------------
-// Test Scenarios
-//-----------------------------------------------------------------------------
+INSTANTIATE_TEST_SUITE_P(TLSVersions, TLSVersionParameterizedTest,
+                         // TODO(ddelnano): Testing earlier versions will require making the
+                         // server test container support compatible cihpers.
+                         ::testing::Values("1.2", "1.3"));
 
-// The is the response to `GET /index.html`.
-
-tls::Record GetExpectedTLSRecord() {
-  tls::Record expected_record;
-  return expected_record;
-}
-
-using TLSServerImplementations = Types<NginxOpenSSL_3_0_8_ContainerWrapper>;
-
-TYPED_TEST_SUITE(TLSTraceTest, TLSServerImplementations);
-
-TYPED_TEST(TLSTraceTest, tls_v1_2) {
-  FLAGS_stirling_conn_trace_pid = this->server_.PID();
-
-  this->StartTransferDataThread();
-
-  // Make an SSL request with curl.
-  // Because the server uses a self-signed certificate, curl will normally refuse to connect.
-  // This is similar to the warning pages that Firefox/Chrome would display.
-  // To take an exception and make the SSL connection anyways, we use the --insecure flag.
-
-  // Run the client in the network of the server, so they can connect to each other.
-  ::px::stirling::testing::CurlContainer client;
-  constexpr bool kHostPid = false;
-  ASSERT_OK(client.Run(std::chrono::seconds{60},
-                       {absl::Substitute("--network=container:$0", this->server_.container_name())},
-                       {"--insecure", "-s", "-S", "--tlsv1.2", "--tls-max", "1.2", "https://127.0.0.1:443/index.html"}, kHostPid));
-  client.Wait();
-  this->StopTransferDataThread();
-
-  TraceRecords records = this->GetTraceRecords(this->server_.PID());
-
-  EXPECT_THAT(records.tls_records, SizeIs(1));
-}
-
-TYPED_TEST(TLSTraceTest, tls_v1_3) {
-  FLAGS_stirling_conn_trace_pid = this->server_.PID();
-
-  this->StartTransferDataThread();
-
-  // Make an SSL request with curl.
-  // Because the server uses a self-signed certificate, curl will normally refuse to connect.
-  // This is similar to the warning pages that Firefox/Chrome would display.
-  // To take an exception and make the SSL connection anyways, we use the --insecure flag.
-
-  // Run the client in the network of the server, so they can connect to each other.
-  ::px::stirling::testing::CurlContainer client;
-  constexpr bool kHostPid = false;
-  ASSERT_OK(client.Run(std::chrono::seconds{60},
-                       {absl::Substitute("--network=container:$0", this->server_.container_name())},
-                       {"--insecure", "-s", "-S", "--tlsv1.3", "https://127.0.0.1:443/index.html"}, kHostPid));
-  client.Wait();
-  this->StopTransferDataThread();
-
-  TraceRecords records = this->GetTraceRecords(this->server_.PID());
-
-  EXPECT_THAT(records.tls_records, SizeIs(1));
+TEST_P(TLSVersionParameterizedTest, TestTLSVersions) {
+  const std::string& tls_version = GetParam();
+  TestTLSVersion(tls_version, tls_version);
 }
 
 }  // namespace stirling
