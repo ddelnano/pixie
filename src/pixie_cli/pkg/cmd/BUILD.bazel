@@ -42,6 +42,11 @@ go_library(
     importpath = "px.dev/pixie/src/pixie_cli/pkg/cmd",
     visibility = ["//src:__subpackages__"],
     deps = [
+        "//src/api/go/pxapi",
+        "//src/api/go/pxapi/errdefs",
+        "//src/api/go/pxapi/formatters",
+        "//src/api/go/pxapi/muxes",
+        "//src/api/go/pxapi/types",
         "//src/api/proto/cloudpb:cloudapi_pl_go_proto",
         "//src/api/proto/vizierpb:vizier_pl_go_proto",
         "//src/cloud/api/ptproxy",
