@@ -577,7 +577,6 @@ void Dwarvifier::AddEntryProbeVariables(ir::physical::Probe* output_probe) {
   }
 }
 
-// TODO(ddelnano): It seems all the Go variables are added in AddEntryProbeVariables.
 void Dwarvifier::AddRetProbeVariables(ir::physical::Probe* output_probe) {
   // Add return value variable for convenience.
   if ((language_ == ir::shared::C || language_ == ir::shared::CPP)) {
@@ -815,7 +814,6 @@ Status Dwarvifier::ProcessStructBlob(const std::string& base, uint64_t offset,
   return Status::OK();
 }
 
-// TODO(ddelnano): This function would need to support the register based calling convention
 Status Dwarvifier::ProcessVarExpr(const std::string& var_name, const ArgInfo& arg_info,
                                   const std::string& base_var,
                                   const std::vector<std::string_view>& components,
@@ -942,7 +940,6 @@ Status Dwarvifier::ProcessArgExpr(const ir::logical::Argument& arg,
   std::string base_var;
   switch (language_) {
     case ir::shared::GOLANG:
-      // TODO(ddelnano): Register based calling convention can't use kSPVarName
       switch (arg_info.location.loc_type) {
         case LocationType::kStack:
           base_var = kSPVarName;
@@ -1035,8 +1032,6 @@ Status Dwarvifier::ProcessRetValExpr(const ir::logical::ReturnValue& ret_val,
         // is not counted in the indexing.
         // To address this problem, we search for the first ~r<n> that we can find,
         // then we apply the index offset to all indices from the user.
-        // TODO(ddelnano): This might not work for Go 1.17+ as well. Or maybe it does and
-        // the tests need to be updated
         PX_ASSIGN_OR_RETURN(int first_index, GolangReturnValueIndex(args_map_));
         index += first_index;
 
