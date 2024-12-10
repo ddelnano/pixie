@@ -79,7 +79,7 @@ pl_cc_test(
     name = "autogen_test",
     srcs = ["autogen_test.cc"],
     data = [
-        "//src/stirling/obj_tools/testdata/go:test_go_1_16_binary",
+        "//src/stirling/obj_tools/testdata/go:test_go_1_21_binary",
     ],
     deps = [
         ":cc_library",
