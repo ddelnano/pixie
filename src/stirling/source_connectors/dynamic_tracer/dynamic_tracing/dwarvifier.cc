@@ -569,13 +569,15 @@ void Dwarvifier::AddEntryProbeVariables(ir::physical::Probe* output_probe) {
     auto* parm_ptr_var =
         AddVariable<ScalarVariable>(output_probe, kParmPtrVarName, ir::shared::VOID_POINTER);
     parm_ptr_var->set_reg(ir::physical::Register::SYSV_AMD64_ARGS_PTR);
+  } else if (language_ == ir::shared::GOLANG) {
+    // TODO(oazizi): For Golang 1.17+, will need the following:
+    auto* parm_ptr_var =
+        AddVariable<ScalarVariable>(output_probe, kParmPtrVarName, ir::shared::VOID_POINTER);
+    parm_ptr_var->set_reg(ir::physical::Register::GOLANG_ARGS_PTR);
   }
-  // TODO(oazizi): For Golang 1.17+, will need the following:
-  //  auto* parm_ptr_var =
-  //          AddVariable<ScalarVariable>(output_probe, kParmPtrVarName, ir::shared::VOID_POINTER);
-  //  parm_ptr_var->set_reg(ir::physical::Register::GOLANG_ARGS_PTR);
 }
 
+// TODO(ddelnano): It seems all the Go variables are added in AddEntryProbeVariables.
 void Dwarvifier::AddRetProbeVariables(ir::physical::Probe* output_probe) {
   // Add return value variable for convenience.
   if ((language_ == ir::shared::C || language_ == ir::shared::CPP)) {
@@ -813,6 +815,7 @@ Status Dwarvifier::ProcessStructBlob(const std::string& base, uint64_t offset,
   return Status::OK();
 }
 
+// TODO(ddelnano): This function would need to support the register based calling convention
 Status Dwarvifier::ProcessVarExpr(const std::string& var_name, const ArgInfo& arg_info,
                                   const std::string& base_var,
                                   const std::vector<std::string_view>& components,
@@ -936,13 +939,24 @@ Status Dwarvifier::ProcessArgExpr(const ir::logical::Argument& arg,
 
   PX_ASSIGN_OR_RETURN(ArgInfo arg_info, GetArgInfo(args_map_, components.front()));
 
+  std::string base_var;
   switch (language_) {
     case ir::shared::GOLANG:
-      return ProcessVarExpr(arg.id(), arg_info, kSPVarName, components, output_probe);
+      // TODO(ddelnano): Register based calling convention can't use kSPVarName
+      switch (arg_info.location.loc_type) {
+        case LocationType::kStack:
+          base_var = kSPVarName;
+          break;
+        case LocationType::kRegister:
+          base_var = kParmPtrVarName;
+          break;
+        default:
+          return error::Internal("Unsupported argument LocationType $0",
+                                 magic_enum::enum_name(arg_info.location.loc_type));
+      }
+      return ProcessVarExpr(arg.id(), arg_info, base_var, components, output_probe);
     case ir::shared::CPP:
     case ir::shared::C: {
-      std::string base_var;
-
       switch (arg_info.location.loc_type) {
         case LocationType::kStack:
           base_var = kSPVarName;
@@ -1021,6 +1035,8 @@ Status Dwarvifier::ProcessRetValExpr(const ir::logical::ReturnValue& ret_val,
         // is not counted in the indexing.
         // To address this problem, we search for the first ~r<n> that we can find,
         // then we apply the index offset to all indices from the user.
+        // TODO(ddelnano): This might not work for Go 1.17+ as well. Or maybe it does and
+        // the tests need to be updated
         PX_ASSIGN_OR_RETURN(int first_index, GolangReturnValueIndex(args_map_));
         index += first_index;
 
@@ -1029,8 +1045,15 @@ Status Dwarvifier::ProcessRetValExpr(const ir::logical::ReturnValue& ret_val,
 
       // Golang return values are really arguments located on the stack, so get the arg info.
       PX_ASSIGN_OR_RETURN(ArgInfo arg_info, GetArgInfo(args_map_, ret_val_name));
-
-      return ProcessVarExpr(ret_val.id(), arg_info, kSPVarName, components, output_probe);
+      switch (arg_info.location.loc_type) {
+        case LocationType::kStack:
+          return ProcessVarExpr(ret_val.id(), arg_info, kSPVarName, components, output_probe);
+        case LocationType::kRegister:
+          return ProcessVarExpr(ret_val.id(), arg_info, kParmPtrVarName, components, output_probe);
+        default:
+          return error::Internal("Unsupported return value LocationType $0",
+                                 magic_enum::enum_name(arg_info.location.loc_type));
+      }
     }
     case ir::shared::CPP:
     case ir::shared::C: {
