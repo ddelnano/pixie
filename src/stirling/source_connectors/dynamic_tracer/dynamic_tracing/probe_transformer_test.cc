@@ -222,14 +222,6 @@ tracepoints {
         symbol: "main.MixedArgTypes"
         type: RETURN
       }
-      ret_vals {
-        id: "retval0"
-        expr: "$$0"
-      }
-      ret_vals {
-        id: "retval1"
-        expr: "$$1"
-      }
       map_vals {
         map_name: "probe0_argstash"
         key: GOID
