@@ -174,9 +174,12 @@ Status CreateReturnProbe(const ir::shared::Language& language,
   }
 
   // Generate return values.
-  for (const auto& in_ret_val : input_probe.ret_vals()) {
-    auto* out_ret_val = return_probe->add_ret_vals();
-    out_ret_val->CopyFrom(in_ret_val);
+  if (language != ir::shared::GOLANG) {
+    // For Go, return values are accessed in the entry probe.
+    for (const auto& in_ret_val : input_probe.ret_vals()) {
+      auto* out_ret_val = return_probe->add_ret_vals();
+      out_ret_val->CopyFrom(in_ret_val);
+    }
   }
 
   if (IsFunctionLatecySpecified(input_probe)) {
