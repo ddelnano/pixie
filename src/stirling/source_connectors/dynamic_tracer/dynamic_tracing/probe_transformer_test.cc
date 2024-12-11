@@ -194,6 +194,14 @@ tracepoints {
         id: "arg5"
         expr: "b2.B3"
       }
+      ret_vals {
+        id: "retval0"
+        expr: "$$0"
+      }
+      ret_vals {
+        id: "retval1"
+        expr: "$$1"
+      }
       map_stash_actions {
         map_name: "probe0_argstash"
         key: GOID
@@ -203,6 +211,8 @@ tracepoints {
         value_variable_names: "arg3"
         value_variable_names: "arg4"
         value_variable_names: "arg5"
+        value_variable_names: "retval0"
+        value_variable_names: "retval1"
         value_variable_names: "time_"
       }
     }
@@ -212,7 +222,14 @@ tracepoints {
         symbol: "main.MixedArgTypes"
         type: RETURN
       }
-      function_latency { id: "fn_latency" }
+      ret_vals {
+        id: "retval0"
+        expr: "$$0"
+      }
+      ret_vals {
+        id: "retval1"
+        expr: "$$1"
+      }
       map_vals {
         map_name: "probe0_argstash"
         key: GOID
@@ -222,15 +239,12 @@ tracepoints {
         value_ids: "arg3"
         value_ids: "arg4"
         value_ids: "arg5"
+        value_ids: "retval0"
+        value_ids: "retval1"
         value_ids: "start_ktime_ns"
       }
-      ret_vals {
-        id: "retval0"
-        expr: "$$0"
-      }
-      ret_vals {
-        id: "retval1"
-        expr: "$$1"
+      function_latency {
+        id: "fn_latency"
       }
       output_actions {
         output_name: "probe0_table"
