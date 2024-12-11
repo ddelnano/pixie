@@ -570,7 +570,6 @@ void Dwarvifier::AddEntryProbeVariables(ir::physical::Probe* output_probe) {
         AddVariable<ScalarVariable>(output_probe, kParmPtrVarName, ir::shared::VOID_POINTER);
     parm_ptr_var->set_reg(ir::physical::Register::SYSV_AMD64_ARGS_PTR);
   } else if (language_ == ir::shared::GOLANG) {
-    // TODO(oazizi): For Golang 1.17+, will need the following:
     auto* parm_ptr_var =
         AddVariable<ScalarVariable>(output_probe, kParmPtrVarName, ir::shared::VOID_POINTER);
     parm_ptr_var->set_reg(ir::physical::Register::GOLANG_ARGS_PTR);
@@ -1010,7 +1009,7 @@ Status Dwarvifier::ProcessRetValExpr(const ir::logical::ReturnValue& ret_val,
 
   switch (language_) {
     case ir::shared::GOLANG: {
-      // This represents the actualy return value being returned,
+      // This represents the actual return value being returned,
       // without sub-field accesses.
       std::string ret_val_name(components.front());
 
