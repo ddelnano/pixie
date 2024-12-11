@@ -32,11 +32,12 @@
 
 constexpr std::string_view kClientPath =
     "src/stirling/source_connectors/socket_tracer/protocols/http2/testing/go_grpc_client/"
-    "golang_1_19_grpc_client";
+    "golang_1_21_grpc_client";
 constexpr std::string_view kServerPath =
     "src/stirling/source_connectors/socket_tracer/protocols/http2/testing/go_grpc_server/"
-    "golang_1_19_grpc_server";
+    "golang_1_21_grpc_server";
 
+DECLARE_bool(debug_dt_pipeline);
 namespace px {
 namespace stirling {
 
@@ -200,6 +201,7 @@ TEST_F(GoHTTPDynamicTraceTest, TraceGolangHTTPClientAndServer) {
 }
 
 TEST_F(GoHTTPDynamicTraceTest, TraceReturnValue) {
+  FLAGS_debug_dt_pipeline = true;
   ASSERT_NO_FATAL_FAILURE(InitTestFixturesAndRunTestProgram(kReturnValueTraceProgram));
   std::vector<TaggedRecordBatch> tablets = GetRecords();
 
