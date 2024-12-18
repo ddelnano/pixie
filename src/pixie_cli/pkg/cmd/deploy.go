@@ -19,13 +19,9 @@
 package cmd
 
 import (
-	"bufio"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"math"
 	"os"
 	"strings"
 	"time"
@@ -45,7 +41,6 @@ import (
 	"k8s.io/client-go/rest"
 
 	"px.dev/pixie/src/api/proto/cloudpb"
-	"px.dev/pixie/src/api/proto/vizierpb"
 	vztypes "px.dev/pixie/src/operator/apis/px.dev/v1alpha1"
 	"px.dev/pixie/src/operator/client/versioned"
 	"px.dev/pixie/src/pixie_cli/pkg/auth"
@@ -64,9 +59,6 @@ import (
 const (
 	// DeploySuccess is the successful deploy const.
 	DeploySuccess = "successfulDeploy"
-
-	equalityThreshold          = 0.01
-	headersInstalledPercColumn = "headers_installed_percent"
 )
 
 // BlockListedLabels are labels that we won't allow users to specify, since these are labels that we
@@ -611,119 +603,6 @@ func deploy(cloudConn *grpc.ClientConn, clientset *kubernetes.Clientset, vzClien
 	return clusterID
 }
 
-type healthCheckWarning struct {
-	message string
-}
-
-func (h *healthCheckWarning) Error() string {
-	return h.message
-}
-
-func newHealthCheckWarning(message string) error {
-	return &healthCheckWarning{message}
-}
-
-func evaluateHealthCheckResult(output string) error {
-	jsonData := make(map[string]interface{})
-
-	err := json.Unmarshal([]byte(output), &jsonData)
-	if err != nil {
-		return err
-	}
-
-	if v, ok := jsonData[headersInstalledPercColumn]; ok {
-		switch t := v.(type) {
-		case float64:
-			if math.Abs(1.0-t) > equalityThreshold {
-				msg := fmt.Sprintf("Only %.2f of your cluster's nodes have kernel headers installed. This may cause issues with the Pixie agent. Please install kernel headers on all nodes.", t)
-				return newHealthCheckWarning(msg)
-			}
-
-		}
-	} else {
-		return newHealthCheckWarning("Please validate that your cluster's nodes have the distro kernel headers installed. The current vizier is too old to perform this check automatically.")
-	}
-	return nil
-}
-
-func RunSimpleHealthCheckScript(cloudAddr string, clusterID uuid.UUID) error {
-	v, err := vizier.ConnectionToVizierByID(cloudAddr, clusterID)
-	br := mustCreateBundleReader()
-	if err != nil {
-		return err
-	}
-	execScript, err := br.GetScript(script.AgentStatusDiagnosticsScript)
-	if err != nil {
-		execScript = br.MustGetScript(script.AgentStatusScript)
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	var encOpts, decOpts *vizierpb.ExecuteScriptRequest_EncryptionOptions
-
-	resp, err := vizier.RunScript(ctx, []*vizier.Connector{v}, execScript, encOpts)
-	if err != nil {
-		return err
-	}
-
-	reader, writer := io.Pipe()
-	defer reader.Close()
-	factoryFunc := func(md *vizierpb.ExecuteScriptResponse_MetaData) components.OutputStreamWriter {
-		return components.CreateStreamWriter("json", writer)
-	}
-	tw := vizier.NewStreamOutputAdapterWithFactory(ctx, resp, "json", decOpts, factoryFunc)
-
-	bufReader := bufio.NewReader(reader)
-	errCh := make(chan error, 1)
-	go func() {
-		defer writer.Close()
-		err = tw.WaitForCompletion()
-
-		if err != nil {
-			errCh <- err
-			return
-		}
-	}()
-
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				errCh <- ctx.Err()
-				break
-			default:
-				if ctx.Err() != nil {
-					errCh <- ctx.Err()
-					return
-				}
-				line, err := bufReader.ReadString('\n')
-				if err != nil {
-					if err == io.EOF {
-						errCh <- nil
-					}
-					errCh <- err
-					break
-				}
-				err = evaluateHealthCheckResult(line)
-				if err != nil {
-					if _, ok := err.(*healthCheckWarning); ok {
-						log.Warnf(err.Error())
-						errCh <- nil
-					} else {
-						errCh <- err
-					}
-					return
-				}
-			}
-		}
-	}()
-
-	err = <-errCh
-
-	return err
-}
-
 func waitForHealthCheckTaskGenerator(cloudAddr string, clusterID uuid.UUID) func() error {
 	return func() error {
 		timeout := time.NewTimer(5 * time.Minute)
@@ -733,7 +612,7 @@ func waitForHealthCheckTaskGenerator(cloudAddr string, clusterID uuid.UUID) func
 			case <-timeout.C:
 				return errors.New("timeout waiting for healthcheck  (it is possible that Pixie stabilized after the healthcheck timeout. To check if Pixie successfully deployed, run `px debug pods`)")
 			default:
-				err := RunSimpleHealthCheckScript(cloudAddr, clusterID)
+				_, err := vizier.RunSimpleHealthCheckScript(mustCreateBundleReader(), cloudAddr, clusterID)
 				if err == nil {
 					return nil
 				}
