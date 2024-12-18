@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"strings"
 	"time"
@@ -43,11 +44,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
-	"px.dev/pixie/src/api/go/pxapi"
-	"px.dev/pixie/src/api/go/pxapi/errdefs"
-	"px.dev/pixie/src/api/go/pxapi/formatters"
-	"px.dev/pixie/src/api/go/pxapi/muxes"
-	"px.dev/pixie/src/api/go/pxapi/types"
 	"px.dev/pixie/src/api/proto/cloudpb"
 	"px.dev/pixie/src/api/proto/vizierpb"
 	vztypes "px.dev/pixie/src/operator/apis/px.dev/v1alpha1"
@@ -57,6 +53,7 @@ import (
 	"px.dev/pixie/src/pixie_cli/pkg/pxanalytics"
 	"px.dev/pixie/src/pixie_cli/pkg/pxconfig"
 	"px.dev/pixie/src/pixie_cli/pkg/utils"
+	"px.dev/pixie/src/pixie_cli/pkg/vizier"
 	utils2 "px.dev/pixie/src/utils"
 	"px.dev/pixie/src/utils/script"
 	"px.dev/pixie/src/utils/shared/artifacts"
@@ -67,6 +64,9 @@ import (
 const (
 	// DeploySuccess is the successful deploy const.
 	DeploySuccess = "successfulDeploy"
+
+	equalityThreshold          = 0.01
+	headersInstalledPercColumn = "headers_installed_percent"
 )
 
 // BlockListedLabels are labels that we won't allow users to specify, since these are labels that we
@@ -611,135 +611,117 @@ func deploy(cloudConn *grpc.ClientConn, clientset *kubernetes.Clientset, vzClien
 	return clusterID
 }
 
-func performDiagnosticCheck(resp *vizierpb.ExecuteScriptResponse) {
-	// Check for kernel_headers_preinstalled column
-	if _, ok := resp.Result.(*vizierpb.ExecuteScriptResponse_Data); ok {
-		batch := resp.Result.(*vizierpb.ExecuteScriptResponse_Data).Data.Batch
-
-		for _, col := range batch.Cols {
-			_, boolOk := col.ColData.(*vizierpb.Column_BooleanData)
-			if !boolOk {
-				fmt.Println("Error: Expected bool data")
-				continue
-			}
-
-			fmt.Printf("Column: %v\n", col)
-		}
-	}
+type healthCheckWarning struct {
+	message string
 }
 
-func RunSimpleHealthCheckScript(cloudAddr string, clusterID uuid.UUID) error {
-	creds := auth.MustLoadDefaultCredentials()
+func (h *healthCheckWarning) Error() string {
+	return h.message
+}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+func newHealthCheckWarning(message string) error {
+	return &healthCheckWarning{message}
+}
 
-	client, err := pxapi.NewClient(ctx, pxapi.WithCloudAddr(cloudAddr), pxapi.WithBearerAuth(creds.Token))
+func evaluateHealthCheckResult(output string) error {
+	jsonData := make(map[string]interface{})
 
+	err := json.Unmarshal([]byte(output), &jsonData)
 	if err != nil {
 		return err
 	}
 
-	br := mustCreateBundleReader()
-	execScript := br.MustGetScript(script.AgentStatusScript)
+	if v, ok := jsonData[headersInstalledPercColumn]; ok {
+		switch t := v.(type) {
+		case float64:
+			if math.Abs(1.0-t) > equalityThreshold {
+				msg := fmt.Sprintf("Only %.2f of your cluster's nodes have kernel headers installed. This may cause issues with the Pixie agent. Please install kernel headers on all nodes.", t)
+				return newHealthCheckWarning(msg)
+			}
 
-	vz, err := client.NewVizierClient(ctx, clusterID.String())
+		}
+	} else {
+		return newHealthCheckWarning("Please validate that your cluster's nodes have the distro kernel headers installed. The current vizier is too old to perform this check automatically.")
+	}
+	return nil
+}
+
+func RunSimpleHealthCheckScript(cloudAddr string, clusterID uuid.UUID) error {
+	v, err := vizier.ConnectionToVizierByID(cloudAddr, clusterID)
+	br := mustCreateBundleReader()
+	if err != nil {
+		return err
+	}
+	execScript, err := br.GetScript(script.AgentStatusDiagnosticsScript)
+	if err != nil {
+		execScript = br.MustGetScript(script.AgentStatusScript)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	var encOpts, decOpts *vizierpb.ExecuteScriptRequest_EncryptionOptions
+
+	resp, err := vizier.RunScript(ctx, []*vizier.Connector{v}, execScript, encOpts)
 	if err != nil {
 		return err
 	}
 
 	reader, writer := io.Pipe()
-	tm := muxes.NewRegexTableMux()
-	err = tm.RegisterHandlerForPattern("output", func(metadata types.TableMetadata) (pxapi.TableRecordHandler, error) {
-		return formatters.NewJSONFormatter(writer)
-	})
-	if err != nil {
-		return err
+	defer reader.Close()
+	factoryFunc := func(md *vizierpb.ExecuteScriptResponse_MetaData) components.OutputStreamWriter {
+		return components.CreateStreamWriter("json", writer)
 	}
+	tw := vizier.NewStreamOutputAdapterWithFactory(ctx, resp, "json", decOpts, factoryFunc)
 
-	fmt.Println("Executing script")
-	execCtx, execCancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer execCancel()
-	resultSet, err := vz.ExecuteScript(execCtx, execScript.ScriptString, tm)
-	if err != nil {
-		return err
-	}
-	defer resultSet.Close()
-
+	bufReader := bufio.NewReader(reader)
 	errCh := make(chan error, 1)
-	doneCh := make(chan struct{})
-
-	// Goroutine to stream results.
 	go func() {
-		defer close(doneCh)
-		defer writer.Close() // Ensure writer is closed no matter what.
-		if err := resultSet.Stream(); err != nil {
-			if errdefs.IsCompilationError(err) {
-				fmt.Printf("Got compiler error: \n %s\n", err.Error())
-			} else {
-				fmt.Printf("Got error : %+v, while streaming\n", err)
-			}
+		defer writer.Close()
+		err = tw.WaitForCompletion()
+
+		if err != nil {
 			errCh <- err
 			return
 		}
 	}()
 
-	bufReader := bufio.NewReader(reader)
-	totalCount := 0
-	kernelHeadersPreinstalledCount := 0
-
-	// Goroutine to process responses.
 	go func() {
-		defer close(errCh)
 		for {
 			select {
 			case <-ctx.Done():
-				log.Warnf("context cancelled waiting for cluster healthcheck to complete")
 				errCh <- ctx.Err()
-				return
+				break
 			default:
-				// Use a timeout on the read operation to avoid blocking indefinitely.
 				if ctx.Err() != nil {
 					errCh <- ctx.Err()
 					return
 				}
-
-				data, err := bufReader.ReadString('\n')
-				if err == io.EOF {
-					return
-				}
+				line, err := bufReader.ReadString('\n')
 				if err != nil {
+					if err == io.EOF {
+						errCh <- nil
+					}
 					errCh <- err
+					break
+				}
+				err = evaluateHealthCheckResult(line)
+				if err != nil {
+					if _, ok := err.(*healthCheckWarning); ok {
+						log.Warnf(err.Error())
+						errCh <- nil
+					} else {
+						errCh <- err
+					}
 					return
 				}
-				fmt.Println(data)
-				// Decode json to access kernel_headers_preinstalled
-				jsonData := make(map[string]interface{})
-				json.Unmarshal([]byte(data), &jsonData)
-				if v, ok := jsonData["kernel_headers_preinstalled"]; ok {
-					// Convert v to a bool and check if its true
-					if b, ok := v.(bool); ok && b {
-						kernelHeadersPreinstalledCount++
-					}
-				}
-				totalCount++
-
 			}
 		}
 	}()
 
-	// Wait for either an error or completion of the context.
-	select {
-	case err := <-errCh:
-		return err
-	case <-doneCh:
-		if float64(kernelHeadersPreinstalledCount)/float64(totalCount) > 0.75 {
-			fmt.Println("Kernel headers are preinstalled")
-		} else {
-			log.Warnf("Kernel headers are not preinstalled")
-		}
-		return nil
-	}
+	err = <-errCh
+
+	return err
 }
 
 func waitForHealthCheckTaskGenerator(cloudAddr string, clusterID uuid.UUID) func() error {
