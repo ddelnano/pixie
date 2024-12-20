@@ -615,6 +615,10 @@ func waitForHealthCheckTaskGenerator(cloudAddr string, clusterID uuid.UUID) func
 				_, err := vizier.RunSimpleHealthCheckScript(mustCreateBundleReader(), cloudAddr, clusterID)
 				if err == nil {
 					return nil
+				} else {
+					if _, ok := err.(*vizier.HealthCheckWarning); ok {
+						return err
+					}
 				}
 				time.Sleep(5 * time.Second)
 			}
@@ -635,13 +639,17 @@ func waitForHealthCheck(cloudAddr string, clusterID uuid.UUID, clientset *kubern
 	hc := utils.NewSerialTaskRunner(healthCheckJobs)
 	err := hc.RunAndMonitor()
 	if err != nil {
-		_ = pxanalytics.Client().Enqueue(&analytics.Track{
-			UserId: pxconfig.Cfg().UniqueClientID,
-			Event:  "Deploy Healthcheck Failed",
-			Properties: analytics.NewProperties().
-				Set("err", err.Error()),
-		})
-		utils.WithError(err).Fatal("Failed Pixie healthcheck")
+		if _, ok := err.(*vizier.HealthCheckWarning); ok {
+			utils.WithError(err).Error("Failed Pixie healthcheck")
+		} else {
+			_ = pxanalytics.Client().Enqueue(&analytics.Track{
+				UserId: pxconfig.Cfg().UniqueClientID,
+				Event:  "Deploy Healthcheck Failed",
+				Properties: analytics.NewProperties().
+					Set("err", err.Error()),
+			})
+			utils.WithError(err).Fatal("Failed Pixie healthcheck")
+		}
 	}
 	_ = pxanalytics.Client().Enqueue(&analytics.Track{
 		UserId: pxconfig.Cfg().UniqueClientID,

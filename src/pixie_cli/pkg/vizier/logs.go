@@ -132,7 +132,7 @@ func (c *LogCollector) CollectPixieLogs(fName string) error {
 	outputCh, err := RunSimpleHealthCheckScript(c.br, c.cloudAddr, clusterID)
 
 	if err != nil {
-		log.WithError(err).Warnf("failed to run health check script")
+		log.WithError(err).Warn("failed to run health check script")
 	}
 
 	return c.LogOutputToZipFile(zf, "px_agent_diagnostics.txt", <-outputCh)

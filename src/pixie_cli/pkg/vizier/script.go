@@ -27,6 +27,7 @@ import (
 	"io"
 	"math"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gofrs/uuid"
@@ -207,7 +208,6 @@ func runScript(ctx context.Context, conns []*Connector, execScript *script.Execu
 	return tw, err
 }
 
-// RunScript runs the script and return the data channel
 func RunScript(ctx context.Context, conns []*Connector, execScript *script.ExecutableScript, encOpts *vizierpb.ExecuteScriptRequest_EncryptionOptions) (chan *ExecData, error) {
 	// TODO(zasgar): Refactor this when we change to the new API to make analytics cleaner.
 	_ = pxanalytics.Client().Enqueue(&analytics.Track{
@@ -269,16 +269,16 @@ func RunScript(ctx context.Context, conns []*Connector, execScript *script.Execu
 	return mergedResponses, nil
 }
 
-type healthCheckWarning struct {
+type HealthCheckWarning struct {
 	message string
 }
 
-func (h *healthCheckWarning) Error() string {
+func (h *HealthCheckWarning) Error() string {
 	return h.message
 }
 
 func newHealthCheckWarning(message string) error {
-	return &healthCheckWarning{message}
+	return &HealthCheckWarning{message}
 }
 
 func evaluateHealthCheckResult(output string) error {
@@ -288,6 +288,7 @@ func evaluateHealthCheckResult(output string) error {
 	if err != nil {
 		return err
 	}
+	log.Warnf("Health check output: %v\n", jsonData)
 
 	if v, ok := jsonData[headersInstalledPercColumn]; ok {
 		switch t := v.(type) {
@@ -303,20 +304,8 @@ func evaluateHealthCheckResult(output string) error {
 	return nil
 }
 
-// RunSimpleHealthCheckScript runs a diagnostic pxl script to verify query serving works.
-// For newer viziers, it performs additional checks to ensure that the cluster is healthy
-// and that common issues are detected.
-func RunSimpleHealthCheckScript(br *script.BundleManager, cloudAddr string, clusterID uuid.UUID) (chan string, error) {
+func runHealthCheckScript(v *Connector, execScript *script.ExecutableScript) (chan string, error) {
 	output := make(chan string, 1)
-	v, err := ConnectionToVizierByID(cloudAddr, clusterID)
-	if err != nil {
-		return output, err
-	}
-	execScript, err := br.GetScript(script.AgentStatusDiagnosticsScript)
-	if err != nil {
-		execScript = br.MustGetScript(script.AgentStatusScript)
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -335,25 +324,31 @@ func RunSimpleHealthCheckScript(br *script.BundleManager, cloudAddr string, clus
 	tw := NewStreamOutputAdapterWithFactory(ctx, resp, "json", decOpts, factoryFunc)
 
 	bufReader := bufio.NewReader(reader)
-	errCh := make(chan error, 1)
+	errCh := make(chan error, 2)
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		defer writer.Close()
 		err = tw.WaitForCompletion()
 
 		if err != nil {
+			log.Warnf("Error on tw.WaitForCompletion: %v", err)
 			errCh <- err
 			return
 		}
 	}()
 
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		defer close(output)
 		var prevLine string
 		for {
 			select {
 			case <-ctx.Done():
 				errCh <- ctx.Err()
-				break
+				return
 			default:
 				if ctx.Err() != nil {
 					errCh <- ctx.Err()
@@ -362,11 +357,13 @@ func RunSimpleHealthCheckScript(br *script.BundleManager, cloudAddr string, clus
 				line, err := bufReader.ReadString('\n')
 				if err != nil {
 					if err == io.EOF {
+						log.Warn("EOF reached while reading health check script output")
 						output <- prevLine
-						errCh <- nil
+						errCh <- err
+						return
 					}
 					errCh <- err
-					break
+					return
 				}
 				// Capture the last line of output. This ensures
 				// that the EOF case returns the actual output instead of
@@ -374,20 +371,53 @@ func RunSimpleHealthCheckScript(br *script.BundleManager, cloudAddr string, clus
 				prevLine = line
 				err = evaluateHealthCheckResult(line)
 				if err != nil {
-					if _, ok := err.(*healthCheckWarning); ok {
-						log.Errorf(err.Error())
-						output <- prevLine
-						errCh <- nil
-					} else {
-						errCh <- err
-					}
+					log.Warn("evaluateHealthCheckResult err")
+					output <- prevLine
+					errCh <- err
 					return
 				}
 			}
 		}
 	}()
 
+	go func() {
+		wg.Wait()
+		close(errCh)
+	}()
+
 	err = <-errCh
 
 	return output, err
+}
+
+// RunSimpleHealthCheckScript runs a diagnostic pxl script to verify query serving works.
+// For newer viziers, it performs additional checks to ensure that the cluster is healthy
+// and that common issues are detected.
+func RunSimpleHealthCheckScript(br *script.BundleManager, cloudAddr string, clusterID uuid.UUID) (chan string, error) {
+	v, err := ConnectionToVizierByID(cloudAddr, clusterID)
+	if err != nil {
+		return nil, err
+	}
+	execScript, err := br.GetScript(script.AgentStatusDiagnosticsScript)
+
+	if err != nil {
+		execScript, err = br.GetScript(script.AgentStatusScript)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	resp, err := runHealthCheckScript(v, execScript)
+	if scriptErr, ok := err.(*ScriptExecutionError); ok {
+		if scriptErr.Code() == CodeCompilerError {
+			log.Warn("Detected an older vizier running. Please upgrade to the latest version.")
+			// If the script compilation failed, we fall back to the old health check script.
+			execScript, err = br.GetScript(script.AgentStatusScript)
+			if err != nil {
+				return nil, err
+			}
+			return runHealthCheckScript(v, execScript)
+		}
+	}
+	return resp, err
 }
