@@ -134,9 +134,9 @@ func (c *LogCollector) CollectPixieLogs(fName string) error {
 	if err != nil {
 		entry := log.WithError(err)
 		if _, ok := err.(*HealthCheckWarning); ok {
-			entry.Warn("health check script returned warning")
+			entry.Warn("healthcheck script detected the following warnings:")
 		} else {
-			entry.Warn("failed to run health check script")
+			entry.Warn("failed to run healthcheck script")
 		}
 	}
 

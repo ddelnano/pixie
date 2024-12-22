@@ -71,6 +71,7 @@ var BlockListedLabels = []string{
 }
 
 func init() {
+	DeployCmd.Flags().StringP("bundle", "b", "", "Path/URL to bundle file")
 	DeployCmd.Flags().StringP("extract_yaml", "e", "", "Directory to extract the Pixie yamls to")
 	DeployCmd.Flags().StringP("vizier_version", "v", "", "Pixie version to deploy")
 	DeployCmd.Flags().BoolP("check", "c", true, "Check whether the cluster can run Pixie")
@@ -105,6 +106,7 @@ var DeployCmd = &cobra.Command{
 	Use:   "deploy",
 	Short: "Deploys Pixie on the current K8s cluster",
 	PreRun: func(cmd *cobra.Command, args []string) {
+		viper.BindPFlag("bundle", cmd.Flags().Lookup("bundle"))
 		viper.BindPFlag("extract_yaml", cmd.Flags().Lookup("extract_yaml"))
 		viper.BindPFlag("vizier_version", cmd.Flags().Lookup("vizier_version"))
 		viper.BindPFlag("check", cmd.Flags().Lookup("check"))
@@ -640,7 +642,7 @@ func waitForHealthCheck(cloudAddr string, clusterID uuid.UUID, clientset *kubern
 	err := hc.RunAndMonitor()
 	if err != nil {
 		if _, ok := err.(*vizier.HealthCheckWarning); ok {
-			utils.WithError(err).Error("Failed Pixie healthcheck")
+			utils.WithError(err).Error("Pixie healthcheck detected the following warnings:")
 		} else {
 			_ = pxanalytics.Client().Enqueue(&analytics.Track{
 				UserId: pxconfig.Cfg().UniqueClientID,
