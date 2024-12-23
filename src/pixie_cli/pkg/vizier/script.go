@@ -34,8 +34,6 @@ import (
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc/codes"
 
-	log "github.com/sirupsen/logrus"
-
 	apiutils "px.dev/pixie/src/api/go/pxapi/utils"
 	"px.dev/pixie/src/api/proto/vizierpb"
 	"px.dev/pixie/src/pixie_cli/pkg/components"
@@ -398,7 +396,6 @@ func RunSimpleHealthCheckScript(br *script.BundleManager, cloudAddr string, clus
 	resp, err := runHealthCheckScript(v, execScript)
 	if scriptErr, ok := err.(*ScriptExecutionError); ok {
 		if scriptErr.Code() == CodeCompilerError {
-			log.Warn("Detected an older vizier running. Please upgrade to the latest version.")
 			// If the script compilation failed, we fall back to the old health check script.
 			execScript, err = br.GetScript(script.AgentStatusScript)
 			if err != nil {
