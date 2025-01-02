@@ -19,6 +19,7 @@
 #include "src/stirling/source_connectors/socket_tracer/testing/protocol_checkers.h"
 
 #include "src/stirling/source_connectors/socket_tracer/http_table.h"
+#include "src/stirling/source_connectors/socket_tracer/tls_table.h"
 #include "src/stirling/testing/common.h"
 
 namespace px {
@@ -111,10 +112,10 @@ std::vector<tls::Record> ToRecordVector(const types::ColumnWrapperRecordBatch& r
                                         const std::vector<size_t>& indices) {
   std::vector<tls::Record> result;
 
-  PX_UNUSED(rb);
   for (const auto& idx : indices) {
-    PX_UNUSED(idx);
+    auto version = rb[kTLSVersionIdx]->Get<types::Int64Value>(idx);
     tls::Record r;
+    r.req.version = static_cast<tls::LegacyVersion>(version.val);
     result.push_back(r);
   }
   return result;

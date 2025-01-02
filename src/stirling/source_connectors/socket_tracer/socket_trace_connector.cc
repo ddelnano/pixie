@@ -1715,7 +1715,7 @@ void SocketTraceConnector::AppendMessage(ConnectorContext* ctx, const ConnTracke
   r.Append<r.ColIndex("local_port")>(conn_tracker.local_endpoint().port());
   r.Append<r.ColIndex("trace_role")>(conn_tracker.role());
   r.Append<r.ColIndex("req_type")>(static_cast<uint64_t>(req_message.content_type));
-  r.Append<r.ColIndex("version")>(static_cast<uint64_t>(req_message.legacy_version));
+  r.Append<r.ColIndex("version")>(static_cast<uint64_t>(resp_message.legacy_version));
   r.Append<r.ColIndex("extensions")>(ToJSONString(req_message.extensions), kMaxHTTPHeadersBytes);
   r.Append<r.ColIndex("latency")>(
       CalculateLatency(req_message.timestamp_ns, resp_message.timestamp_ns));
