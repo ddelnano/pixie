@@ -219,6 +219,10 @@ struct Frame : public FrameBase {
 
   LegacyVersion handshake_version;
 
+  // Used to track the version negotiated in the session. For TLS 1.3 and later
+  // this is the version within the supported_versions extension.
+  LegacyVersion version;
+
   std::string session_id;
   std::string body;
 
