@@ -77,7 +77,7 @@ tls::Record GetExpectedTLSRecord() {
 
 class TLSVersionParameterizedTest
     : public SocketTraceBPFTestFixture</* TClientSideTracing */ false>,
-      public ::testing::WithParamInterface<std::string> {
+      public ::testing::WithParamInterface<tls::LegacyVersion> {
  protected:
   TLSVersionParameterizedTest() {
     Init();
@@ -93,7 +93,7 @@ class TLSVersionParameterizedTest
     sleep(1);
   }
 
-  void TestTLSVersion(const std::string& tls_version, const std::string& tls_max_version) {
+  void TestTLSVersion(const tls::LegacyVersion& tls_version) {
     FLAGS_stirling_conn_trace_pid = this->server_.PID();
 
     this->StartTransferDataThread();
@@ -101,11 +101,12 @@ class TLSVersionParameterizedTest
     // Make an SSL request with curl.
     ::px::stirling::testing::CurlContainer client;
     constexpr bool kHostPid = false;
+    std::string tls_version_str = TLSVersionToString(tls_version);
     ASSERT_OK(
         client.Run(std::chrono::seconds{60},
                    {absl::Substitute("--network=container:$0", this->server_.container_name())},
                    {"--insecure", "-s", "-S", "--resolve", "test-host:443:127.0.0.1",
-                    absl::Substitute("--tlsv$0", tls_version), "--tls-max", tls_max_version,
+                    absl::Substitute("--tlsv$0", tls_version_str), "--tls-max", tls_version_str,
                     "https://test-host/index.html"},
                    kHostPid));
     client.Wait();
@@ -116,6 +117,8 @@ class TLSVersionParameterizedTest
     EXPECT_GT(records[0].req.body.size(), 0);
     auto sni_str = R"({"extensions":{"server_name":["test-host"]}})";
     EXPECT_THAT(records[0].req.body, StrEq(sni_str));
+    auto version_str = absl::Substitute(R"({"version":"$0","extensions":{}})", tls_version_str);
+    EXPECT_THAT(records[0].resp.body, StrEq(version_str));
   }
 
   // Returns the trace records of the process specified by the input pid.
@@ -137,11 +140,11 @@ class TLSVersionParameterizedTest
 INSTANTIATE_TEST_SUITE_P(TLSVersions, TLSVersionParameterizedTest,
                          // TODO(ddelnano): Testing earlier versions will require making the
                          // server test container support compatible cihpers.
-                         ::testing::Values("1.2", "1.3"));
+                         ::testing::Values(tls::LegacyVersion::kTLS1_2, tls::LegacyVersion::kTLS1_3));
 
 TEST_P(TLSVersionParameterizedTest, TestTLSVersions) {
-  const std::string& tls_version = GetParam();
-  TestTLSVersion(tls_version, tls_version);
+  const tls::LegacyVersion& tls_version = GetParam();
+  TestTLSVersion(tls_version);
 }
 
 }  // namespace stirling

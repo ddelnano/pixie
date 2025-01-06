@@ -184,6 +184,24 @@ enum class ExtensionType : uint16_t {
   kRenegotiationInfo = 65281,
 };
 
+inline std::string TLSVersionToString(tls::LegacyVersion version) {
+  switch (version) {
+    case tls::LegacyVersion::kSSL3:
+      return "SSL3";
+    case tls::LegacyVersion::kTLS1_0:
+      return "1.0";
+    case tls::LegacyVersion::kTLS1_1:
+      return "1.1";
+    case tls::LegacyVersion::kTLS1_2:
+      return "1.2";
+    case tls::LegacyVersion::kTLS1_3:
+      return "1.3";
+    default:
+      return "Unknown";
+  }
+}
+
+
 // Extensions that are common to both the client and server side
 // of a TLS handshake
 struct SharedExtensions {

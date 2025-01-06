@@ -76,7 +76,7 @@ StatusOr<ParseState> ExtractSNIExtension(SharedExtensions* exts, BinaryDecoder* 
  * diagram: https://en.wikipedia.org/wiki/Transport_Layer_Security#TLS_record
  */
 
-ParseState ParseFullFrame(SharedExtensions* extensions, BinaryDecoder* decoder, Frame* frame) {
+ParseState ParseFullFrame(message_type_t type, SharedExtensions* extensions, BinaryDecoder* decoder, Frame* frame) {
   PX_ASSIGN_OR(auto raw_content_type, decoder->ExtractBEInt<uint8_t>(),
                return ParseState::kInvalid);
   auto content_type = magic_enum::enum_cast<tls::ContentType>(raw_content_type);
@@ -183,6 +183,9 @@ ParseState ParseFullFrame(SharedExtensions* extensions, BinaryDecoder* decoder, 
     extensions_length -= kExtensionMinimumLength + extension_length;
   }
   JSONObjectBuilder body_builder;
+  if (type == kResponse) {
+    body_builder.WriteKV("version", TLSVersionToString(frame->handshake_version));
+  }
   body_builder.WriteKVRecursive("extensions", *extensions);
   frame->body = body_builder.GetString();
 
@@ -209,7 +212,7 @@ ParseState ParseFrame(message_type_t type, std::string_view* buf, tls::Frame* fr
   } else {
     extensions = std::make_unique<tls::RespExtensions>();
   }
-  auto parse_result = tls::ParseFullFrame(extensions.get(), &decoder, frame);
+  auto parse_result = tls::ParseFullFrame(type, extensions.get(), &decoder, frame);
   if (parse_result == ParseState::kSuccess) {
     buf->remove_prefix(length + tls::kTLSRecordHeaderLength);
   }
