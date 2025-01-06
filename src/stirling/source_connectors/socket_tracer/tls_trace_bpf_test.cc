@@ -89,9 +89,26 @@ inline std::vector<std::string> GetExtensions(const types::ColumnWrapperRecordBa
   return exts;
 }
 
+inline std::string TLSVersionToString(tls::LegacyVersion version) {
+  switch (version) {
+    case tls::LegacyVersion::kSSL3:
+      return "SSL3";
+    case tls::LegacyVersion::kTLS1_0:
+      return "1.0";
+    case tls::LegacyVersion::kTLS1_1:
+      return "1.1";
+    case tls::LegacyVersion::kTLS1_2:
+      return "1.2";
+    case tls::LegacyVersion::kTLS1_3:
+      return "1.3";
+    default:
+      return "Unknown";
+  }
+}
+
 class TLSVersionParameterizedTest
     : public SocketTraceBPFTestFixture</* TClientSideTracing */ false>,
-      public ::testing::WithParamInterface<std::string> {
+      public ::testing::WithParamInterface<tls::LegacyVersion> {
  protected:
   TLSVersionParameterizedTest() {
     Init();
@@ -107,7 +124,7 @@ class TLSVersionParameterizedTest
     sleep(1);
   }
 
-  void TestTLSVersion(const std::string& tls_version, const std::string& tls_max_version) {
+  void TestTLSVersion(const tls::LegacyVersion& tls_version) {
     FLAGS_stirling_conn_trace_pid = this->server_.PID();
 
     this->StartTransferDataThread();
@@ -115,11 +132,12 @@ class TLSVersionParameterizedTest
     // Make an SSL request with curl.
     ::px::stirling::testing::CurlContainer client;
     constexpr bool kHostPid = false;
+    std::string tls_version_str = TLSVersionToString(tls_version);
     ASSERT_OK(
         client.Run(std::chrono::seconds{60},
                    {absl::Substitute("--network=container:$0", this->server_.container_name())},
-                   {"--insecure", "-s", "-S", "--resolve", "test-host:443:127.0.0.1", absl::Substitute("--tlsv$0", tls_version),
-                    "--tls-max", tls_max_version, "https://test-host/index.html"},
+                   {"--insecure", "-s", "-S", "--resolve", "test-host:443:127.0.0.1", absl::Substitute("--tlsv$0", tls_version_str),
+                    "--tls-max", tls_version_str, "https://test-host/index.html"},
                    kHostPid));
     client.Wait();
     this->StopTransferDataThread();
@@ -127,6 +145,7 @@ class TLSVersionParameterizedTest
     TraceRecords records = this->GetTraceRecords(this->server_.PID());
     EXPECT_THAT(records.tls_records, SizeIs(1));
     EXPECT_THAT(records.tls_extensions, SizeIs(1));
+    EXPECT_THAT(records.tls_records[0].req.version, ::testing::Eq(tls_version));
     auto sni_str = R"({"server_name":"[\"test-host\"]"})";
     EXPECT_THAT(records.tls_extensions[0], StrEq(sni_str));
   }
@@ -154,11 +173,11 @@ class TLSVersionParameterizedTest
 INSTANTIATE_TEST_SUITE_P(TLSVersions, TLSVersionParameterizedTest,
                          // TODO(ddelnano): Testing earlier versions will require making the
                          // server test container support compatible cihpers.
-                         ::testing::Values("1.2", "1.3"));
+                         ::testing::Values(tls::LegacyVersion::kTLS1_2, tls::LegacyVersion::kTLS1_3));
 
 TEST_P(TLSVersionParameterizedTest, TestTLSVersions) {
-  const std::string& tls_version = GetParam();
-  TestTLSVersion(tls_version, tls_version);
+  const tls::LegacyVersion& tls_version = GetParam();
+  TestTLSVersion(tls_version);
 }
 
 }  // namespace stirling
