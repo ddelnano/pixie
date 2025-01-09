@@ -926,6 +926,39 @@ attributes {
 })proto"));
 }
 
+const char kPEMPushDownIssue[] = R"pxl(
+import px
+
+def remove_duplicate_traces(df):
+    df.remote_pod_id = px.ip_to_pod_id(df.remote_addr)
+    df.remote_service_id = px.ip_to_service_id(df.remote_addr)
+    df.remote_outside_cluster = df.remote_pod_id == '' and df.remote_service_id == ''
+    return df
+
+def add_source_dest_columns(df):
+    df.pod = df.ctx['pod']
+    df.ra_pod = px.pod_id_to_pod_name(px.ip_to_pod_id(df.remote_addr))
+    df.is_ra_pod = df.ra_pod != ''
+    df.ra_name = px.select(df.is_ra_pod, df.ra_pod, df.remote_addr)
+    return df.drop(['ra_pod', 'is_ra_pod', 'ra_name'])
+
+df = px.DataFrame('http_events', select=['time_', 'upid', 'remote_addr'], start_time='-5m')
+df = remove_duplicate_traces(df)
+df = add_source_dest_columns(df)
+
+px.display(df)
+)pxl";
+
+TEST_F(LogicalPlannerTest, PEMPushDownIssue) {
+  auto planner = LogicalPlanner::Create(info_).ConsumeValueOrDie();
+  auto state = testutils::CreateTwoPEMsOneKelvinPlannerState(testutils::kHttpEventsSchema);
+  state.mutable_plan_options()->set_max_output_rows_per_table(100);
+  auto plan_or_s = planner->Plan(MakeQueryRequest(state, kPEMPushDownIssue));
+  EXPECT_OK(plan_or_s);
+  auto plan = plan_or_s.ConsumeValueOrDie();
+  EXPECT_OK(plan->ToProto());
+}
+
 TEST_F(LogicalPlannerTest, GenerateOTelScript) {
   auto planner = LogicalPlanner::Create(info_).ConsumeValueOrDie();
   auto state = testutils::CreateTwoPEMsOneKelvinPlannerState(testutils::kHttpEventsSchema);
