@@ -40,15 +40,17 @@ namespace distributed {
 class SplitPEMAndKelvinOnlyUDFOperatorRule : public Rule {
  public:
   explicit SplitPEMAndKelvinOnlyUDFOperatorRule(CompilerState* compiler_state)
-      : Rule(compiler_state, /*use_topo*/ false, /*reverse_topological_execution*/ false) {}
+      : Rule(compiler_state, /*use_topo*/ true, /*reverse_topological_execution*/ false) {}
 
  protected:
   StatusOr<bool> Apply(IRNode* node) override;
 
  private:
+  absl::flat_hash_set<uint64_t> ancestors_with_kelvin_only_udfs_;
+
   StatusOr<absl::flat_hash_set<std::string>> OptionallyUpdateExpression(
       IRNode* expr_parent, ExpressionIR* expr, MapIR* pem_only_map,
-      const absl::flat_hash_set<std::string>& used_column_names);
+      const absl::flat_hash_set<std::string>& used_column_names, bool check_children = true);
 };
 
 }  // namespace distributed
