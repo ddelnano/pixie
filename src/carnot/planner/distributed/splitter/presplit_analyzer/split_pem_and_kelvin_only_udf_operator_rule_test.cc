@@ -132,6 +132,57 @@ TEST_F(SplitPEMAndKelvinOnlyUDFOperatorRuleTest, nested) {
   EXPECT_THAT(map1->Children(), ElementsAre(sink));
 }
 
+TEST_F(SplitPEMAndKelvinOnlyUDFOperatorRuleTest, ancestor_kelvin_op) {
+  MemorySourceIR* src1 = MakeMemSource("http_events", {"remote_addr", "req_path"});
+  auto input1 = MakeColumn("remote_addr", 0);
+  auto input2 = MakeColumn("req_path", 0);
+  auto func1 = MakeFunc("kelvin_only", {input1});
+  auto func2 = MakeFunc("pem_only", {input2});
+  MapIR* map1 = MakeMap(src1, {{"kelvin", func1}, {"req_path", input2}});
+  MapIR* map2 = MakeMap(map1, {{"pem", func2}});
+  MemorySinkIR* sink = MakeMemSink(map2, "foo", {});
+
+  ResolveTypesRule type_rule(compiler_state_.get());
+  ASSERT_OK(type_rule.Execute(graph.get()));
+
+  Relation existing_map_relation({types::STRING, types::STRING}, {"kelvin", "req_path"});
+  EXPECT_THAT(*map1->resolved_table_type(), IsTableType(existing_map_relation));
+
+  SplitPEMAndKelvinOnlyUDFOperatorRule rule(compiler_state_.get());
+  auto rule_or_s = rule.Execute(graph.get());
+  ASSERT_OK(rule_or_s);
+  ASSERT_TRUE(rule_or_s.ConsumeValueOrDie());
+
+  ASSERT_EQ(1, src1->Children().size());
+  EXPECT_NE(src1->Children()[0], map1);
+  EXPECT_MATCH(src1->Children()[0], Map());
+
+  auto new_map = static_cast<MapIR*>(src1->Children()[0]);
+  Relation expected_map_relation({types::STRING, types::STRING, types::STRING}, {"pem_only_0", "remote_addr", "req_path"});
+  EXPECT_THAT(3, new_map->col_exprs().size());
+  EXPECT_MATCH(new_map->col_exprs()[0].node, FuncNameAllArgsMatch("pem_only", ColumnNode("req_path")));
+  EXPECT_THAT(*new_map->resolved_table_type(), IsTableType(expected_map_relation));
+  EXPECT_THAT(new_map->parents(), ElementsAre(src1));
+  EXPECT_THAT(new_map->Children(), ElementsAre(map1));
+
+  Relation existing_map_relation2({types::STRING, types::STRING, types::STRING}, {"kelvin", "req_path", "pem_only_0"});
+  EXPECT_THAT(*map1->resolved_table_type(), IsTableType(existing_map_relation2));
+  EXPECT_EQ(3, map1->col_exprs().size());
+  EXPECT_EQ("kelvin", map1->col_exprs()[0].name);
+  EXPECT_MATCH(map1->col_exprs()[0].node,
+               FuncNameAllArgsMatch("kelvin_only", ColumnNode("remote_addr")));
+  EXPECT_THAT(map1->parents(), ElementsAre(new_map));
+  EXPECT_THAT(1, map1->Children().size());
+  EXPECT_MATCH(map1->Children()[0], Map());
+
+  Relation existing_map_relation3({types::STRING, types::STRING, types::STRING, types::STRING}, {"kelvin", "req_path", "pem_only_0", "pem"});
+  EXPECT_THAT(*map2->resolved_table_type(), IsTableType(existing_map_relation3));
+  EXPECT_EQ(4, map2->col_exprs().size());
+  EXPECT_MATCH(map2->col_exprs()[2].node, ColumnNode("pem_only_0"));
+  EXPECT_THAT(map2->parents(), ElementsAre(map1));
+  EXPECT_THAT(map2->Children(), ElementsAre(sink));
+}
+
 TEST_F(SplitPEMAndKelvinOnlyUDFOperatorRuleTest, name_collision) {
   MemorySourceIR* src1 = MakeMemSource("http_events");
 

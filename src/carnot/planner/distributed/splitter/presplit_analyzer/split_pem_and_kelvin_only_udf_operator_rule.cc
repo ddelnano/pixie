@@ -44,7 +44,7 @@ std::string GetUniqueOutputName(FuncIR* input_expr,
 StatusOr<absl::flat_hash_set<std::string>>
 SplitPEMAndKelvinOnlyUDFOperatorRule::OptionallyUpdateExpression(
     IRNode* expr_parent, ExpressionIR* expr, MapIR* pem_only_map,
-    const absl::flat_hash_set<std::string>& used_column_names, bool check_children) {
+    const absl::flat_hash_set<std::string>& used_column_names) {
   if (!Match(expr, Func())) {
     return absl::flat_hash_set<std::string>({});
   }
@@ -60,7 +60,7 @@ SplitPEMAndKelvinOnlyUDFOperatorRule::OptionallyUpdateExpression(
   PX_ASSIGN_OR_RETURN(
       auto is_scalar_func_executor,
       IsFuncWithExecutor(compiler_state_, expr, udfspb::UDFSourceExecutor::UDF_PEM));
-  if (!is_scalar_func_executor && check_children) {
+  if (!is_scalar_func_executor) {
     // Even if this func itself isn't a PEM-only UDF, its children still might be.
     // Optionally update all of the child expressions of this expression.
     for (ExpressionIR* arg : func->args()) {
@@ -73,7 +73,6 @@ SplitPEMAndKelvinOnlyUDFOperatorRule::OptionallyUpdateExpression(
 
   // Create the column that will replace the expression in the operator we are splitting.
   auto output_col_name = GetUniqueOutputName(func, used_column_names);
-  LOG(WARNING) << "Creating column with name: " << output_col_name;
   new_col_names.insert(output_col_name);
   PX_ASSIGN_OR_RETURN(auto input_col, graph->CreateNode<ColumnIR>(expr->ast(), output_col_name,
                                                                   /*parent_op_idx*/ 0));
@@ -141,10 +140,9 @@ StatusOr<bool> SplitPEMAndKelvinOnlyUDFOperatorRule::Apply(IRNode* node) {
   // TODO(ddelnano): Check if this condition is possible
   DCHECK(has_kelvin_only_udf != has_ancestor_with_kelvin_only);
 
+  // There are cases where a parent Map will contain a Kelvin only UDF. We must detect
+  // this situation and move the PEM only UDF into that Map so this rule can run properly.
   if (has_ancestor_with_kelvin_only) {
-    LOG(WARNING) << "This is happening";
-    /* DCHECK(Match(op, Map()) || Match(op, Filter())); */
-
     auto parent = op->parents()[0];
     auto parent_table_type = parent->resolved_table_type();
     DCHECK(Match(parent, Map()));
@@ -155,8 +153,6 @@ StatusOr<bool> SplitPEMAndKelvinOnlyUDFOperatorRule::Apply(IRNode* node) {
       auto map = static_cast<MapIR*>(op);
       map->set_keep_input_columns(true);
       for (const auto& expr : map->col_exprs()) {
-        LOG(WARNING) << "Adding expression to operator_expressions " << expr.node->DebugString();
-        LOG(INFO) << "keep_input_columns: " << map->keep_input_columns();
         operator_expressions.push_back(expr.node);
       }
     } else if (Match(op, Filter())) {
@@ -199,25 +195,16 @@ StatusOr<bool> SplitPEMAndKelvinOnlyUDFOperatorRule::Apply(IRNode* node) {
                                ColumnExpression(required_input_col, col_node));
     }
 
-    for (const auto& [_, col_expr] : sorted_col_exprs) {
-      LOG(WARNING) << "Adding col_expr to parent_map" << col_expr.node->DebugString();
-      if (col_expr.name.compare("remote_service_id") == 0 || col_expr.name.compare("remote_pod_id") == 0 || col_expr.name.compare("upid_to_pod_name_0") == 0) {
-        continue;
-      }
-      PX_RETURN_IF_ERROR(parent_map->AddColExpr(col_expr));
-    }
+    // Now that the ancestor has kelvin only and PEM only UDFs, we can split the PEM only UDFs.
+    Apply(parent_map);
 
     // Update the relation of the PEM-only map.
     // The relation of the parent should be unchanged, since it is just a reassignment
     // of the same output value.
+    parent_map->ClearResolvedType();
     PX_RETURN_IF_ERROR(ResolveOperatorType(parent_map, compiler_state_));
-    PX_RETURN_IF_ERROR(op->ReplaceParent(parent, parent_map));
-
-    LOG(WARNING) << graph->DebugString();
-    LOG(WARNING) << "Second branch";
-    Apply(parent_map);
-    LOG(WARNING) << graph->DebugString();
-    PX_RETURN_IF_ERROR(ResolveOperatorType(parent_map, compiler_state_));
+    op->ClearResolvedType();
+    PX_RETURN_IF_ERROR(ResolveOperatorType(op, compiler_state_));
     return true;
   }
   auto parent = op->parents()[0];

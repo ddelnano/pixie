@@ -50,7 +50,7 @@ class SplitPEMAndKelvinOnlyUDFOperatorRule : public Rule {
 
   StatusOr<absl::flat_hash_set<std::string>> OptionallyUpdateExpression(
       IRNode* expr_parent, ExpressionIR* expr, MapIR* pem_only_map,
-      const absl::flat_hash_set<std::string>& used_column_names, bool check_children = true);
+      const absl::flat_hash_set<std::string>& used_column_names);
 };
 
 }  // namespace distributed
