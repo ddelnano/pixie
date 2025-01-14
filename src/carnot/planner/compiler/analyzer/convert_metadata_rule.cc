@@ -112,7 +112,6 @@ Status ConvertMetadataRule::UpdateMetadataContainer(IRNode* container, MetadataI
     auto filter = static_cast<FilterIR*>(container);
     return filter->SetFilterExpr(metadata_expr);
   }
-
   return error::Internal("Unsupported IRNode container for metadata: $0", container->DebugString());
 }
 
@@ -189,11 +188,17 @@ StatusOr<bool> ConvertMetadataRule::Apply(IRNode* ir_node) {
         graph->CreateNode<FuncIR>(ir_node->ast(),
                                   FuncIR::Op{FuncIR::Opcode::non_op, "", "_ip_to_pod_id_pem_exec"},
                                   std::vector<ExpressionIR*>{local_addr_col, time_col}));
+
+    // This doesn't need to have a "pem exec" equivalent function as long as the metadata
+    // annotation is set as done below
     PX_ASSIGN_OR_RETURN(
         backup_conversion_func,
         graph->CreateNode<FuncIR>(
-            ir_node->ast(), FuncIR::Op{FuncIR::Opcode::non_op, "", "_pod_id_to_pod_name_pem_exec"},
+            ir_node->ast(), FuncIR::Op{FuncIR::Opcode::non_op, "", "pod_id_to_pod_name"},
             std::vector<ExpressionIR*>{static_cast<ExpressionIR*>(ip_conversion_func)}));
+
+    backup_conversion_func->set_annotations(ExpressionIR::Annotations(md_type));
+
     auto empty_string = static_cast<ExpressionIR*>(
         graph->CreateNode<StringIR>(ir_node->ast(), "").ConsumeValueOrDie());
     PX_ASSIGN_OR_RETURN(
@@ -229,10 +234,7 @@ StatusOr<bool> ConvertMetadataRule::Apply(IRNode* ir_node) {
 
   DCHECK_EQ(conversion_func->EvaluatedDataType(), column_type)
       << "Expected the parent key column type and metadata property type to match.";
-  if (backup_conversion_available) {
-    // These annotations ensure that the OperatorIRs will run on PEMs
-    backup_conversion_func->set_annotations(ExpressionIR::Annotations(md_type));
-  }
+  // These annotations ensure that the OperatorIRs will run on PEMs
   orig_conversion_func->set_annotations(ExpressionIR::Annotations(md_type));
   return true;
 }

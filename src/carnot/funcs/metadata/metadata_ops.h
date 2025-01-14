@@ -123,32 +123,6 @@ class PodIDToPodNameUDF : public ScalarUDF {
   }
 };
 
-class PodIDToPodNamePEMOnlyUDF : public ScalarUDF {
- public:
-  StringValue Exec(FunctionContext* ctx, StringValue pod_id) {
-    auto md = GetMetadataState(ctx);
-
-    const auto* pod_info = md->k8s_metadata_state().PodInfoByID(pod_id);
-    if (pod_info != nullptr) {
-      return absl::Substitute("$0/$1", pod_info->ns(), pod_info->name());
-    }
-
-    return "";
-  }
-  static udf::InfRuleVec SemanticInferenceRules() {
-    return {udf::ExplicitRule::Create<PodIDToPodNameUDF>(types::ST_POD_NAME, {types::ST_NONE})};
-  }
-  static udf::ScalarUDFDocBuilder Doc() {
-    return udf::ScalarUDFDocBuilder("Get the name of a pod from its pod ID.")
-        .Details("Gets the kubernetes name for the pod from its pod ID.")
-        .Example("df.pod_name = px.pod_id_to_pod_name(df.pod_id)")
-        .Arg("pod_id", "The pod ID of the pod to get the name for.")
-        .Returns("The k8s pod name for the pod ID passed in.");
-  }
-
-  static udfspb::UDFSourceExecutor Executor() { return udfspb::UDFSourceExecutor::UDF_PEM; }
-};
-
 class PodIDToPodLabelsUDF : public ScalarUDF {
  public:
   StringValue Exec(FunctionContext* ctx, StringValue pod_id) {
@@ -3019,24 +2993,6 @@ class IPToPodIDAtTimePEMExecUDF : public ScalarUDF {
     return md->k8s_metadata_state().PodIDByIPAtTime(pod_ip, time.val);
   }
 
-  static udfspb::UDFSourceExecutor Executor() { return udfspb::UDFSourceExecutor::UDF_PEM; }
-};
-
-class PodIDToPodNamePEMExecUDF : public ScalarUDF {
- public:
-  StringValue Exec(FunctionContext* ctx, StringValue pod_id) {
-    auto md = GetMetadataState(ctx);
-
-    const auto* pod_info = md->k8s_metadata_state().PodInfoByID(pod_id);
-    if (pod_info != nullptr) {
-      return absl::Substitute("$0/$1", pod_info->ns(), pod_info->name());
-    }
-
-    return "";
-  }
-  static udf::InfRuleVec SemanticInferenceRules() {
-    return {udf::ExplicitRule::Create<PodIDToPodNameUDF>(types::ST_POD_NAME, {types::ST_NONE})};
-  }
   static udfspb::UDFSourceExecutor Executor() { return udfspb::UDFSourceExecutor::UDF_PEM; }
 };
 
