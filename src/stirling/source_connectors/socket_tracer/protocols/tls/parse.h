@@ -28,7 +28,7 @@ namespace stirling {
 namespace protocols {
 namespace tls {
 
-ParseState ParseFullFrame(message_type_t type, SharedExtensions* extensions, BinaryDecoder* decoder, Frame* frame);
+ParseState ParseFullFrame(SharedExtensions* extensions, BinaryDecoder* decoder, Frame* frame);
 
 }
 

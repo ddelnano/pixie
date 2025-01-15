@@ -140,7 +140,8 @@ class TLSVersionParameterizedTest
 INSTANTIATE_TEST_SUITE_P(TLSVersions, TLSVersionParameterizedTest,
                          // TODO(ddelnano): Testing earlier versions will require making the
                          // server test container support compatible cihpers.
-                         ::testing::Values(tls::LegacyVersion::kTLS1_2, tls::LegacyVersion::kTLS1_3));
+                         ::testing::Values(tls::LegacyVersion::kTLS1_2,
+                                           tls::LegacyVersion::kTLS1_3));
 
 TEST_P(TLSVersionParameterizedTest, TestTLSVersions) {
   const tls::LegacyVersion& tls_version = GetParam();

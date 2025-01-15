@@ -63,6 +63,25 @@ StatusOr<ParseState> ExtractSNIExtension(SharedExtensions* exts, BinaryDecoder* 
   return ParseState::kSuccess;
 }
 
+StatusOr<ParseState> ExtractSupportedVersionsExtension(Frame* frame, BinaryDecoder* decoder,
+                                                       uint16_t extension_length) {
+  if (frame->handshake_type == HandshakeType::kClientHello) {
+    auto s = decoder->ExtractBufIgnore(extension_length);
+    if (!s.ok()) {
+      return ParseState::kInvalid;
+    }
+  } else {
+    PX_ASSIGN_OR(auto raw_supported_version, decoder->ExtractBEInt<uint16_t>(),
+                 return ParseState::kInvalid);
+    auto supported_version = magic_enum::enum_cast<tls::LegacyVersion>(raw_supported_version);
+    if (!supported_version.has_value()) {
+      return ParseState::kInvalid;
+    }
+    frame->version = supported_version.value();
+  }
+  return ParseState::kSuccess;
+}
+
 /*
  * The TLS wire protocol is best described in each of the RFCs for the protocol
  * SSL v3.0: https://tools.ietf.org/html/rfc6101
@@ -76,7 +95,7 @@ StatusOr<ParseState> ExtractSNIExtension(SharedExtensions* exts, BinaryDecoder* 
  * diagram: https://en.wikipedia.org/wiki/Transport_Layer_Security#TLS_record
  */
 
-ParseState ParseFullFrame(message_type_t type, SharedExtensions* extensions, BinaryDecoder* decoder, Frame* frame) {
+ParseState ParseFullFrame(SharedExtensions* extensions, BinaryDecoder* decoder, Frame* frame) {
   PX_ASSIGN_OR(auto raw_content_type, decoder->ExtractBEInt<uint8_t>(),
                return ParseState::kInvalid);
   auto content_type = magic_enum::enum_cast<tls::ContentType>(raw_content_type);
@@ -123,6 +142,9 @@ ParseState ParseFullFrame(message_type_t type, SharedExtensions* extensions, Bin
     return ParseState::kInvalid;
   }
   frame->handshake_version = handshake_version.value();
+  // In TLS 1.2 and earlier, the version is negotiated in the server hello message.
+  // The supported_versions extension processing will overwrite this if it is present.
+  frame->version = frame->handshake_version;
 
   // Skip the random struct.
   if (!decoder->ExtractBufIgnore(kRandomStructLength).ok()) {
@@ -169,8 +191,12 @@ ParseState ParseFullFrame(message_type_t type, SharedExtensions* extensions, Bin
                  return ParseState::kInvalid);
 
     if (extension_length > 0) {
-      if (extension_type == 0x00) {
+      if (extension_type == static_cast<uint16_t>(ExtensionType::kServerName)) {
         if (!ExtractSNIExtension(extensions, decoder).ok()) {
+          return ParseState::kInvalid;
+        }
+      } else if (extension_type == static_cast<uint16_t>(ExtensionType::kSupportedVersions)) {
+        if (!ExtractSupportedVersionsExtension(frame, decoder, extension_length).ok()) {
           return ParseState::kInvalid;
         }
       } else {
@@ -183,8 +209,8 @@ ParseState ParseFullFrame(message_type_t type, SharedExtensions* extensions, Bin
     extensions_length -= kExtensionMinimumLength + extension_length;
   }
   JSONObjectBuilder body_builder;
-  if (type == kResponse) {
-    body_builder.WriteKV("version", TLSVersionToString(frame->handshake_version));
+  if (frame->handshake_type == HandshakeType::kServerHello) {
+    body_builder.WriteKV("version", TLSVersionToString(frame->version));
   }
   body_builder.WriteKVRecursive("extensions", *extensions);
   frame->body = body_builder.GetString();
@@ -212,7 +238,7 @@ ParseState ParseFrame(message_type_t type, std::string_view* buf, tls::Frame* fr
   } else {
     extensions = std::make_unique<tls::RespExtensions>();
   }
-  auto parse_result = tls::ParseFullFrame(type, extensions.get(), &decoder, frame);
+  auto parse_result = tls::ParseFullFrame(extensions.get(), &decoder, frame);
   if (parse_result == ParseState::kSuccess) {
     buf->remove_prefix(length + tls::kTLSRecordHeaderLength);
   }
