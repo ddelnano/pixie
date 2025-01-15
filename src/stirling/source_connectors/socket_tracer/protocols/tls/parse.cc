@@ -63,6 +63,25 @@ StatusOr<ParseState> ExtractSNIExtension(std::map<std::string, std::string>* ext
   return ParseState::kSuccess;
 }
 
+StatusOr<ParseState> ExtractSupportedVersionsExtension(Frame* frame, BinaryDecoder* decoder,
+                                                       uint16_t extension_length) {
+  if (frame->handshake_type == HandshakeType::kClientHello) {
+    auto s = decoder->ExtractBufIgnore(extension_length);
+    if (!s.ok()) {
+      return ParseState::kInvalid;
+    }
+  } else {
+    PX_ASSIGN_OR(auto raw_supported_version, decoder->ExtractBEInt<uint16_t>(),
+                 return ParseState::kInvalid);
+    auto supported_version = magic_enum::enum_cast<tls::LegacyVersion>(raw_supported_version);
+    if (!supported_version.has_value()) {
+      return ParseState::kInvalid;
+    }
+    frame->version = supported_version.value();
+  }
+  return ParseState::kSuccess;
+}
+
 /*
  * The TLS wire protocol is best described in each of the RFCs for the protocol
  * SSL v3.0: https://tools.ietf.org/html/rfc6101
@@ -169,8 +188,12 @@ ParseState ParseFullFrame(BinaryDecoder* decoder, Frame* frame) {
                  return ParseState::kInvalid);
 
     if (extension_length > 0) {
-      if (extension_type == 0x00) {
+      if (extension_type == static_cast<uint16_t>(ExtensionType::kServerName)) {
         if (!ExtractSNIExtension(&frame->extensions, decoder).ok()) {
+          return ParseState::kInvalid;
+        }
+      } else if (extension_type == static_cast<uint16_t>(ExtensionType::kSupportedVersions)) {
+        if (!ExtractSupportedVersionsExtension(frame, decoder, extension_length).ok()) {
           return ParseState::kInvalid;
         }
       } else {
@@ -181,6 +204,12 @@ ParseState ParseFullFrame(BinaryDecoder* decoder, Frame* frame) {
     }
 
     extensions_length -= kExtensionMinimumLength + extension_length;
+  }
+
+  if (frame->handshake_type == HandshakeType::kServerHello &&
+      frame->version < LegacyVersion::kTLS1_3) {
+    // In TLS 1.2 and earlier, the version is negotiated in the server hello message.
+    frame->version = frame->handshake_version;
   }
 
   return ParseState::kSuccess;

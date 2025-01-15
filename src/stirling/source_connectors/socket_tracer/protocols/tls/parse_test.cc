@@ -169,6 +169,16 @@ constexpr uint8_t kFailedTLSv1_2[] = {
   0x02, 0x03, 0x03, 0x01, 0x02, 0x01, 0x03, 0x02, 0x02, 0x02, 0x04, 0x02, 0x05, 0x02, 0x06, 0x02,
 };
 
+constexpr uint8_t kServerHelloTLS1_2[] = {
+  0x16, 0x03, 0x03, 0x00, 0x5d, 0x02, 0x00, 0x00, 0x59, 0x03, 0x03, 0x05, 0x8d, 0x58, 0x63, 0x18,
+  0x01, 0xb7, 0x2b, 0x53, 0x07, 0xb6, 0xc2, 0xdd, 0xf6, 0x0d, 0x49, 0x65, 0xc8, 0xe5, 0xc1, 0x0e,
+  0xee, 0x01, 0x97, 0x44, 0x4f, 0x57, 0x4e, 0x47, 0x52, 0x44, 0x01, 0x20, 0xf2, 0x97, 0x38, 0x98,
+  0xb1, 0x63, 0x69, 0x67, 0x23, 0xf9, 0x3b, 0x80, 0x8b, 0x80, 0xc0, 0x4a, 0xa5, 0xb1, 0x2f, 0x30,
+  0xfa, 0xe5, 0xa3, 0x81, 0xd5, 0xbc, 0x22, 0xd9, 0x3c, 0x13, 0x5f, 0x7b, 0xc0, 0x2b, 0x00, 0x00,
+  0x11, 0xff, 0x01, 0x00, 0x01, 0x00, 0x00, 0x0b, 0x00, 0x04, 0x03, 0x00, 0x01, 0x02, 0x00, 0x17,
+  0x00, 0x00,
+};
+
 // This caught a bug where TLS extensions can have a length of 0. Prior to this we unconditionally
 // tried to parse a server_name extension that had a length of 0.
 constexpr uint8_t kServerHelloWithZeroLengthExtension[] = {
@@ -319,6 +329,24 @@ TEST_F(TLSParserTest, ParseValidClientHello) {
   ASSERT_EQ(state, ParseState::kSuccess);
 }
 
+TEST_F(TLSParserTest, ParseValidServerHelloTLS1_2) {
+  auto frame_view = CreateStringView<char>(CharArrayStringView<uint8_t>(kServerHelloTLS1_2));
+
+  tls::Frame frame;
+  ParseState state = ParseFrame(message_type_t::kRequest, &frame_view, &frame);
+
+  ASSERT_EQ(frame.content_type, tls::ContentType::kHandshake);
+  ASSERT_EQ(frame.legacy_version, tls::LegacyVersion::kTLS1_2);
+  ASSERT_EQ(frame.version, tls::LegacyVersion::kTLS1_2);
+  ASSERT_EQ(frame.length, 93);
+
+  ASSERT_EQ(frame.handshake_type, tls::HandshakeType::kServerHello);
+  ASSERT_EQ(frame.handshake_length, 89);
+  ASSERT_EQ(frame.handshake_version, tls::LegacyVersion::kTLS1_2);
+  ASSERT_GT(frame.session_id.size(), 0);
+  ASSERT_EQ(state, ParseState::kSuccess);
+}
+
 TEST_F(TLSParserTest, ParseValidServerHello) {
   auto frame_view = CreateStringView<char>(CharArrayStringView<uint8_t>(kServerHello));
 
@@ -327,6 +355,7 @@ TEST_F(TLSParserTest, ParseValidServerHello) {
 
   ASSERT_EQ(frame.content_type, tls::ContentType::kHandshake);
   ASSERT_EQ(frame.legacy_version, tls::LegacyVersion::kTLS1_2);
+  ASSERT_EQ(frame.version, tls::LegacyVersion::kTLS1_3);
   ASSERT_EQ(frame.length, 122);
 
   ASSERT_EQ(frame.handshake_type, tls::HandshakeType::kServerHello);

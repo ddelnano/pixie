@@ -81,7 +81,7 @@ tls::Record GetExpectedTLSRecord() {
 }
 
 inline std::vector<std::string> GetExtensions(const types::ColumnWrapperRecordBatch& rb,
-                                               const std::vector<size_t>& indices) {
+                                              const std::vector<size_t>& indices) {
   std::vector<std::string> exts;
   for (size_t idx : indices) {
     exts.push_back(rb[kTLSExtensionsIdx]->Get<types::StringValue>(idx));
@@ -136,8 +136,9 @@ class TLSVersionParameterizedTest
     ASSERT_OK(
         client.Run(std::chrono::seconds{60},
                    {absl::Substitute("--network=container:$0", this->server_.container_name())},
-                   {"--insecure", "-s", "-S", "--resolve", "test-host:443:127.0.0.1", absl::Substitute("--tlsv$0", tls_version_str),
-                    "--tls-max", tls_version_str, "https://test-host/index.html"},
+                   {"--insecure", "-s", "-S", "--resolve", "test-host:443:127.0.0.1",
+                    absl::Substitute("--tlsv$0", tls_version_str), "--tls-max", tls_version_str,
+                    "https://test-host/index.html"},
                    kHostPid));
     client.Wait();
     this->StopTransferDataThread();
@@ -173,7 +174,8 @@ class TLSVersionParameterizedTest
 INSTANTIATE_TEST_SUITE_P(TLSVersions, TLSVersionParameterizedTest,
                          // TODO(ddelnano): Testing earlier versions will require making the
                          // server test container support compatible cihpers.
-                         ::testing::Values(tls::LegacyVersion::kTLS1_2, tls::LegacyVersion::kTLS1_3));
+                         ::testing::Values(tls::LegacyVersion::kTLS1_2,
+                                           tls::LegacyVersion::kTLS1_3));
 
 TEST_P(TLSVersionParameterizedTest, TestTLSVersions) {
   const tls::LegacyVersion& tls_version = GetParam();
