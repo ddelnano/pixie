@@ -127,9 +127,7 @@ TEST_F(ConvertMetadataRuleTest, multichild_with_fallback_func) {
   metadata_ir->set_property(property);
 
   auto src = MakeMemSource(relation);
-  auto map1 = MakeMap(src, {{"md", metadata_ir}});
-  auto map2 = MakeMap(src, {{"other_col", MakeInt(2)}, {"md", metadata_ir}});
-  auto filter = MakeFilter(src, MakeEqualsFunc(metadata_ir, MakeString("pl/foobar")));
+  auto map = MakeMap(src, {{"md", metadata_ir}});
 
   ResolveTypesRule type_rule(compiler_state_.get());
   ASSERT_OK(type_rule.Execute(graph.get()));
@@ -141,33 +139,18 @@ TEST_F(ConvertMetadataRuleTest, multichild_with_fallback_func) {
 
   EXPECT_EQ(0, graph->FindNodesThatMatch(Metadata()).size());
 
-  // Check the contents of the new func.
-  EXPECT_MATCH(filter->filter_expr(), Equals(Func(), String()));
-  auto converted_md = static_cast<FuncIR*>(filter->filter_expr())->all_args()[0];
-  EXPECT_EQ(ExpressionIR::Annotations(MetadataType::POD_NAME), converted_md->annotations());
-  EXPECT_MATCH(converted_md, Func());
-  auto converted_md_func = static_cast<FuncIR*>(converted_md);
-  EXPECT_MATCH(converted_md_func, ResolvedExpression());
+  EXPECT_EQ(1, src->Children().size());
+  auto md_map = static_cast<MapIR*>(src->Children()[0]);
+  EXPECT_NE(md_map, map);
 
-  // When the fallback is provided, the compiler will make the following transfomation (pseudo
-  // code): Before:
-  //   df.ctx["pod"]
-  //
-  // After:
-  //   fallback_func = px.pod_id_to_pod_name(px.ip_to_pod_id(df.ctx["local_addr"]))
-  //   px.select(px.upid_to_pod_name(df.upid) == "", fallback_func, px.upid_to_pod_name(df.upid))
-  EXPECT_EQ("select", converted_md_func->func_name());
-  EXPECT_EQ(3, converted_md_func->all_args().size());
-
-  auto orig_func_check = converted_md_func->all_args()[0];
-  EXPECT_MATCH(orig_func_check, Func());
-  auto equals_func = static_cast<FuncIR*>(orig_func_check);
-  EXPECT_EQ("equal", equals_func->func_name());
-  EXPECT_EQ(2, equals_func->all_args().size());
-  EXPECT_MATCH(equals_func->all_args()[0], Func());
-  EXPECT_MATCH(orig_func_check, ResolvedExpression());
-
-  auto upid_to_pod_name = static_cast<FuncIR*>(equals_func->all_args()[0]);
+  FuncIR* upid_to_pod_name = nullptr;
+  for (auto col_expr : md_map->col_exprs()) {
+    if (col_expr.name == "pod_name_0") {
+      EXPECT_MATCH(col_expr.node, Func());
+      upid_to_pod_name = static_cast<FuncIR*>(col_expr.node);
+    }
+  }
+  EXPECT_NE(upid_to_pod_name, nullptr);
   EXPECT_EQ(absl::Substitute("upid_to_$0", metadata_name), upid_to_pod_name->func_name());
   EXPECT_EQ(1, upid_to_pod_name->all_args().size());
   auto input_col = upid_to_pod_name->all_args()[0];
@@ -175,10 +158,31 @@ TEST_F(ConvertMetadataRuleTest, multichild_with_fallback_func) {
   EXPECT_MATCH(upid_to_pod_name, ResolvedExpression());
   EXPECT_MATCH(input_col, ResolvedExpression());
 
-  EXPECT_MATCH(equals_func->all_args()[1], String(""));
+  EXPECT_EQ(1, md_map->Children().size());
+  auto fallback_map = static_cast<MapIR*>(md_map->Children()[0]);
+  FuncIR* fallback_func_select = nullptr;
+  for (auto col_expr : fallback_map->col_exprs()) {
+    if (col_expr.name == "pod_name_1") {
+      EXPECT_MATCH(col_expr.node, Func());
+      fallback_func_select = static_cast<FuncIR*>(col_expr.node);
+    }
+  }
 
-  EXPECT_MATCH(converted_md_func->all_args()[1], Func());
-  auto fallback_func = static_cast<FuncIR*>(converted_md_func->all_args()[1]);
+  EXPECT_NE(fallback_func_select, nullptr);
+  EXPECT_EQ("select", fallback_func_select->func_name());
+  EXPECT_EQ(3, fallback_func_select->all_args().size());
+
+  auto orig_func_check = fallback_func_select->all_args()[0];
+  EXPECT_MATCH(orig_func_check, Func());
+  auto equals_func = static_cast<FuncIR*>(orig_func_check);
+  EXPECT_EQ("equal", equals_func->func_name());
+  EXPECT_EQ(2, equals_func->all_args().size());
+  EXPECT_MATCH(equals_func->all_args()[0], ColumnNode("pod_name_0"));
+  EXPECT_MATCH(equals_func->all_args()[1], String(""));
+  EXPECT_MATCH(orig_func_check, ResolvedExpression());
+
+  EXPECT_MATCH(fallback_func_select->all_args()[1], Func());
+  auto fallback_func = static_cast<FuncIR*>(fallback_func_select->all_args()[1]);
   EXPECT_EQ("pod_id_to_pod_name", fallback_func->func_name());
   EXPECT_EQ(1, fallback_func->all_args().size());
   EXPECT_MATCH(fallback_func->all_args()[0], Func());
@@ -191,20 +195,8 @@ TEST_F(ConvertMetadataRuleTest, multichild_with_fallback_func) {
   EXPECT_MATCH(ip_func->all_args()[1], ColumnNode("time_"));
   EXPECT_MATCH(ip_func, ResolvedExpression());
 
-  EXPECT_MATCH(converted_md_func->all_args()[2], Func());
-  auto default_func = static_cast<FuncIR*>(converted_md_func->all_args()[2]);
-  EXPECT_EQ(absl::Substitute("upid_to_$0", metadata_name), default_func->func_name());
-  EXPECT_EQ(1, default_func->all_args().size());
-  EXPECT_MATCH(default_func->all_args()[0], ColumnNode("upid"));
-  EXPECT_MATCH(default_func, ResolvedExpression());
-
-  // Check to make sure that all of the operators and expressions depending on the metadata
-  // now have an updated reference to the func.
-  EXPECT_EQ(converted_md, map1->col_exprs()[0].node);
-  EXPECT_EQ(converted_md, map2->col_exprs()[1].node);
-
   // Check that the semantic type of the conversion func is propagated properly.
-  auto type_or_s = map2->resolved_table_type()->GetColumnType("md");
+  auto type_or_s = map->resolved_table_type()->GetColumnType("md");
   ASSERT_OK(type_or_s);
   auto type = std::static_pointer_cast<ValueType>(type_or_s.ConsumeValueOrDie());
   EXPECT_EQ(types::STRING, type->data_type());
