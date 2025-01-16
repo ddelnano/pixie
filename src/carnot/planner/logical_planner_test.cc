@@ -830,7 +830,9 @@ TEST_F(LogicalPlannerTest, pod_name_fallback_conversion_with_filter) {
   ASSERT_OK(plan->ToProto());
 }
 
-const char kPodNameMissingCol[] = R"pxl(
+// Use a data table that doesn't contain local_addr to test df.ctx['pod'] conversion without
+// the fallback conversion.
+const char kPodNameConversionWithoutFallback[] = R"pxl(
 import px
 
 def cql_flow_graph():
@@ -854,15 +856,26 @@ def cql_summary_with_links():
 
     return df
 )pxl";
-TEST_F(LogicalPlannerTest, pod_name_missing_cal) {
+TEST_F(LogicalPlannerTest, pod_name_conversion_without_fallback) {
   auto planner = LogicalPlanner::Create(info_).ConsumeValueOrDie();
   auto state = testutils::CreateTwoPEMsOneKelvinPlannerState(testutils::kHttpEventsSchema);
   ASSERT_OK_AND_ASSIGN(
       auto plan, planner->Plan(MakeQueryRequestWithExecArgs(
-                     state, kPodNameMissingCol, {"cql_flow_graph", "cql_summary_with_links"})));
+                     state, kPodNameConversionWithoutFallback, {"cql_flow_graph", "cql_summary_with_links"})));
   ASSERT_OK(plan->ToProto());
 }
 
+// PxL query that contains a GRPC bridge with 2 branches where branch 1 is a blocking node
+// and branch 2 contains a PEM only UDF func (not a metadata expression). This triggers a previous
+// splitter bug where a PEM only UDF is incorrectly placed on the after blocking side of the bridge.
+// Metadata expressions didn't have this problem since md annotations force PEM only scheduling,
+// however, calling UDF only UDFs directly triggers this problem.
+//
+// The PxL below is roughly equivalent to the following problematic bridge:
+//
+// MemSrc  ->  Map ->  Map (w/ PEM only UDF)  ->  GRPC Sink (df return)
+//                \
+//                 ->  GRPC Sink (px.debug)
 const char kBrokenUpidToPodNameQuery[] = R"pxl(
 import px
 def dns_flow_graph():
