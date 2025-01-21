@@ -201,7 +201,6 @@ TEST_F(GoHTTPDynamicTraceTest, TraceGolangHTTPClientAndServer) {
 }
 
 TEST_F(GoHTTPDynamicTraceTest, TraceReturnValue) {
-  FLAGS_debug_dt_pipeline = true;
   ASSERT_NO_FATAL_FAILURE(InitTestFixturesAndRunTestProgram(kReturnValueTraceProgram));
   std::vector<TaggedRecordBatch> tablets = GetRecords();
 

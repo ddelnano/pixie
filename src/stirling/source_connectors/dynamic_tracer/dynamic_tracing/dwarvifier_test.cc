@@ -280,6 +280,13 @@ probes {
   }
   vars {
     scalar_var {
+      name: "parm__"
+      type: VOID_POINTER
+      reg: GOLANG_ARGS_PTR
+    }
+  }
+  vars {
+    scalar_var {
       name: "retval0"
       type: INT
       memory {
@@ -383,6 +390,13 @@ probes {
   }
   vars {
     scalar_var {
+      name: "parm__"
+      type: VOID_POINTER
+      reg: GOLANG_ARGS_PTR
+    }
+  }
+  vars {
+    scalar_var {
       name: "retval0"
       type: INT
       memory {
@@ -482,6 +496,13 @@ probes {
       name: "goid_"
       type: INT64
       builtin: GOID
+    }
+  }
+  vars {
+    scalar_var {
+      name: "parm__"
+      type: VOID_POINTER
+      reg: GOLANG_ARGS_PTR
     }
   }
   vars {
@@ -988,6 +1009,13 @@ probes {
     }
   }
   vars {
+    scalar_var {
+      name: "parm__"
+      type: VOID_POINTER
+      reg: GOLANG_ARGS_PTR
+    }
+  }
+  vars {
     map_var {
       name: "my_stash_ptr"
       type: "my_stash_value_t"
@@ -1400,6 +1428,13 @@ probes {
       name: "goid_"
       type: INT64
       builtin: GOID
+    }
+  }
+  vars {
+    scalar_var {
+      name: "parm__"
+      type: VOID_POINTER
+      reg: GOLANG_ARGS_PTR
     }
   }
   vars {

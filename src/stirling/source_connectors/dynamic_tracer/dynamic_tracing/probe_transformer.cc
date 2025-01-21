@@ -22,8 +22,6 @@
 #include <string>
 #include <utility>
 
-#include <google/protobuf/text_format.h>
-
 #include "src/stirling/source_connectors/dynamic_tracer/dynamic_tracing/goid.h"
 #include "src/stirling/source_connectors/dynamic_tracer/dynamic_tracing/ir/sharedpb/shared.pb.h"
 #include "src/stirling/source_connectors/dynamic_tracer/dynamic_tracing/types.h"
@@ -36,10 +34,8 @@ namespace dynamic_tracing {
 
 constexpr char kStartKTimeNSVarName[] = "start_ktime_ns";
 
-void CreateMap(const ir::shared::Language& language, const ir::logical::Probe& input_probe, ir::logical::TracepointSpec* out) {
-  if (input_probe.args().empty() &&
-      !input_probe.has_function_latency() &&
-      (input_probe.ret_vals().empty() || language != ir::shared::GOLANG)) {
+void CreateMap(const ir::logical::Probe& input_probe, ir::logical::TracepointSpec* out) {
+  if (input_probe.args().empty() && !input_probe.has_function_latency()) {
     return;
   }
   auto* stash_map = out->add_maps();
@@ -78,20 +74,9 @@ void CreateEntryProbe(const ir::shared::Language& language, const ir::logical::P
     out_arg->CopyFrom(in_arg);
   }
 
-  // Go 1.17+ calling convention means return values from registers must be accessed in the entry probe.
-  if (language == ir::shared::GOLANG) {
-    for (const auto& in_ret_val : input_probe.ret_vals()) {
-      auto* out_ret_val = entry_probe->add_ret_vals();
-      out_ret_val->CopyFrom(in_ret_val);
-    }
-  }
-
   // Generate argument stash.
   // For now, always stash all arguments.
-  if (input_probe.args_size() > 0 ||
-      IsFunctionLatecySpecified(input_probe) ||
-      (language == ir::shared::GOLANG && input_probe.ret_vals_size() > 0)) {
-
+  if (input_probe.args_size() > 0 || IsFunctionLatecySpecified(input_probe)) {
     std::string map_name = input_probe.name() + "_argstash";
 
     auto* stash_action = entry_probe->add_map_stash_actions();
@@ -100,12 +85,6 @@ void CreateEntryProbe(const ir::shared::Language& language, const ir::logical::P
 
     for (const auto& in_arg : input_probe.args()) {
       stash_action->add_value_variable_names(in_arg.id());
-    }
-
-    if (language == ir::shared::GOLANG) {
-      for (const auto& ret_val : input_probe.ret_vals()) {
-        stash_action->add_value_variable_names(ret_val.id());
-      }
     }
 
     if (IsFunctionLatecySpecified(input_probe)) {
@@ -140,10 +119,7 @@ Status CreateReturnProbe(const ir::shared::Language& language,
   return_probe->mutable_tracepoint()->CopyFrom(input_probe.tracepoint());
   return_probe->mutable_tracepoint()->set_type(ir::shared::Tracepoint::RETURN);
 
-  if (input_probe.args_size() > 0 ||
-      IsFunctionLatecySpecified(input_probe) ||
-      (language == ir::shared::GOLANG && input_probe.ret_vals_size() > 0)) {
-
+  if (input_probe.args_size() > 0 || IsFunctionLatecySpecified(input_probe)) {
     std::string map_name = input_probe.name() + "_argstash";
 
     auto* map_val = return_probe->add_map_vals();
@@ -152,11 +128,6 @@ Status CreateReturnProbe(const ir::shared::Language& language,
 
     for (const auto& in_arg : input_probe.args()) {
       map_val->add_value_ids(in_arg.id());
-    }
-    if (language == ir::shared::GOLANG) {
-      for (const auto& ret_val : input_probe.ret_vals()) {
-        map_val->add_value_ids(ret_val.id());
-      }
     }
 
     // The order must be consistent with the MapStashAction.
@@ -174,12 +145,9 @@ Status CreateReturnProbe(const ir::shared::Language& language,
   }
 
   // Generate return values.
-  if (language != ir::shared::GOLANG) {
-    // For Go, return values are accessed in the entry probe.
-    for (const auto& in_ret_val : input_probe.ret_vals()) {
-      auto* out_ret_val = return_probe->add_ret_vals();
-      out_ret_val->CopyFrom(in_ret_val);
-    }
+  for (const auto& in_ret_val : input_probe.ret_vals()) {
+    auto* out_ret_val = return_probe->add_ret_vals();
+    out_ret_val->CopyFrom(in_ret_val);
   }
 
   if (IsFunctionLatecySpecified(input_probe)) {
@@ -213,7 +181,7 @@ Status TransformLogicalProbe(const ir::shared::Language& language,
   // TODO(oazizi): An optimization could be to determine whether both entry and return probes
   //               are required. When not required, one probe and the stash map can be avoided.
   out->set_language(language);
-  CreateMap(language, input_probe, out);
+  CreateMap(input_probe, out);
   CreateEntryProbe(language, input_probe, out);
   PX_RETURN_IF_ERROR(CreateReturnProbe(language, input_probe, outputs, out));
 

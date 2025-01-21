@@ -585,6 +585,10 @@ void Dwarvifier::AddRetProbeVariables(ir::physical::Probe* output_probe) {
     auto* rc_ptr_var =
         AddVariable<ScalarVariable>(output_probe, kRCPtrVarName, ir::shared::VOID_POINTER);
     rc_ptr_var->set_reg(ir::physical::Register::RC_PTR);
+  } else if (language_ == ir::shared::GOLANG) {
+    auto* parm_ptr_var =
+            AddVariable<ScalarVariable>(output_probe, kParmPtrVarName, ir::shared::VOID_POINTER);
+    parm_ptr_var->set_reg(ir::physical::Register::GOLANG_ARGS_PTR);
   }
 }
 
@@ -793,6 +797,9 @@ Status Dwarvifier::ProcessStructBlob(const std::string& base, uint64_t offset,
                                      ir::physical::Probe* output_probe) {
   PX_ASSIGN_OR_RETURN(std::vector<StructSpecEntry> struct_spec_entires,
                       dwarf_reader_->GetStructSpec(type_info.type_name));
+  for (auto entry : struct_spec_entires) {
+    LOG(INFO) << entry.ToString();
+  }
   PX_ASSIGN_OR_RETURN(ir::physical::StructSpec struct_spec_proto,
                       CreateStructSpecProto(struct_spec_entires, language_));
 

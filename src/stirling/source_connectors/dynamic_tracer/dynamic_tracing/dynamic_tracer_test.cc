@@ -353,7 +353,6 @@ const std::vector<std::string> kExpectedBCC = {
     "  int arg0;",
     "  int arg1;",
     "  int arg2;",
-    "  int retval0;",
     "  uint64_t time_;",
     "} __attribute__((packed, aligned(1)));",
     "struct probe_output_value_t {",
@@ -412,13 +411,10 @@ const std::vector<std::string> kExpectedBCC = {
     "bpf_probe_read(&arg1, sizeof(int), parm__ + 48);",
     "int arg2;",
     "bpf_probe_read(&arg2, sizeof(int), parm__ + 56);",
-    "int retval0;",
-    "bpf_probe_read(&retval0, sizeof(int), parm__ + 0);",
     "struct probe0_argstash_value_t probe0_argstash_value = {};",
     "probe0_argstash_value.arg0 = arg0;",
     "probe0_argstash_value.arg1 = arg1;",
     "probe0_argstash_value.arg2 = arg2;",
-    "probe0_argstash_value.retval0 = retval0;",
     "probe0_argstash_value.time_ = time_;",
     "probe0_argstash.update(&goid_, &probe0_argstash_value);",
     "return 0;",
@@ -430,6 +426,9 @@ const std::vector<std::string> kExpectedBCC = {
     "uint64_t tgid_start_time_ = pl_tgid_start_time();",
     "uint64_t time_ = bpf_ktime_get_ns();",
     "int64_t goid_ = pl_goid();",
+    "uint64_t parm___[9];parm___[0] = ctx->ax;parm___[1] = ctx->bx;parm___[2] = ctx->cx;parm___[3] = ctx->di;parm___[4] = ctx->si;parm___[5] = ctx->r8;parm___[6] = ctx->r9;parm___[7] = ctx->r10;parm___[8] = ctx->r11;void* parm__ = &parm___;",
+    "int retval0;",
+    "bpf_probe_read(&retval0, sizeof(int), parm__ + 0);",
     "struct probe0_argstash_value_t* probe0_argstash_ptr = probe0_argstash.lookup(&goid_);",
     "if (probe0_argstash_ptr == NULL) { return 0; }",
     "int arg0 = probe0_argstash_ptr->arg0;",
@@ -437,8 +436,6 @@ const std::vector<std::string> kExpectedBCC = {
     "int arg1 = probe0_argstash_ptr->arg1;",
     "if (probe0_argstash_ptr == NULL) { return 0; }",
     "int arg2 = probe0_argstash_ptr->arg2;",
-    "if (probe0_argstash_ptr == NULL) { return 0; }",
-    "int retval0 = probe0_argstash_ptr->retval0;",
     "if (probe0_argstash_ptr == NULL) { return 0; }",
     "uint64_t start_ktime_ns = probe0_argstash_ptr->time_;",
     "int64_t latency = time_ - start_ktime_ns;",
@@ -524,6 +521,7 @@ TEST(DynamicTracerTest, Compile) {
                                         type: INT64
                                       }
                                       )proto"));
+  LOG(INFO) << bcc_program.code;
   std::vector<std::string> code_lines = absl::StrSplit(bcc_program.code, "\n");
 
   EXPECT_THAT(code_lines, ElementsAreArray(kExpectedBCC));
