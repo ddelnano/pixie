@@ -11,9 +11,9 @@ spec:
       hostPID: true
       restartPolicy: Never
       containers:
-        - image: mock-go-server:latest
+        - image: docker.io/ddelnano/mock-go-server:latest
           name: short-request
-          imagePullPolicy: Never
+          imagePullPolicy: Always
           command: ["/bin/bash", "/bash/short-request.bash"]
           resources:
             requests:
