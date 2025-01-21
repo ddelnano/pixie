@@ -521,7 +521,6 @@ TEST(DynamicTracerTest, Compile) {
                                         type: INT64
                                       }
                                       )proto"));
-  LOG(INFO) << bcc_program.code;
   std::vector<std::string> code_lines = absl::StrSplit(bcc_program.code, "\n");
 
   EXPECT_THAT(code_lines, ElementsAreArray(kExpectedBCC));

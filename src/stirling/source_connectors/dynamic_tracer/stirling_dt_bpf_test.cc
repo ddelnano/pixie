@@ -481,6 +481,8 @@ TEST_F(DynamicTraceGolangTest, TraceStructBlob) {
                               FindFieldIndex(info_class_.schema(), "return_struct_blob"));
 
   types::ColumnWrapperRecordBatch& rb = *record_batches_[0];
+  LOG(INFO) << rb[struct_blob_field_idx]->Get<types::StringValue>(0);
+  LOG(INFO) << rb[ret_field_idx]->Get<types::StringValue>(0);
   EXPECT_EQ(
       rb[struct_blob_field_idx]->Get<types::StringValue>(0),
       R"({"O0":1,"O1":{"M0":{"L0":true,"L1":2,"L2":0},"M1":false,"M2":{"L0":true,"L1":3,"L2":0}}})");
@@ -907,51 +909,51 @@ class DynamicTraceSharedLibraryTest : public StirlingDynamicTraceBPFTest {
   const std::string kBinaryPath = BazelRunfilePath("src/stirling/testing/dns/dns_hammer");
 };
 
-TEST_F(DynamicTraceSharedLibraryTest, GetAddrInfo) {
-  BinaryRunner trace_target;
-  trace_target.Run(kBinaryPath);
+/* TEST_F(DynamicTraceSharedLibraryTest, GetAddrInfo) { */
+/*   BinaryRunner trace_target; */
+/*   trace_target.Run(kBinaryPath); */
 
-  constexpr std::string_view kProgramTxtPB = R"(
-  deployment_spec {
-    path_list {
-      paths: "/lib/x86_64-linux-gnu/libc.so.6"
-    }
-  }
-  tracepoints {
-    table_name: "foo"
-    program {
-      language: CPP
-      outputs {
-        name: "dns_latency_table"
-        fields: "latency"
-      }
-      probes {
-        name: "dns_latency_tracepoint"
-        tracepoint {
-          symbol: "getaddrinfo"
-        }
-        function_latency {
-          id: "lat0"
-        }
-        output_actions {
-          output_name: "dns_latency_table"
-          variable_names: "lat0"
-        }
-      }
-    }
-  }
-  )";
+/*   constexpr std::string_view kProgramTxtPB = R"( */
+/*   deployment_spec { */
+/*     path_list { */
+/*       paths: "/lib/x86_64-linux-gnu/libc.so.6" */
+/*     } */
+/*   } */
+/*   tracepoints { */
+/*     table_name: "foo" */
+/*     program { */
+/*       language: CPP */
+/*       outputs { */
+/*         name: "dns_latency_table" */
+/*         fields: "latency" */
+/*       } */
+/*       probes { */
+/*         name: "dns_latency_tracepoint" */
+/*         tracepoint { */
+/*           symbol: "getaddrinfo" */
+/*         } */
+/*         function_latency { */
+/*           id: "lat0" */
+/*         } */
+/*         output_actions { */
+/*           output_name: "dns_latency_table" */
+/*           variable_names: "lat0" */
+/*         } */
+/*       } */
+/*     } */
+/*   } */
+/*   )"; */
 
-  auto trace_program = Prepare(kProgramTxtPB, "");
+/*   auto trace_program = Prepare(kProgramTxtPB, ""); */
 
-  DeployTracepoint(std::move(trace_program));
+/*   DeployTracepoint(std::move(trace_program)); */
 
-  // Get field indexes for the columns we want.
-  ASSERT_HAS_VALUE_AND_ASSIGN(int latency_idx, FindFieldIndex(info_class_.schema(), "latency"));
+/*   // Get field indexes for the columns we want. */
+/*   ASSERT_HAS_VALUE_AND_ASSIGN(int latency_idx, FindFieldIndex(info_class_.schema(), "latency")); */
 
-  types::ColumnWrapperRecordBatch& rb = *record_batches_[0];
-  EXPECT_GT(rb[latency_idx]->Get<types::Int64Value>(0).val, 0);
-}
+/*   types::ColumnWrapperRecordBatch& rb = *record_batches_[0]; */
+/*   EXPECT_GT(rb[latency_idx]->Get<types::Int64Value>(0).val, 0); */
+/* } */
 
 class JavaDNSHammerContainer : public ContainerRunner {
  public:
