@@ -71,9 +71,9 @@ pl_cc_bpf_test(
     srcs = ["stirling_dt_bpf_test.cc"],
     data = [
         "//src/stirling/obj_tools/testdata/cc:test_exe",
+        "//src/stirling/obj_tools/testdata/go:test_go_1_21_binary",
         "//src/stirling/testing/dns:dns_hammer",
         "//src/stirling/testing/dns:dns_hammer_image.tar",
-        "//src/stirling/obj_tools/testdata/go:test_go_1_21_binary",
     ],
     flaky = True,
     shard_count = 8,

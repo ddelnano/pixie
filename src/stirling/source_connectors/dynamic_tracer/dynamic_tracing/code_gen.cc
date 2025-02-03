@@ -383,8 +383,6 @@ std::vector<std::string> GenStructBlobMemoryVariable(const ScalarVariable& var) 
         absl::Substitute("$0.decoder_idx = $1;", var.name(), var.memory().decoder_idx()));
     code_lines.push_back(absl::Substitute("bpf_probe_read(&$0.buf, $1, $2 + $3);", var.name(), size,
                                           var.memory().base(), var.memory().offset()));
-    /* code_lines.push_back( */
-    /*     absl::Substitute("__builtin_memcpy($0.buf, $1, $2);", var.name(), var.memory().base(), size)); */
   }
 
   return code_lines;
@@ -656,9 +654,6 @@ std::string GenMapVariable(const ir::physical::MapVariable& map_var) {
 
 Status CheckVarExists(const absl::flat_hash_map<std::string_view, const Variable*>& var_names,
                       std::string_view var_name, std::string_view context) {
-  for (const auto& [name, _] : var_names) {
-    LOG(INFO) << "Var: " << name;
-  }
   if (!var_names.contains(var_name)) {
     return error::InvalidArgument("Variable name '$0' was not defined [context = $1]", var_name,
                                   context);

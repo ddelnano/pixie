@@ -97,8 +97,9 @@ class Dwarvifier {
                                                       uint64_t offset, const TypeInfo& type_info);
 
   // Used by ProcessVarExpr() to handle a Struct variable.
-  Status ProcessStructBlob(const ArgInfo& arg_info, const std::string& base, uint64_t offset, const TypeInfo& type_info,
-                           const std::string& var_name, ir::physical::Probe* output_probe);
+  Status ProcessStructBlob(const ArgInfo& arg_info, const std::string& base, uint64_t offset,
+                           const TypeInfo& type_info, const std::string& var_name,
+                           ir::physical::Probe* output_probe);
 
   // The input components describes a sequence of field of nesting structures. The first component
   // is the name of an input argument of a function, or an expression to describe the index of an
@@ -586,7 +587,7 @@ void Dwarvifier::AddRetProbeVariables(ir::physical::Probe* output_probe) {
     rc_ptr_var->set_reg(ir::physical::Register::RC_PTR);
   } else if (language_ == ir::shared::GOLANG) {
     auto* parm_ptr_var =
-            AddVariable<ScalarVariable>(output_probe, kParmPtrVarName, ir::shared::VOID_POINTER);
+        AddVariable<ScalarVariable>(output_probe, kParmPtrVarName, ir::shared::VOID_POINTER);
     parm_ptr_var->set_reg(ir::physical::Register::GOLANG_ARGS_PTR);
   }
 }
@@ -791,17 +792,18 @@ Status Dwarvifier::ProcessGolangInterfaceExpr(const std::string& base, uint64_t 
   return Status::OK();
 }
 
-Status Dwarvifier::ProcessStructBlob(const ArgInfo& arg_info, const std::string& base, uint64_t offset,
-                                     const TypeInfo& type_info, const std::string& var_name,
+Status Dwarvifier::ProcessStructBlob(const ArgInfo& arg_info, const std::string& base,
+                                     uint64_t offset, const TypeInfo& type_info,
+                                     const std::string& var_name,
                                      ir::physical::Probe* output_probe) {
   PX_ASSIGN_OR_RETURN(std::vector<StructSpecEntry> struct_spec_entires,
                       dwarf_reader_->GetStructSpec(type_info.type_name));
-  PX_UNUSED(offset);
-  PX_UNUSED(base);
-  DCHECK_EQ(struct_spec_entires.size(), arg_info.location.registers.size());
+  VLOG(1) << arg_info.ToString();
+  // TODO(ddelnano): Remove once structs in registers are supported (gh#2106)
+  DCHECK(arg_info.type_info.type != VarType::kStruct ||
+         arg_info.location.loc_type == LocationType::kStack)
+      << "StructBlob should be a stack variable. Structs in registers aren't supported yet.";
   PX_ASSIGN_OR_RETURN(ir::physical::StructSpec struct_spec_proto,
-                      CreateStructSpecProto(struct_spec_entires, language_));
-  PX_ASSIGN_OR_RETURN(ir::physical::StructSpec struct_struct_spec_proto,
                       CreateStructSpecProto(struct_spec_entires, language_));
 
   // STRUCT_BLOB is special. It is the only type where we specify the size to get copied.
@@ -810,30 +812,10 @@ Status Dwarvifier::ProcessStructBlob(const ArgInfo& arg_info, const std::string&
 
   RepeatedPtrField<ir::physical::StructSpec> struct_spec;
   struct_spec.Add(std::move(struct_spec_proto));
-  RepeatedPtrField<ir::physical::StructSpec> struct_struct_spec;
-  struct_struct_spec.Add(std::move(struct_struct_spec_proto));
-  /* PX_UNUSED(struct_var); */
-  /* auto* struct_var = AddVariable<StructVariable>(output_probe, "test", ir::shared::ScalarType::VOID_POINTER); */
-  /* for (size_t i = 0; i < struct_spec_entires.size(); i++) { */
-  /*   auto entry = struct_spec_entires[i]; */
-  /*   auto loc = arg_info.location.registers[i]; */
-  /*   LOG(INFO) << absl::Substitute("Register: $0", loc); */
-  /*   LOG(INFO) << entry.ToString(); */
-  /*   auto* field_assignment = struct_var->add_field_assignments(); */
-  /*   field_assignment->set_field_name(entry.path); */
-  /*   field_assignment->set_variable_name("parm__[0]"); */
-    /* field_assignment->set_variable_name(loc); // Should match the name */
-    // field_assignment->set_value(); // Come from the DWARF info (regs)
-  /* } */
-  /* struct_var->set_type("type"); */
-  /* struct_var->set_op(ir::physical::ASSIGN_ONLY); */
 
-  /* auto blob_name = absl::StrCat(var_name, "_blob"); */
-  /* auto* var = AddVariable<ScalarVariable>( */
-  /*     output_probe, var_name, ir::shared::ScalarType::STRUCT, std::move(struct_spec)); */
-  // For StuctBlob with one single schema, the index is always 0.
   auto* var = AddVariable<ScalarVariable>(
-        output_probe, var_name, ir::shared::ScalarType::STRUCT_BLOB, std::move(struct_spec));
+      output_probe, var_name, ir::shared::ScalarType::STRUCT_BLOB, std::move(struct_spec));
+  // For StuctBlob with one single schema, the index is always 0.
   var->mutable_memory()->set_decoder_idx(0);
   var->mutable_memory()->set_base(base);
   var->mutable_memory()->set_offset(offset);
@@ -945,7 +927,8 @@ Status Dwarvifier::ProcessVarExpr(const std::string& var_name, const ArgInfo& ar
       PX_RETURN_IF_ERROR(
           ProcessGolangInterfaceExpr(base, offset, type_info, var_name, output_probe));
     } else {
-      PX_RETURN_IF_ERROR(ProcessStructBlob(arg_info, base, offset, type_info, var_name, output_probe));
+      PX_RETURN_IF_ERROR(
+          ProcessStructBlob(arg_info, base, offset, type_info, var_name, output_probe));
     }
   } else {
     return error::Internal("Expected struct or base type, but got type: $0", type_info.ToString());
@@ -978,7 +961,6 @@ Status Dwarvifier::ProcessArgExpr(const ir::logical::Argument& arg,
           return error::Internal("Unsupported argument LocationType $0",
                                  magic_enum::enum_name(arg_info.location.loc_type));
       }
-      LOG(INFO) << "arg_info: " << arg_info.ToString();
       return ProcessVarExpr(arg.id(), arg_info, base_var, components, output_probe);
     case ir::shared::CPP:
     case ir::shared::C: {
