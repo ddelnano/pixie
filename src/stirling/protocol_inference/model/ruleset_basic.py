@@ -458,6 +458,8 @@ def infer_mux_message(buf, count):
 # TODO(chengruizhe): Instead of maintaining two copies of protocol_inference.h in C and Python,
 # directly call C functions with an extension.
 def infer_protocol(buf, count):
+    if infer_tls_message(buf, count) != MessageType.kUnknown:
+        return "tls"
     if infer_http_message(buf, count) != MessageType.kUnknown:
         return "http"
     elif infer_cql_message(buf, count) != MessageType.kUnknown:
@@ -481,6 +483,21 @@ def infer_protocol(buf, count):
     elif infer_amqp_message(buf, count) != MessageType.kUnknown:
         return "amqp"
     return "unknown"
+
+def infer_tls_message(buf, count):
+    if count < 6:
+        return MessageType.kUnknown
+    if buf[0] != 0x16:
+        return MessageType.kUnknown
+    legacy_version = buf[1] << 8 | buf[2]
+    if legacy_version < 0x0300 or legacy_version > 0x0304:
+        return MessageType.kUnknown
+    handshake_type = buf[5]
+    if handshake_type == 2:
+        return MessageType.kResponse
+    if handshake_type == 1:
+        return MessageType.kRequest
+    return MessageType.kUnknown
 
 
 protocol2idx = {protocol: i for i, protocol in enumerate(kTargetProtocols)}
