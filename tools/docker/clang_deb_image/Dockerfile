@@ -19,7 +19,7 @@ FROM ubuntu:18.04@sha256:8aa9c2798215f99544d1ce7439ea9c3a6dfd82de607da1cec3a8a2f
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update -y --fix-missing
 RUN apt-get install -y ruby ruby-dev rubygems build-essential
-RUN gem install --no-document fpm
+RUN gem install dotenv -v 2.8.1 && gem install --no-document fpm
 
 RUN apt-get install -y bison build-essential flex git libedit-dev lsb \
   python3 python3-distutils swig libncurses5-dev zlib1g-dev libelf-dev subversion gpg \
