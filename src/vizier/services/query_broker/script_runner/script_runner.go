@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 	"time"
 
@@ -62,6 +63,14 @@ var (
 	CronScriptUpdatesResponseChannel = messagebus.V2CTopic(cvmsgs.CronScriptUpdatesResponseChannel)
 	natsWaitTimeout                  = 2 * time.Minute
 	defaultOTelTimeoutS              = int64(5)
+
+	// TODO(ddelnano): Refactor this so that the cloud proxy can send this list to the UI
+	// to remove the duplication between the UI and the backend.
+	pxlMutationSources = []string{
+		"from pxtrace",
+		"import pxtrace",
+		"import pxconfig",
+	}
 )
 
 // ScriptRunner tracks registered cron scripts and runs them according to schedule.
@@ -264,13 +273,20 @@ func (r *runner) runScript(scriptPeriod time.Duration) {
 		}
 	}
 
-	// We set the time 1 second in the past to cover colletor latency and request latencies
+	// We set the time 1 second in the past to cover collector latency and request latencies
 	// which can cause data overlaps or cause data to be missed.
 	startTime := r.lastRun.Add(-time.Second)
 	endTime := startTime.Add(scriptPeriod)
 	r.lastRun = time.Now()
+	hasMutation := false
+	for _, source := range pxlMutationSources {
+		if strings.Contains(r.cronScript.Script, source) {
+			hasMutation = true
+		}
+	}
 	execScriptClient, err := r.vzClient.ExecuteScript(ctx, &vizierpb.ExecuteScriptRequest{
 		QueryStr: r.cronScript.Script,
+		Mutation: hasMutation,
 		Configs: &vizierpb.Configs{
 			OTelEndpointConfig: otelEndpoint,
 			PluginConfig: &vizierpb.Configs_PluginConfig{
