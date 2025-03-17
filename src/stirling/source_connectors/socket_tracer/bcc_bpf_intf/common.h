@@ -42,12 +42,12 @@ enum traffic_protocol_t {
   kProtocolHTTP = 1,
   kProtocolHTTP2 = 2,
   kProtocolMySQL = 3,
-  kProtocolPGSQL = 5,
-  kProtocolDNS = 6,
-  kProtocolRedis = 7,
-  kProtocolMongo = 9,
-  kProtocolKafka = 10,
-  kProtocolAMQP = 12,
+  kProtocolPGSQL = 4,
+  kProtocolDNS = 5,
+  kProtocolRedis = 6,
+  kProtocolMongo = 7,
+  kProtocolKafka = 8,
+  kProtocolAMQP = 9,
 // We use magic enum to iterate through protocols in C++ land,
 // and don't want the C-enum-size trick to show up there.
 #ifndef __cplusplus
