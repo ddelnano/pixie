@@ -154,16 +154,74 @@ TYPED_TEST(GoTLSTraceTest, BasicHTTP) {
   }
 }
 
-TYPED_TEST(GoTLSTraceTest, BasicHTTP2) {
-  FLAGS_stirling_conn_trace_pid = this->server_.process_pid();
+class HTTP2Server {
+ public:
+  static constexpr std::string_view kServerPath =
+      "src/stirling/testing/demo_apps/go_https/server/https_server";
+
+  HTTP2Server() = default;
+
+  void LaunchServer() {
+    /* std::string server_path = absl::Substitute(kServerPath, go_version); */
+    std::string server_path = px::testing::BazelRunfilePath(kServerPath).string();
+    LOG(INFO) << "Server path: " << server_path;
+    CHECK(fs::Exists(server_path));
+
+    PX_CHECK_OK(s_.Start({server_path, "--cert=src/stirling/testing/demo_apps/go_https/server/server.crt", "--key=src/stirling/testing/demo_apps/go_https/server/server.key"}));
+    LOG(INFO) << "Server PID: " << s_.child_pid();
+
+    // Give some time for the server to start up.
+    sleep(2);
+  }
+
+  int pid() { return s_.child_pid(); }
+
+  SubProcess s_;
+};
+
+class HTTP2Client {
+ public:
+  static constexpr std::string_view kClientPath =
+      "src/stirling/testing/demo_apps/go_https/client/https_client";
+
+  void LaunchClient() {
+    /* std::string client_path = absl::Substitute(kClientPath, go_version); */
+    std::string client_path = px::testing::BazelRunfilePath(kClientPath).string();
+
+    CHECK(fs::Exists(client_path));
+
+    PX_CHECK_OK(c_.Start({client_path, "--http2=true", "--iters=2", "--sub_iters=5"}));
+    LOG(INFO) << "Client PID: " << c_.child_pid();
+    CHECK_EQ(0, c_.Wait());
+  }
+
+  SubProcess c_;
+};
+
+class GoTLSTraceRawBinTest : public testing::SocketTraceBPFTestFixture</* TClientSideTracing */ false> {
+ protected:
+  GoTLSTraceRawBinTest() {
+    // Run the server.
+    // The container runner will make sure it is in the ready state before unblocking.
+    // Stirling will run after this unblocks, as part of SocketTraceBPFTest SetUp().
+    server_.LaunchServer();
+  }
+
+  HTTP2Server server_;
+  HTTP2Client client_;
+};
+
+TEST_F(GoTLSTraceRawBinTest, BasicHTTP2) {
+  FLAGS_stirling_conn_trace_pid = this->server_.pid();
   this->StartTransferDataThread();
 
   // Run the client in the network of the server, so they can connect to each other.
-  PX_CHECK_OK(this->client_.Run(
-      std::chrono::seconds{10},
-      {absl::Substitute("--network=container:$0", this->server_.container_name())},
-      {"--http2=true", "--iters=2", "--sub_iters=5"}));
-  this->client_.Wait();
+  this->client_.LaunchClient();
+  /* PX_CHECK_OK(this->client_.Run( */
+  /*     std::chrono::seconds{10}, */
+  /*     {absl::Substitute("--network=container:$0", this->server_.container_name())}, */
+  /*     {"--http2=true", "--iters=2", "--sub_iters=5"})); */
+  /* this->client_.Wait(); */
 
   this->StopTransferDataThread();
 
@@ -174,7 +232,7 @@ TYPED_TEST(GoTLSTraceTest, BasicHTTP2) {
 
   {
     const std::vector<size_t> target_record_indices =
-        FindRecordIdxMatchesPID(record_batch, kHTTPUPIDIdx, this->server_.process_pid());
+        FindRecordIdxMatchesPID(record_batch, kHTTPUPIDIdx, this->server_.pid());
 
     std::vector<http::Record> records =
         ToRecordVector<http::Record>(record_batch, target_record_indices);

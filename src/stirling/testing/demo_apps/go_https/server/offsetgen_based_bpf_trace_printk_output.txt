@@ -1,0 +1,380 @@
+           <...>-2227549 [021] ....1 763280.659609: bpf_trace_printk: Filling header field
+
+           <...>-2227549 [021] ....1 763280.659625: bpf_trace_printk: name: 
+           <...>-2227549 [021] ....1 763280.659632: bpf_trace_printk: Filling header field
+
+           <...>-2227549 [021] ....1 763280.659636: bpf_trace_printk: name: 
+           <...>-2227549 [021] ....1 763280.659639: bpf_trace_printk: Filling header field
+
+           <...>-2227549 [021] ....1 763280.659642: bpf_trace_printk: name: 
+           <...>-2227549 [021] ....1 763280.659646: bpf_trace_printk: Filling header field
+
+           <...>-2227549 [021] ....1 763280.659650: bpf_trace_printk: name: 
+           <...>-2227549 [021] ....1 763280.659654: bpf_trace_printk: Filling header field
+
+           <...>-2227549 [021] ....1 763280.659657: bpf_trace_printk: name: 
+           <...>-2227549 [021] ....1 763280.659660: bpf_trace_printk: Filling header field
+
+           <...>-2227549 [021] ....1 763280.659663: bpf_trace_printk: name: 
+           <...>-2227547 [030] ....1 763280.659954: bpf_trace_printk: calling submit_headers ':statushttp://chunkednosniffCreatedIM Usedstrings[="%s"]19531259765625invaliduintptrChanDir Value>ConvertforcegcallocmWcpuprofallocmRunknowngctraceIO waitrunningsyscallwaitingforevernetworkUNKNOWN:events, goid= s=nil
+ (scan  MB in pacer: % CPU ( zombie, j0 = head = ,errno=panic:  nmsys= locks= dying= allocsrax    rbx    rcx    rdx    rdi    rsi    rbp    rsp    r8     r9     r10    r11    r12    r13    r14    r15    rip    rflags cs     fs     gs     Signal signal  m->g0= pad1=  pad2=  text= minpc= 	value='
+           <...>-2227547 [030] ....1 763280.659964: bpf_trace_printk:  attr: 000000002cdba006
+           <...>-2227547 [030] ....1 763280.659965: bpf_trace_printk:  event: 00000000bfe65b09
+           <...>-2227547 [030] ....1 763280.660101: bpf_trace_printk: calling submit_headers 'content-typemax-forwardshttp2debug=1http2debug=2push_promisedata_on_idleheaders_evendup_trailers100-continuemoreSpecificMulti-StatusNot ModifiedUnauthorizedI'm a teapotNot Extended (sensitive)152587890625762939453125can't happenreflect.CopysweepWaiterstraceStringsspanSetSpinemspanSpecialtraceTypeTabgcBitsArenasmheapSpecialgcpacertraceharddecommitmadvdontneeddumping heapchan receivelfstack.push span.limit= span.state=bad flushGen MB stacks, worker mode  nDataRoots= nSpanRoots= wbuf1=<nil> wbuf2=<nil> gcscan'
+           <...>-2227547 [030] ....1 763280.660111: bpf_trace_printk:  attr: 000000002cdba006
+           <...>-2227547 [030] ....1 763280.660112: bpf_trace_printk:  event: 00000000bfe65b09
+           <...>-2227547 [030] ....1 763280.660157: bpf_trace_printk: calling submit_headers 'content-lengthfirst_settingsping_on_streamtrailers_bogus{$} not at endempty wildcardinvalid methodinternal errorparsing %q: %wNot Acceptableneed more datainvalid syntax1907348632812595367431640625unsafe.Pointer on zero Valueunknown methoduserArenaStateGC (dedicated)read mem statsasynctimerchangcstoptheworldprofstackdepthtraceallocfreeGC assist waitfinalizer waitsync.Cond.WaitSIGABRT: aborts.allocCount= key size wrongruntime: mmap(nil elem type! to finalizer GC worker initruntime: full=runtime: want=MB; all'
+           <...>-2227547 [030] ....1 763280.660165: bpf_trace_printk:  attr: 000000002cdba006
+           <...>-2227547 [030] ....1 763280.660166: bpf_trace_printk:  event: 00000000bfe65b09
+           <...>-2227547 [030] ....1 763280.660191: bpf_trace_printk: calling submit_headers 'dateetagfromhostlinkvarypathDateconn%x
+Gonebool--%suintintsint8json3125Atoi-Inf+Infreadopenstatsyncfilechanfunccallkind on  in  != allgallprootitabsbrkdead is LEAFbase of ) =  <==GOGC] = s + ,r2= pc=: p=cas1cas2cas3cas4cas5cas6 at 
+	m= sp= sp: lr: fp= gp= mp=) m=JuneJuly as hour/etcFromicmpigmpftpspop3smtpdial 	
+bindunixxn--AhomChamKawiLisuMiaoModiNewaThaiTotoOsFsINFOWARNnull'\''NodeTrue.exe.inf.nanTRUENullNULL.NaN.NAN.Inf.INFermssse3avx2bmi1bmi2timebitsNameTypehtmlasn1cx16sse2false<nil>Error&amp;&#34;&#'
+           <...>-2227547 [030] ....1 763280.660194: bpf_trace_printk:  attr: 000000002cdba006
+           <...>-2227547 [030] ....1 763280.660194: bpf_trace_printk:  event: 00000000bfe65b09
+           <...>-2227544 [027] ....1 763280.660405: bpf_trace_printk: go_http2_symaddrs_t -1928098824
+
+           <...>-2227544 [027] ....1 763280.660420: bpf_trace_printk: go_regabi_regs 2142768056
+
+           <...>-2227548 [030] ....1 763281.661696: bpf_trace_printk: Filling header field
+
+           <...>-2227548 [030] ....1 763281.661722: bpf_trace_printk: name: 
+           <...>-2227548 [030] ....1 763281.661730: bpf_trace_printk: Filling header field
+
+           <...>-2227548 [030] ....1 763281.661735: bpf_trace_printk: name: 
+           <...>-2227548 [030] ....1 763281.661738: bpf_trace_printk: Filling header field
+
+           <...>-2227548 [030] ....1 763281.661743: bpf_trace_printk: name: 
+           <...>-2227548 [030] ....1 763281.661746: bpf_trace_printk: Filling header field
+
+           <...>-2227548 [030] ....1 763281.661750: bpf_trace_printk: name: 
+           <...>-2227548 [030] ....1 763281.661754: bpf_trace_printk: Filling header field
+
+           <...>-2227548 [030] ....1 763281.661758: bpf_trace_printk: name: 
+           <...>-2227548 [030] ....1 763281.661761: bpf_trace_printk: Filling header field
+
+           <...>-2227548 [030] ....1 763281.661765: bpf_trace_printk: name: 
+           <...>-2227548 [030] ....1 763281.662005: bpf_trace_printk: calling submit_headers ':statushttp://chunkednosniffCreatedIM Usedstrings[="%s"]19531259765625invaliduintptrChanDir Value>ConvertforcegcallocmWcpuprofallocmRunknowngctraceIO waitrunningsyscallwaitingforevernetworkUNKNOWN:events, goid= s=nil
+ (scan  MB in pacer: % CPU ( zombie, j0 = head = ,errno=panic:  nmsys= locks= dying= allocsrax    rbx    rcx    rdx    rdi    rsi    rbp    rsp    r8     r9     r10    r11    r12    r13    r14    r15    rip    rflags cs     fs     gs     Signal signal  m->g0= pad1=  pad2=  text= minpc= 	value='
+           <...>-2227548 [030] ....1 763281.662020: bpf_trace_printk:  attr: 0000000085990380
+           <...>-2227548 [030] ....1 763281.662021: bpf_trace_printk:  event: 00000000bfe65b09
+           <...>-2227548 [030] ....1 763281.662041: bpf_trace_printk: calling submit_headers 'content-typemax-forwardshttp2debug=1http2debug=2push_promisedata_on_idleheaders_evendup_trailers100-continuemoreSpecificMulti-StatusNot ModifiedUnauthorizedI'm a teapotNot Extended (sensitive)152587890625762939453125can't happenreflect.CopysweepWaiterstraceStringsspanSetSpinemspanSpecialtraceTypeTabgcBitsArenasmheapSpecialgcpacertraceharddecommitmadvdontneeddumping heapchan receivelfstack.push span.limit= span.state=bad flushGen MB stacks, worker mode  nDataRoots= nSpanRoots= wbuf1=<nil> wbuf2=<nil> gcscan'
+           <...>-2227548 [030] ....1 763281.662042: bpf_trace_printk:  attr: 0000000085990380
+           <...>-2227548 [030] ....1 763281.662043: bpf_trace_printk:  event: 00000000bfe65b09
+           <...>-2227548 [030] ....1 763281.662053: bpf_trace_printk: calling submit_headers 'content-lengthfirst_settingsping_on_streamtrailers_bogus{$} not at endempty wildcardinvalid methodinternal errorparsing %q: %wNot Acceptableneed more datainvalid syntax1907348632812595367431640625unsafe.Pointer on zero Valueunknown methoduserArenaStateGC (dedicated)read mem statsasynctimerchangcstoptheworldprofstackdepthtraceallocfreeGC assist waitfinalizer waitsync.Cond.WaitSIGABRT: aborts.allocCount= key size wrongruntime: mmap(nil elem type! to finalizer GC worker initruntime: full=runtime: want=MB; all'
+           <...>-2227548 [030] ....1 763281.662054: bpf_trace_printk:  attr: 0000000085990380
+           <...>-2227548 [030] ....1 763281.662055: bpf_trace_printk:  event: 00000000bfe65b09
+           <...>-2227548 [030] ....1 763281.662065: bpf_trace_printk: calling submit_headers 'dateetagfromhostlinkvarypathDateconn%x
+Gonebool--%suintintsint8json3125Atoi-Inf+Infreadopenstatsyncfilechanfunccallkind on  in  != allgallprootitabsbrkdead is LEAFbase of ) =  <==GOGC] = s + ,r2= pc=: p=cas1cas2cas3cas4cas5cas6 at 
+	m= sp= sp: lr: fp= gp= mp=) m=JuneJuly as hour/etcFromicmpigmpftpspop3smtpdial 	
+bindunixxn--AhomChamKawiLisuMiaoModiNewaThaiTotoOsFsINFOWARNnull'\''NodeTrue.exe.inf.nanTRUENullNULL.NaN.NAN.Inf.INFermssse3avx2bmi1bmi2timebitsNameTypehtmlasn1cx16sse2false<nil>Error&amp;&#34;&#'
+           <...>-2227548 [030] ....1 763281.662066: bpf_trace_printk:  attr: 0000000085990380
+           <...>-2227548 [030] ....1 763281.662067: bpf_trace_printk:  event: 00000000bfe65b09
+    https_server-2227548 [030] ....1 763281.662300: bpf_trace_printk: go_http2_symaddrs_t -1928098824
+
+    https_server-2227548 [030] ....1 763281.662319: bpf_trace_printk: go_regabi_regs 2144340920
+
+    https_server-2227547 [031] ....1 763282.663353: bpf_trace_printk: Filling header field
+
+    https_server-2227547 [031] ....1 763282.663373: bpf_trace_printk: name: 
+    https_server-2227547 [031] ....1 763282.663381: bpf_trace_printk: Filling header field
+
+    https_server-2227547 [031] ....1 763282.663386: bpf_trace_printk: name: 
+    https_server-2227547 [031] ....1 763282.663389: bpf_trace_printk: Filling header field
+
+    https_server-2227547 [031] ....1 763282.663393: bpf_trace_printk: name: 
+    https_server-2227547 [031] ....1 763282.663397: bpf_trace_printk: Filling header field
+
+    https_server-2227547 [031] ....1 763282.663401: bpf_trace_printk: name: 
+    https_server-2227547 [031] ....1 763282.663405: bpf_trace_printk: Filling header field
+
+    https_server-2227547 [031] ....1 763282.663409: bpf_trace_printk: name: 
+    https_server-2227547 [031] ....1 763282.663412: bpf_trace_printk: Filling header field
+
+    https_server-2227547 [031] ....1 763282.663416: bpf_trace_printk: name: 
+    https_server-2227547 [031] ....1 763282.663630: bpf_trace_printk: calling submit_headers ':statushttp://chunkednosniffCreatedIM Usedstrings[="%s"]19531259765625invaliduintptrChanDir Value>ConvertforcegcallocmWcpuprofallocmRunknowngctraceIO waitrunningsyscallwaitingforevernetworkUNKNOWN:events, goid= s=nil
+ (scan  MB in pacer: % CPU ( zombie, j0 = head = ,errno=panic:  nmsys= locks= dying= allocsrax    rbx    rcx    rdx    rdi    rsi    rbp    rsp    r8     r9     r10    r11    r12    r13    r14    r15    rip    rflags cs     fs     gs     Signal signal  m->g0= pad1=  pad2=  text= minpc= 	value='
+    https_server-2227547 [031] ....1 763282.663640: bpf_trace_printk:  attr: 000000009618247b
+    https_server-2227547 [031] ....1 763282.663641: bpf_trace_printk:  event: 0000000043dfd120
+    https_server-2227547 [031] ....1 763282.663659: bpf_trace_printk: calling submit_headers 'content-typemax-forwardshttp2debug=1http2debug=2push_promisedata_on_idleheaders_evendup_trailers100-continuemoreSpecificMulti-StatusNot ModifiedUnauthorizedI'm a teapotNot Extended (sensitive)152587890625762939453125can't happenreflect.CopysweepWaiterstraceStringsspanSetSpinemspanSpecialtraceTypeTabgcBitsArenasmheapSpecialgcpacertraceharddecommitmadvdontneeddumping heapchan receivelfstack.push span.limit= span.state=bad flushGen MB stacks, worker mode  nDataRoots= nSpanRoots= wbuf1=<nil> wbuf2=<nil> gcscan'
+    https_server-2227547 [031] ....1 763282.663660: bpf_trace_printk:  attr: 000000009618247b
+    https_server-2227547 [031] ....1 763282.663661: bpf_trace_printk:  event: 0000000043dfd120
+    https_server-2227547 [031] ....1 763282.663671: bpf_trace_printk: calling submit_headers 'content-lengthfirst_settingsping_on_streamtrailers_bogus{$} not at endempty wildcardinvalid methodinternal errorparsing %q: %wNot Acceptableneed more datainvalid syntax1907348632812595367431640625unsafe.Pointer on zero Valueunknown methoduserArenaStateGC (dedicated)read mem statsasynctimerchangcstoptheworldprofstackdepthtraceallocfreeGC assist waitfinalizer waitsync.Cond.WaitSIGABRT: aborts.allocCount= key size wrongruntime: mmap(nil elem type! to finalizer GC worker initruntime: full=runtime: want=MB; all'
+    https_server-2227547 [031] ....1 763282.663672: bpf_trace_printk:  attr: 000000009618247b
+    https_server-2227547 [031] ....1 763282.663673: bpf_trace_printk:  event: 0000000043dfd120
+    https_server-2227547 [031] ....1 763282.663684: bpf_trace_printk: calling submit_headers 'dateetagfromhostlinkvarypathDateconn%x
+Gonebool--%suintintsint8json3125Atoi-Inf+Infreadopenstatsyncfilechanfunccallkind on  in  != allgallprootitabsbrkdead is LEAFbase of ) =  <==GOGC] = s + ,r2= pc=: p=cas1cas2cas3cas4cas5cas6 at 
+	m= sp= sp: lr: fp= gp= mp=) m=JuneJuly as hour/etcFromicmpigmpftpspop3smtpdial 	
+bindunixxn--AhomChamKawiLisuMiaoModiNewaThaiTotoOsFsINFOWARNnull'\''NodeTrue.exe.inf.nanTRUENullNULL.NaN.NAN.Inf.INFermssse3avx2bmi1bmi2timebitsNameTypehtmlasn1cx16sse2false<nil>Error&amp;&#34;&#'
+    https_server-2227547 [031] ....1 763282.663685: bpf_trace_printk:  attr: 000000009618247b
+    https_server-2227547 [031] ....1 763282.663686: bpf_trace_printk:  event: 0000000043dfd120
+    https_server-2227547 [031] ....1 763282.663878: bpf_trace_printk: go_http2_symaddrs_t -1928098824
+
+    https_server-2227547 [031] ....1 763282.663889: bpf_trace_printk: go_regabi_regs 2144865208
+
+    https_server-2227544 [027] ....1 763283.664885: bpf_trace_printk: Filling header field
+
+    https_server-2227544 [027] ....1 763283.664907: bpf_trace_printk: name: 
+    https_server-2227544 [027] ....1 763283.664916: bpf_trace_printk: Filling header field
+
+    https_server-2227544 [027] ....1 763283.664920: bpf_trace_printk: name: 
+    https_server-2227544 [027] ....1 763283.664924: bpf_trace_printk: Filling header field
+
+    https_server-2227544 [027] ....1 763283.664928: bpf_trace_printk: name: 
+    https_server-2227544 [027] ....1 763283.664931: bpf_trace_printk: Filling header field
+
+    https_server-2227544 [027] ....1 763283.664935: bpf_trace_printk: name: 
+    https_server-2227544 [027] ....1 763283.664939: bpf_trace_printk: Filling header field
+
+    https_server-2227544 [027] ....1 763283.664943: bpf_trace_printk: name: 
+    https_server-2227544 [027] ....1 763283.664946: bpf_trace_printk: Filling header field
+
+    https_server-2227544 [027] ....1 763283.664950: bpf_trace_printk: name: 
+    https_server-2227544 [027] ....1 763283.665130: bpf_trace_printk: calling submit_headers ':statushttp://chunkednosniffCreatedIM Usedstrings[="%s"]19531259765625invaliduintptrChanDir Value>ConvertforcegcallocmWcpuprofallocmRunknowngctraceIO waitrunningsyscallwaitingforevernetworkUNKNOWN:events, goid= s=nil
+ (scan  MB in pacer: % CPU ( zombie, j0 = head = ,errno=panic:  nmsys= locks= dying= allocsrax    rbx    rcx    rdx    rdi    rsi    rbp    rsp    r8     r9     r10    r11    r12    r13    r14    r15    rip    rflags cs     fs     gs     Signal signal  m->g0= pad1=  pad2=  text= minpc= 	value='
+    https_server-2227544 [027] ....1 763283.665133: bpf_trace_printk:  attr: 00000000a7351bf8
+    https_server-2227544 [027] ....1 763283.665134: bpf_trace_printk:  event: 00000000eec0e448
+    https_server-2227544 [027] ....1 763283.665152: bpf_trace_printk: calling submit_headers 'content-typemax-forwardshttp2debug=1http2debug=2push_promisedata_on_idleheaders_evendup_trailers100-continuemoreSpecificMulti-StatusNot ModifiedUnauthorizedI'm a teapotNot Extended (sensitive)152587890625762939453125can't happenreflect.CopysweepWaiterstraceStringsspanSetSpinemspanSpecialtraceTypeTabgcBitsArenasmheapSpecialgcpacertraceharddecommitmadvdontneeddumping heapchan receivelfstack.push span.limit= span.state=bad flushGen MB stacks, worker mode  nDataRoots= nSpanRoots= wbuf1=<nil> wbuf2=<nil> gcscan'
+    https_server-2227544 [027] ....1 763283.665153: bpf_trace_printk:  attr: 00000000a7351bf8
+    https_server-2227544 [027] ....1 763283.665154: bpf_trace_printk:  event: 00000000eec0e448
+    https_server-2227544 [027] ....1 763283.665164: bpf_trace_printk: calling submit_headers 'content-lengthfirst_settingsping_on_streamtrailers_bogus{$} not at endempty wildcardinvalid methodinternal errorparsing %q: %wNot Acceptableneed more datainvalid syntax1907348632812595367431640625unsafe.Pointer on zero Valueunknown methoduserArenaStateGC (dedicated)read mem statsasynctimerchangcstoptheworldprofstackdepthtraceallocfreeGC assist waitfinalizer waitsync.Cond.WaitSIGABRT: aborts.allocCount= key size wrongruntime: mmap(nil elem type! to finalizer GC worker initruntime: full=runtime: want=MB; all'
+    https_server-2227544 [027] ....1 763283.665166: bpf_trace_printk:  attr: 00000000a7351bf8
+    https_server-2227544 [027] ....1 763283.665167: bpf_trace_printk:  event: 00000000eec0e448
+    https_server-2227544 [027] ....1 763283.665178: bpf_trace_printk: calling submit_headers 'dateetagfromhostlinkvarypathDateconn%x
+Gonebool--%suintintsint8json3125Atoi-Inf+Infreadopenstatsyncfilechanfunccallkind on  in  != allgallprootitabsbrkdead is LEAFbase of ) =  <==GOGC] = s + ,r2= pc=: p=cas1cas2cas3cas4cas5cas6 at 
+	m= sp= sp: lr: fp= gp= mp=) m=JuneJuly as hour/etcFromicmpigmpftpspop3smtpdial 	
+bindunixxn--AhomChamKawiLisuMiaoModiNewaThaiTotoOsFsINFOWARNnull'\''NodeTrue.exe.inf.nanTRUENullNULL.NaN.NAN.Inf.INFermssse3avx2bmi1bmi2timebitsNameTypehtmlasn1cx16sse2false<nil>Error&amp;&#34;&#'
+    https_server-2227544 [027] ....1 763283.665179: bpf_trace_printk:  attr: 00000000a7351bf8
+    https_server-2227544 [027] ....1 763283.665180: bpf_trace_printk:  event: 00000000eec0e448
+    https_server-2227544 [027] ....1 763283.665341: bpf_trace_printk: go_http2_symaddrs_t -1928098824
+
+    https_server-2227544 [027] ....1 763283.665351: bpf_trace_printk: go_regabi_regs 2142768056
+
+    https_server-2227548 [030] ....1 763284.666276: bpf_trace_printk: Filling header field
+
+    https_server-2227548 [030] ....1 763284.666303: bpf_trace_printk: name: 
+    https_server-2227548 [030] ....1 763284.666311: bpf_trace_printk: Filling header field
+
+    https_server-2227548 [030] ....1 763284.666317: bpf_trace_printk: name: 
+    https_server-2227548 [030] ....1 763284.666321: bpf_trace_printk: Filling header field
+
+    https_server-2227548 [030] ....1 763284.666326: bpf_trace_printk: name: 
+    https_server-2227548 [030] ....1 763284.666331: bpf_trace_printk: Filling header field
+
+    https_server-2227548 [030] ....1 763284.666336: bpf_trace_printk: name: 
+    https_server-2227548 [030] ....1 763284.666340: bpf_trace_printk: Filling header field
+
+    https_server-2227548 [030] ....1 763284.666346: bpf_trace_printk: name: 
+    https_server-2227548 [030] ....1 763284.666350: bpf_trace_printk: Filling header field
+
+    https_server-2227548 [030] ....1 763284.666356: bpf_trace_printk: name: 
+    https_server-2227548 [030] ....1 763284.666512: bpf_trace_printk: calling submit_headers ':statushttp://chunkednosniffCreatedIM Usedstrings[="%s"]19531259765625invaliduintptrChanDir Value>ConvertforcegcallocmWcpuprofallocmRunknowngctraceIO waitrunningsyscallwaitingforevernetworkUNKNOWN:events, goid= s=nil
+ (scan  MB in pacer: % CPU ( zombie, j0 = head = ,errno=panic:  nmsys= locks= dying= allocsrax    rbx    rcx    rdx    rdi    rsi    rbp    rsp    r8     r9     r10    r11    r12    r13    r14    r15    rip    rflags cs     fs     gs     Signal signal  m->g0= pad1=  pad2=  text= minpc= 	value='
+    https_server-2227548 [030] ....1 763284.666524: bpf_trace_printk:  attr: 000000002cdba006
+    https_server-2227548 [030] ....1 763284.666525: bpf_trace_printk:  event: 00000000bfe65b09
+    https_server-2227548 [030] ....1 763284.666593: bpf_trace_printk: calling submit_headers 'content-typemax-forwardshttp2debug=1http2debug=2push_promisedata_on_idleheaders_evendup_trailers100-continuemoreSpecificMulti-StatusNot ModifiedUnauthorizedI'm a teapotNot Extended (sensitive)152587890625762939453125can't happenreflect.CopysweepWaiterstraceStringsspanSetSpinemspanSpecialtraceTypeTabgcBitsArenasmheapSpecialgcpacertraceharddecommitmadvdontneeddumping heapchan receivelfstack.push span.limit= span.state=bad flushGen MB stacks, worker mode  nDataRoots= nSpanRoots= wbuf1=<nil> wbuf2=<nil> gcscan'
+    https_server-2227548 [030] ....1 763284.666595: bpf_trace_printk:  attr: 000000002cdba006
+    https_server-2227548 [030] ....1 763284.666596: bpf_trace_printk:  event: 00000000bfe65b09
+    https_server-2227548 [030] ....1 763284.666612: bpf_trace_printk: calling submit_headers 'content-lengthfirst_settingsping_on_streamtrailers_bogus{$} not at endempty wildcardinvalid methodinternal errorparsing %q: %wNot Acceptableneed more datainvalid syntax1907348632812595367431640625unsafe.Pointer on zero Valueunknown methoduserArenaStateGC (dedicated)read mem statsasynctimerchangcstoptheworldprofstackdepthtraceallocfreeGC assist waitfinalizer waitsync.Cond.WaitSIGABRT: aborts.allocCount= key size wrongruntime: mmap(nil elem type! to finalizer GC worker initruntime: full=runtime: want=MB; all'
+    https_server-2227548 [030] ....1 763284.666614: bpf_trace_printk:  attr: 000000002cdba006
+    https_server-2227548 [030] ....1 763284.666614: bpf_trace_printk:  event: 00000000bfe65b09
+    https_server-2227548 [030] ....1 763284.666627: bpf_trace_printk: calling submit_headers 'dateetagfromhostlinkvarypathDateconn%x
+Gonebool--%suintintsint8json3125Atoi-Inf+Infreadopenstatsyncfilechanfunccallkind on  in  != allgallprootitabsbrkdead is LEAFbase of ) =  <==GOGC] = s + ,r2= pc=: p=cas1cas2cas3cas4cas5cas6 at 
+	m= sp= sp: lr: fp= gp= mp=) m=JuneJuly as hour/etcFromicmpigmpftpspop3smtpdial 	
+bindunixxn--AhomChamKawiLisuMiaoModiNewaThaiTotoOsFsINFOWARNnull'\''NodeTrue.exe.inf.nanTRUENullNULL.NaN.NAN.Inf.INFermssse3avx2bmi1bmi2timebitsNameTypehtmlasn1cx16sse2false<nil>Error&amp;&#34;&#'
+    https_server-2227548 [030] ....1 763284.666628: bpf_trace_printk:  attr: 000000002cdba006
+    https_server-2227548 [030] ....1 763284.666641: bpf_trace_printk:  event: 00000000bfe65b09
+    https_server-2227548 [030] ....1 763284.666868: bpf_trace_printk: go_http2_symaddrs_t -1928098824
+
+    https_server-2227548 [030] ....1 763284.666880: bpf_trace_printk: go_regabi_regs 2144340920
+
+           <...>-2227546 [007] ....1 763285.671275: bpf_trace_printk: Filling header field
+
+           <...>-2227546 [007] ....1 763285.671295: bpf_trace_printk: name: 
+           <...>-2227546 [007] ....1 763285.671303: bpf_trace_printk: Filling header field
+
+           <...>-2227546 [007] ....1 763285.671307: bpf_trace_printk: name: 
+           <...>-2227546 [007] ....1 763285.671311: bpf_trace_printk: Filling header field
+
+           <...>-2227546 [007] ....1 763285.671315: bpf_trace_printk: name: 
+           <...>-2227546 [007] ....1 763285.671318: bpf_trace_printk: Filling header field
+
+           <...>-2227546 [007] ....1 763285.671321: bpf_trace_printk: name: 
+           <...>-2227546 [007] ....1 763285.671325: bpf_trace_printk: Filling header field
+
+           <...>-2227546 [007] ....1 763285.671328: bpf_trace_printk: name: 
+           <...>-2227546 [007] ....1 763285.671331: bpf_trace_printk: Filling header field
+
+           <...>-2227546 [007] ....1 763285.671335: bpf_trace_printk: name: 
+    https_server-2227547 [031] ....1 763285.671492: bpf_trace_printk: calling submit_headers ':statushttp://chunkednosniffCreatedIM Usedstrings[="%s"]19531259765625invaliduintptrChanDir Value>ConvertforcegcallocmWcpuprofallocmRunknowngctraceIO waitrunningsyscallwaitingforevernetworkUNKNOWN:events, goid= s=nil
+ (scan  MB in pacer: % CPU ( zombie, j0 = head = ,errno=panic:  nmsys= locks= dying= allocsrax    rbx    rcx    rdx    rdi    rsi    rbp    rsp    r8     r9     r10    r11    r12    r13    r14    r15    rip    rflags cs     fs     gs     Signal signal  m->g0= pad1=  pad2=  text= minpc= 	value='
+    https_server-2227547 [031] ....1 763285.671508: bpf_trace_printk:  attr: 00000000ced40c0b
+    https_server-2227547 [031] ....1 763285.671510: bpf_trace_printk:  event: 0000000043dfd120
+    https_server-2227547 [031] ....1 763285.671535: bpf_trace_printk: calling submit_headers 'content-typemax-forwardshttp2debug=1http2debug=2push_promisedata_on_idleheaders_evendup_trailers100-continuemoreSpecificMulti-StatusNot ModifiedUnauthorizedI'm a teapotNot Extended (sensitive)152587890625762939453125can't happenreflect.CopysweepWaiterstraceStringsspanSetSpinemspanSpecialtraceTypeTabgcBitsArenasmheapSpecialgcpacertraceharddecommitmadvdontneeddumping heapchan receivelfstack.push span.limit= span.state=bad flushGen MB stacks, worker mode  nDataRoots= nSpanRoots= wbuf1=<nil> wbuf2=<nil> gcscan'
+    https_server-2227547 [031] ....1 763285.671537: bpf_trace_printk:  attr: 00000000ced40c0b
+    https_server-2227547 [031] ....1 763285.671549: bpf_trace_printk:  event: 0000000043dfd120
+    https_server-2227547 [031] ....1 763285.671581: bpf_trace_printk: calling submit_headers 'content-lengthfirst_settingsping_on_streamtrailers_bogus{$} not at endempty wildcardinvalid methodinternal errorparsing %q: %wNot Acceptableneed more datainvalid syntax1907348632812595367431640625unsafe.Pointer on zero Valueunknown methoduserArenaStateGC (dedicated)read mem statsasynctimerchangcstoptheworldprofstackdepthtraceallocfreeGC assist waitfinalizer waitsync.Cond.WaitSIGABRT: aborts.allocCount= key size wrongruntime: mmap(nil elem type! to finalizer GC worker initruntime: full=runtime: want=MB; all'
+    https_server-2227547 [031] ....1 763285.671583: bpf_trace_printk:  attr: 00000000ced40c0b
+    https_server-2227547 [031] ....1 763285.671585: bpf_trace_printk:  event: 0000000043dfd120
+    https_server-2227547 [031] ....1 763285.671600: bpf_trace_printk: calling submit_headers 'dateetagfromhostlinkvarypathDateconn%x
+Gonebool--%suintintsint8json3125Atoi-Inf+Infreadopenstatsyncfilechanfunccallkind on  in  != allgallprootitabsbrkdead is LEAFbase of ) =  <==GOGC] = s + ,r2= pc=: p=cas1cas2cas3cas4cas5cas6 at 
+	m= sp= sp: lr: fp= gp= mp=) m=JuneJuly as hour/etcFromicmpigmpftpspop3smtpdial 	
+bindunixxn--AhomChamKawiLisuMiaoModiNewaThaiTotoOsFsINFOWARNnull'\''NodeTrue.exe.inf.nanTRUENullNULL.NaN.NAN.Inf.INFermssse3avx2bmi1bmi2timebitsNameTypehtmlasn1cx16sse2false<nil>Error&amp;&#34;&#'
+    https_server-2227547 [031] ....1 763285.671602: bpf_trace_printk:  attr: 00000000ced40c0b
+    https_server-2227547 [031] ....1 763285.671603: bpf_trace_printk:  event: 0000000043dfd120
+    https_server-2227547 [031] ....1 763285.671712: bpf_trace_printk: go_http2_symaddrs_t -1928098824
+
+    https_server-2227547 [031] ....1 763285.671723: bpf_trace_printk: go_regabi_regs 2144865208
+
+    https_server-2227544 [026] ....1 763286.673450: bpf_trace_printk: Filling header field
+
+    https_server-2227544 [026] ....1 763286.673471: bpf_trace_printk: name: 
+    https_server-2227544 [026] ....1 763286.673480: bpf_trace_printk: Filling header field
+
+    https_server-2227544 [026] ....1 763286.673483: bpf_trace_printk: name: 
+    https_server-2227544 [026] ....1 763286.673487: bpf_trace_printk: Filling header field
+
+    https_server-2227544 [026] ....1 763286.673490: bpf_trace_printk: name: 
+    https_server-2227544 [026] ....1 763286.673493: bpf_trace_printk: Filling header field
+
+    https_server-2227544 [026] ....1 763286.673496: bpf_trace_printk: name: 
+    https_server-2227544 [026] ....1 763286.673500: bpf_trace_printk: Filling header field
+
+    https_server-2227544 [026] ....1 763286.673503: bpf_trace_printk: name: 
+    https_server-2227544 [026] ....1 763286.673506: bpf_trace_printk: Filling header field
+
+    https_server-2227544 [026] ....1 763286.673509: bpf_trace_printk: name: 
+    https_server-2227544 [026] ....1 763286.673757: bpf_trace_printk: calling submit_headers ':statushttp://chunkednosniffCreatedIM Usedstrings[="%s"]19531259765625invaliduintptrChanDir Value>ConvertforcegcallocmWcpuprofallocmRunknowngctraceIO waitrunningsyscallwaitingforevernetworkUNKNOWN:events, goid= s=nil
+ (scan  MB in pacer: % CPU ( zombie, j0 = head = ,errno=panic:  nmsys= locks= dying= allocsrax    rbx    rcx    rdx    rdi    rsi    rbp    rsp    r8     r9     r10    r11    r12    r13    r14    r15    rip    rflags cs     fs     gs     Signal signal  m->g0= pad1=  pad2=  text= minpc= 	value='
+    https_server-2227544 [026] ....1 763286.673768: bpf_trace_printk:  attr: 000000005cdd882b
+    https_server-2227544 [026] ....1 763286.673769: bpf_trace_printk:  event: 000000005d50a065
+    https_server-2227544 [026] ....1 763286.673788: bpf_trace_printk: calling submit_headers 'content-typemax-forwardshttp2debug=1http2debug=2push_promisedata_on_idleheaders_evendup_trailers100-continuemoreSpecificMulti-StatusNot ModifiedUnauthorizedI'm a teapotNot Extended (sensitive)152587890625762939453125can't happenreflect.CopysweepWaiterstraceStringsspanSetSpinemspanSpecialtraceTypeTabgcBitsArenasmheapSpecialgcpacertraceharddecommitmadvdontneeddumping heapchan receivelfstack.push span.limit= span.state=bad flushGen MB stacks, worker mode  nDataRoots= nSpanRoots= wbuf1=<nil> wbuf2=<nil> gcscan'
+    https_server-2227544 [026] ....1 763286.673789: bpf_trace_printk:  attr: 000000005cdd882b
+    https_server-2227544 [026] ....1 763286.673790: bpf_trace_printk:  event: 000000005d50a065
+    https_server-2227544 [026] ....1 763286.673800: bpf_trace_printk: calling submit_headers 'content-lengthfirst_settingsping_on_streamtrailers_bogus{$} not at endempty wildcardinvalid methodinternal errorparsing %q: %wNot Acceptableneed more datainvalid syntax1907348632812595367431640625unsafe.Pointer on zero Valueunknown methoduserArenaStateGC (dedicated)read mem statsasynctimerchangcstoptheworldprofstackdepthtraceallocfreeGC assist waitfinalizer waitsync.Cond.WaitSIGABRT: aborts.allocCount= key size wrongruntime: mmap(nil elem type! to finalizer GC worker initruntime: full=runtime: want=MB; all'
+    https_server-2227544 [026] ....1 763286.673802: bpf_trace_printk:  attr: 000000005cdd882b
+    https_server-2227544 [026] ....1 763286.673803: bpf_trace_printk:  event: 000000005d50a065
+    https_server-2227544 [026] ....1 763286.673813: bpf_trace_printk: calling submit_headers 'dateetagfromhostlinkvarypathDateconn%x
+Gonebool--%suintintsint8json3125Atoi-Inf+Infreadopenstatsyncfilechanfunccallkind on  in  != allgallprootitabsbrkdead is LEAFbase of ) =  <==GOGC] = s + ,r2= pc=: p=cas1cas2cas3cas4cas5cas6 at 
+	m= sp= sp: lr: fp= gp= mp=) m=JuneJuly as hour/etcFromicmpigmpftpspop3smtpdial 	
+bindunixxn--AhomChamKawiLisuMiaoModiNewaThaiTotoOsFsINFOWARNnull'\''NodeTrue.exe.inf.nanTRUENullNULL.NaN.NAN.Inf.INFermssse3avx2bmi1bmi2timebitsNameTypehtmlasn1cx16sse2false<nil>Error&amp;&#34;&#'
+    https_server-2227544 [026] ....1 763286.673814: bpf_trace_printk:  attr: 000000005cdd882b
+    https_server-2227544 [026] ....1 763286.673815: bpf_trace_printk:  event: 000000005d50a065
+    https_server-2227544 [026] ....1 763286.673981: bpf_trace_printk: go_http2_symaddrs_t -1928098824
+
+    https_server-2227544 [026] ....1 763286.673990: bpf_trace_printk: go_regabi_regs 2142243768
+
+    https_server-2227546 [007] ....1 763287.674910: bpf_trace_printk: Filling header field
+
+    https_server-2227546 [007] ....1 763287.674938: bpf_trace_printk: name: 
+    https_server-2227546 [007] ....1 763287.674946: bpf_trace_printk: Filling header field
+
+    https_server-2227546 [007] ....1 763287.674950: bpf_trace_printk: name: 
+    https_server-2227546 [007] ....1 763287.674954: bpf_trace_printk: Filling header field
+
+    https_server-2227546 [007] ....1 763287.674958: bpf_trace_printk: name: 
+    https_server-2227546 [007] ....1 763287.674961: bpf_trace_printk: Filling header field
+
+    https_server-2227546 [007] ....1 763287.674966: bpf_trace_printk: name: 
+    https_server-2227546 [007] ....1 763287.674970: bpf_trace_printk: Filling header field
+
+    https_server-2227546 [007] ....1 763287.674974: bpf_trace_printk: name: 
+    https_server-2227546 [007] ....1 763287.674977: bpf_trace_printk: Filling header field
+
+    https_server-2227546 [007] ....1 763287.674981: bpf_trace_printk: name: 
+    https_server-2227546 [007] ....1 763287.675130: bpf_trace_printk: calling submit_headers ':statushttp://chunkednosniffCreatedIM Usedstrings[="%s"]19531259765625invaliduintptrChanDir Value>ConvertforcegcallocmWcpuprofallocmRunknowngctraceIO waitrunningsyscallwaitingforevernetworkUNKNOWN:events, goid= s=nil
+ (scan  MB in pacer: % CPU ( zombie, j0 = head = ,errno=panic:  nmsys= locks= dying= allocsrax    rbx    rcx    rdx    rdi    rsi    rbp    rsp    r8     r9     r10    r11    r12    r13    r14    r15    rip    rflags cs     fs     gs     Signal signal  m->g0= pad1=  pad2=  text= minpc= 	value='
+    https_server-2227546 [007] ....1 763287.675137: bpf_trace_printk:  attr: 00000000ea3af53d
+    https_server-2227546 [007] ....1 763287.675138: bpf_trace_printk:  event: 000000002abcc80a
+    https_server-2227546 [007] ....1 763287.675156: bpf_trace_printk: calling submit_headers 'content-typemax-forwardshttp2debug=1http2debug=2push_promisedata_on_idleheaders_evendup_trailers100-continuemoreSpecificMulti-StatusNot ModifiedUnauthorizedI'm a teapotNot Extended (sensitive)152587890625762939453125can't happenreflect.CopysweepWaiterstraceStringsspanSetSpinemspanSpecialtraceTypeTabgcBitsArenasmheapSpecialgcpacertraceharddecommitmadvdontneeddumping heapchan receivelfstack.push span.limit= span.state=bad flushGen MB stacks, worker mode  nDataRoots= nSpanRoots= wbuf1=<nil> wbuf2=<nil> gcscan'
+    https_server-2227546 [007] ....1 763287.675157: bpf_trace_printk:  attr: 00000000ea3af53d
+    https_server-2227546 [007] ....1 763287.675158: bpf_trace_printk:  event: 000000002abcc80a
+    https_server-2227546 [007] ....1 763287.675170: bpf_trace_printk: calling submit_headers 'content-lengthfirst_settingsping_on_streamtrailers_bogus{$} not at endempty wildcardinvalid methodinternal errorparsing %q: %wNot Acceptableneed more datainvalid syntax1907348632812595367431640625unsafe.Pointer on zero Valueunknown methoduserArenaStateGC (dedicated)read mem statsasynctimerchangcstoptheworldprofstackdepthtraceallocfreeGC assist waitfinalizer waitsync.Cond.WaitSIGABRT: aborts.allocCount= key size wrongruntime: mmap(nil elem type! to finalizer GC worker initruntime: full=runtime: want=MB; all'
+    https_server-2227546 [007] ....1 763287.675171: bpf_trace_printk:  attr: 00000000ea3af53d
+    https_server-2227546 [007] ....1 763287.675171: bpf_trace_printk:  event: 000000002abcc80a
+    https_server-2227546 [007] ....1 763287.675182: bpf_trace_printk: calling submit_headers 'dateetagfromhostlinkvarypathDateconn%x
+Gonebool--%suintintsint8json3125Atoi-Inf+Infreadopenstatsyncfilechanfunccallkind on  in  != allgallprootitabsbrkdead is LEAFbase of ) =  <==GOGC] = s + ,r2= pc=: p=cas1cas2cas3cas4cas5cas6 at 
+	m= sp= sp: lr: fp= gp= mp=) m=JuneJuly as hour/etcFromicmpigmpftpspop3smtpdial 	
+bindunixxn--AhomChamKawiLisuMiaoModiNewaThaiTotoOsFsINFOWARNnull'\''NodeTrue.exe.inf.nanTRUENullNULL.NaN.NAN.Inf.INFermssse3avx2bmi1bmi2timebitsNameTypehtmlasn1cx16sse2false<nil>Error&amp;&#34;&#'
+    https_server-2227546 [007] ....1 763287.675183: bpf_trace_printk:  attr: 00000000ea3af53d
+    https_server-2227546 [007] ....1 763287.675184: bpf_trace_printk:  event: 000000002abcc80a
+    https_server-2227546 [007] ....1 763287.675365: bpf_trace_printk: go_http2_symaddrs_t -1928098824
+
+    https_server-2227546 [007] ....1 763287.675376: bpf_trace_printk: go_regabi_regs 2132282296
+
+    https_server-2227548 [030] ....1 763288.676413: bpf_trace_printk: Filling header field
+
+    https_server-2227548 [030] ....1 763288.676433: bpf_trace_printk: name: 
+    https_server-2227548 [030] ....1 763288.676442: bpf_trace_printk: Filling header field
+
+    https_server-2227548 [030] ....1 763288.676445: bpf_trace_printk: name: 
+    https_server-2227548 [030] ....1 763288.676448: bpf_trace_printk: Filling header field
+
+    https_server-2227548 [030] ....1 763288.676452: bpf_trace_printk: name: 
+    https_server-2227548 [030] ....1 763288.676455: bpf_trace_printk: Filling header field
+
+    https_server-2227548 [030] ....1 763288.676458: bpf_trace_printk: name: 
+    https_server-2227548 [030] ....1 763288.676461: bpf_trace_printk: Filling header field
+
+    https_server-2227548 [030] ....1 763288.676464: bpf_trace_printk: name: 
+    https_server-2227548 [030] ....1 763288.676468: bpf_trace_printk: Filling header field
+
+    https_server-2227548 [030] ....1 763288.676471: bpf_trace_printk: name: 
+    https_server-2227548 [030] ....1 763288.676630: bpf_trace_printk: calling submit_headers ':statushttp://chunkednosniffCreatedIM Usedstrings[="%s"]19531259765625invaliduintptrChanDir Value>ConvertforcegcallocmWcpuprofallocmRunknowngctraceIO waitrunningsyscallwaitingforevernetworkUNKNOWN:events, goid= s=nil
+ (scan  MB in pacer: % CPU ( zombie, j0 = head = ,errno=panic:  nmsys= locks= dying= allocsrax    rbx    rcx    rdx    rdi    rsi    rbp    rsp    r8     r9     r10    r11    r12    r13    r14    r15    rip    rflags cs     fs     gs     Signal signal  m->g0= pad1=  pad2=  text= minpc= 	value='
+    https_server-2227548 [030] ....1 763288.676633: bpf_trace_printk:  attr: 00000000a7351bf8
+    https_server-2227548 [030] ....1 763288.676635: bpf_trace_printk:  event: 00000000bfe65b09
+    https_server-2227548 [030] ....1 763288.676653: bpf_trace_printk: calling submit_headers 'content-typemax-forwardshttp2debug=1http2debug=2push_promisedata_on_idleheaders_evendup_trailers100-continuemoreSpecificMulti-StatusNot ModifiedUnauthorizedI'm a teapotNot Extended (sensitive)152587890625762939453125can't happenreflect.CopysweepWaiterstraceStringsspanSetSpinemspanSpecialtraceTypeTabgcBitsArenasmheapSpecialgcpacertraceharddecommitmadvdontneeddumping heapchan receivelfstack.push span.limit= span.state=bad flushGen MB stacks, worker mode  nDataRoots= nSpanRoots= wbuf1=<nil> wbuf2=<nil> gcscan'
+    https_server-2227548 [030] ....1 763288.676654: bpf_trace_printk:  attr: 00000000a7351bf8
+    https_server-2227548 [030] ....1 763288.676655: bpf_trace_printk:  event: 00000000bfe65b09
+    https_server-2227548 [030] ....1 763288.676665: bpf_trace_printk: calling submit_headers 'content-lengthfirst_settingsping_on_streamtrailers_bogus{$} not at endempty wildcardinvalid methodinternal errorparsing %q: %wNot Acceptableneed more datainvalid syntax1907348632812595367431640625unsafe.Pointer on zero Valueunknown methoduserArenaStateGC (dedicated)read mem statsasynctimerchangcstoptheworldprofstackdepthtraceallocfreeGC assist waitfinalizer waitsync.Cond.WaitSIGABRT: aborts.allocCount= key size wrongruntime: mmap(nil elem type! to finalizer GC worker initruntime: full=runtime: want=MB; all'
+    https_server-2227548 [030] ....1 763288.676666: bpf_trace_printk:  attr: 00000000a7351bf8
+    https_server-2227548 [030] ....1 763288.676666: bpf_trace_printk:  event: 00000000bfe65b09
+    https_server-2227548 [030] ....1 763288.676677: bpf_trace_printk: calling submit_headers 'dateetagfromhostlinkvarypathDateconn%x
+Gonebool--%suintintsint8json3125Atoi-Inf+Infreadopenstatsyncfilechanfunccallkind on  in  != allgallprootitabsbrkdead is LEAFbase of ) =  <==GOGC] = s + ,r2= pc=: p=cas1cas2cas3cas4cas5cas6 at 
+	m= sp= sp: lr: fp= gp= mp=) m=JuneJuly as hour/etcFromicmpigmpftpspop3smtpdial 	
+bindunixxn--AhomChamKawiLisuMiaoModiNewaThaiTotoOsFsINFOWARNnull'\''NodeTrue.exe.inf.nanTRUENullNULL.NaN.NAN.Inf.INFermssse3avx2bmi1bmi2timebitsNameTypehtmlasn1cx16sse2false<nil>Error&amp;&#34;&#'
+    https_server-2227548 [030] ....1 763288.676678: bpf_trace_printk:  attr: 00000000a7351bf8
+    https_server-2227548 [030] ....1 763288.676678: bpf_trace_printk:  event: 00000000bfe65b09
+    https_server-2227548 [030] ....1 763288.676946: bpf_trace_printk: go_http2_symaddrs_t -1928098824
+
+    https_server-2227548 [030] ....1 763288.676959: bpf_trace_printk: go_regabi_regs 2144340920
+
+    https_server-2227547 [031] ....1 763289.677901: bpf_trace_printk: Filling header field
+
+    https_server-2227547 [031] ....1 763289.677926: bpf_trace_printk: name: 
+    https_server-2227547 [031] ....1 763289.677936: bpf_trace_printk: Filling header field
+
+    https_server-2227547 [031] ....1 763289.677940: bpf_trace_printk: name: 
+    https_server-2227547 [031] ....1 763289.677943: bpf_trace_printk: Filling header field
+
+    https_server-2227547 [031] ....1 763289.677948: bpf_trace_printk: name: 
+    https_server-2227547 [031] ....1 763289.677953: bpf_trace_printk: Filling header field
+
+    https_server-2227547 [031] ....1 763289.677958: bpf_trace_printk: name: 
+    https_server-2227547 [031] ....1 763289.677963: bpf_trace_printk: Filling header field
+
+    https_server-2227547 [031] ....1 763289.677969: bpf_trace_printk: name: 
+    https_server-2227547 [031] ....1 763289.677974: bpf_trace_printk: Filling header field
+
+    https_server-2227547 [031] ....1 763289.677979: bpf_trace_printk: name: 
+    https_server-2227547 [031] ....1 763289.678221: bpf_trace_printk: calling submit_headers ':statushttp://chunkednosniffCreatedIM Usedstrings[="%s"]19531259765625invaliduintptrChanDir Value>ConvertforcegcallocmWcpuprofallocmRunknowngctraceIO waitrunningsyscallwaitingforevernetworkUNKNOWN:events, goid= s=nil
+ (scan  MB in pacer: % CPU ( zombie, j0 = head = ,errno=panic:  nmsys= locks= dying= allocsrax    rbx    rcx    rdx    rdi    rsi    rbp    rsp    r8     r9     r10    r11    r12    r13    r14    r15    rip    rflags cs     fs     gs     Signal signal  m->g0= pad1=  pad2=  text= minpc= 	value='
+    https_server-2227547 [031] ....1 763289.678235: bpf_trace_printk:  attr: 0000000085990380
+    https_server-2227547 [031] ....1 763289.678236: bpf_trace_printk:  event: 0000000043dfd120
+    https_server-2227547 [031] ....1 763289.678259: bpf_trace_printk: calling submit_headers 'content-typemax-forwardshttp2debug=1http2debug=2push_promisedata_on_idleheaders_evendup_trailers100-continuemoreSpecificMulti-StatusNot ModifiedUnauthorizedI'm a teapotNot Extended (sensitive)152587890625762939453125can't happenreflect.CopysweepWaiterstraceStringsspanSetSpinemspanSpecialtraceTypeTabgcBitsArenasmheapSpecialgcpacertraceharddecommitmadvdontneeddumping heapchan receivelfstack.push span.limit= span.state=bad flushGen MB stacks, worker mode  nDataRoots= nSpanRoots= wbuf1=<nil> wbuf2=<nil> gcscan'
+    https_server-2227547 [031] ....1 763289.678261: bpf_trace_printk:  attr: 0000000085990380
+    https_server-2227547 [031] ....1 763289.678262: bpf_trace_printk:  event: 0000000043dfd120
+    https_server-2227547 [031] ....1 763289.678277: bpf_trace_printk: calling submit_headers 'content-lengthfirst_settingsping_on_streamtrailers_bogus{$} not at endempty wildcardinvalid methodinternal errorparsing %q: %wNot Acceptableneed more datainvalid syntax1907348632812595367431640625unsafe.Pointer on zero Valueunknown methoduserArenaStateGC (dedicated)read mem statsasynctimerchangcstoptheworldprofstackdepthtraceallocfreeGC assist waitfinalizer waitsync.Cond.WaitSIGABRT: aborts.allocCount= key size wrongruntime: mmap(nil elem type! to finalizer GC worker initruntime: full=runtime: want=MB; all'
+    https_server-2227547 [031] ....1 763289.678279: bpf_trace_printk:  attr: 0000000085990380
+    https_server-2227547 [031] ....1 763289.678280: bpf_trace_printk:  event: 0000000043dfd120
+    https_server-2227547 [031] ....1 763289.678296: bpf_trace_printk: calling submit_headers 'dateetagfromhostlinkvarypathDateconn%x
+Gonebool--%suintintsint8json3125Atoi-Inf+Infreadopenstatsyncfilechanfunccallkind on  in  != allgallprootitabsbrkdead is LEAFbase of ) =  <==GOGC] = s + ,r2= pc=: p=cas1cas2cas3cas4cas5cas6 at 
+	m= sp= sp: lr: fp= gp= mp=) m=JuneJuly as hour/etcFromicmpigmpftpspop3smtpdial 	
+bindunixxn--AhomChamKawiLisuMiaoModiNewaThaiTotoOsFsINFOWARNnull'\''NodeTrue.exe.inf.nanTRUENullNULL.NaN.NAN.Inf.INFermssse3avx2bmi1bmi2timebitsNameTypehtmlasn1cx16sse2false<nil>Error&amp;&#34;&#'
+    https_server-2227547 [031] ....1 763289.678297: bpf_trace_printk:  attr: 0000000085990380
+    https_server-2227547 [031] ....1 763289.678299: bpf_trace_printk:  event: 0000000043dfd120
+    https_server-2227547 [031] ....1 763289.678505: bpf_trace_printk: go_http2_symaddrs_t -1928098824
+
+    https_server-2227547 [031] ....1 763289.678514: bpf_trace_printk: go_regabi_regs 2144865208
+

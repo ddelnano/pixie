@@ -268,8 +268,10 @@ StatusOr<std::vector<DWARFDie>> DwarfReader::GetMatchingDIEs(
     std::string_view name, std::optional<llvm::dwarf::Tag> type_opt) {
   DCHECK(dwarf_context_ != nullptr);
 
+  VLOG(3) << "Searhing for " << name;
   // Special case for types that are indexed.
   if (type_opt.has_value() && IsIndexedType(type_opt.value()) && !die_map_.empty()) {
+    VLOG(3) << "Searching in index for " << name;
     auto die_opt = FindInDIEMap(std::string(name), type_opt.value());
     if (die_opt.has_value()) {
       return std::vector<DWARFDie>{die_opt.value()};
@@ -280,9 +282,11 @@ StatusOr<std::vector<DWARFDie>> DwarfReader::GetMatchingDIEs(
   // When there is no index, fall-back to manual search.
   std::vector<DWARFDie> dies;
   DWARFContext::unit_iterator_range units = dwarf_context_->normal_units();
+  VLOG(3) << "Searching in all units for " << name;
   for (const std::unique_ptr<llvm::DWARFUnit>& unit : units) {
     for (const llvm::DWARFDebugInfoEntry& entry : unit->dies()) {
       DWARFDie die = {unit.get(), &entry};
+      VLOG(3) << "Checking against: " << Dump(die);
       if (IsMatchingDIE(name, type_opt, die)) {
         dies.push_back(std::move(die));
       }
@@ -955,7 +959,7 @@ StatusOr<std::map<std::string, ArgInfo>> DwarfReader::GetFunctionArgInfo(
   absl::flat_hash_set<std::string> arg_names;
   for (const auto& die : GetParamDIEs(function_die)) {
     std::string arg_name = die.getShortName();
-    VLOG(1) << arg_name;
+    VLOG(1) << function_symbol_name << " arg: " <<arg_name;
 
     // TODO(chengruizhe): This is a hack that deals with duplicate DWARF entries in Go 1.18
     //  binaries. Remove once this issue is resolved. https://github.com/golang/go/issues/51725
@@ -979,6 +983,7 @@ StatusOr<std::map<std::string, ArgInfo>> DwarfReader::GetFunctionArgInfo(
     PX_ASSIGN_OR_RETURN(
         arg.location,
         arg_tracker->PopLocation(type_class, type_size, alignment_size, num_vars, arg.retarg));
+    VLOG(2) << arg;
   }
 
   return arg_info;

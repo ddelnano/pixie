@@ -70,6 +70,22 @@ StatusOr<std::string> ReadGoString(ElfReader* elf_reader, uint64_t ptr_size, uin
   return std::string(go_version_bytecode);
 }
 
+StatusOr<std::string> ExtractSemVer(const std::string& input) {
+    size_t go_pos = input.find("go"); // Find "go"
+    if (go_pos == std::string::npos) {
+        LOG(ERROR) << "Prefix 'go' not found in input.";
+        return error::NotFound("Prefix 'go' not found in input.");
+    }
+
+    size_t start = go_pos + 2; // Move past "go"
+    size_t end = input.find(" ", start); // Find space delimiter after version
+    if (end == std::string::npos) {
+        end = input.size(); // If no space, take the rest of the string
+    }
+
+    return input.substr(start, end - start);
+}
+
 StatusOr<BuildInfo> ReadBuildInfo(const std::string& mod) {
   BuildInfo build_info;
   Module* last_module = nullptr;
@@ -85,6 +101,8 @@ StatusOr<BuildInfo> ReadBuildInfo(const std::string& mod) {
       std::getline(iss, mod_entry.path, '\t');
       std::getline(iss, mod_entry.version, '\t');
       std::getline(iss, mod_entry.sum, '\t');
+      LOG(INFO) << absl::Substitute("mod.path=$0, mod.version=$1, mod.sum=$2", mod_entry.path,
+                                    mod_entry.version, mod_entry.sum);
       build_info.main = std::move(mod_entry);
       last_module = &build_info.main;
     } else if (absl::StartsWith(line, "dep\t")) {
@@ -93,6 +111,8 @@ StatusOr<BuildInfo> ReadBuildInfo(const std::string& mod) {
       std::getline(iss, dep.path, '\t');
       std::getline(iss, dep.version, '\t');
       std::getline(iss, dep.sum, '\t');
+      LOG(INFO) << absl::Substitute("dep.path=$0, dep.version=$1, dep.sum=$2", dep.path,
+                                    dep.version, dep.sum);
       build_info.deps.push_back(std::move(dep));
       last_module = &build_info.deps.back();
     } else if (absl::StartsWith(line, "=>\t")) {
@@ -148,7 +168,8 @@ StatusOr<std::pair<std::string, BuildInfo>> ReadGoBuildVersion(ElfReader* elf_re
       PX_ASSIGN_OR_RETURN(build_info, ReadBuildInfo(std::string(mod)));
     }
 
-    return std::make_pair(std::string(go_version), std::move(build_info));
+    PX_ASSIGN_OR_RETURN(auto s, ExtractSemVer(std::string(go_version)));
+    return std::make_pair(s, std::move(build_info));
   }
 
   read_ptr_func_t read_ptr;
@@ -206,7 +227,8 @@ StatusOr<std::pair<std::string, BuildInfo>> ReadGoBuildVersion(ElfReader* elf_re
   } else {
     LOG(WARNING) << "Failed to read mod status";
   }
-  return std::make_pair(version, std::move(build_info));
+  PX_ASSIGN_OR_RETURN(auto s, ExtractSemVer(std::string(version)));
+  return std::make_pair(s, std::move(build_info));
 }
 
 // Prefixes used to search for itable symbols in the binary. Follows the format:
