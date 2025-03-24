@@ -37,6 +37,7 @@ pl_cc_library(
         "//src/stirling/core:cc_library",
         "//src/stirling/obj_tools:cc_library",
         "//src/stirling/source_connectors/socket_tracer/bcc_bpf:socket_trace",
+        "//src/stirling/source_connectors/socket_tracer/bcc_bpf:offsetgen_output",
         "//src/stirling/source_connectors/socket_tracer/bcc_bpf_intf:cc_library",
         "//src/stirling/source_connectors/socket_tracer/proto:sock_event_pl_cc_proto",
         "//src/stirling/source_connectors/socket_tracer/protocols:cc_library",

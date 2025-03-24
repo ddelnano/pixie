@@ -58,6 +58,8 @@ DEFINE_string(
     "Comma separated list of binary filenames that should be excluded from uprobe attachment."
     "For a binary at path /path/to/binary, the filename would be binary");
 
+OBJ_STRVIEW(offsetgen_output_json, offsetgen_output);
+
 namespace px {
 namespace stirling {
 
@@ -216,19 +218,14 @@ void parseFuncsObject(const rapidjson::Value& funcsVal) {
 }
 
 static void InitSymAddrs() {
-  auto fname = "/home/ddelnano/code/opentelemetry-go-instrumentation/output_nested.json";
-  std::ifstream ifs(fname);
-  if (!ifs) {
-    LOG(ERROR) << "Could not open file: " << fname;
-    return;
-  }
-  std::stringstream buffer;
-  buffer << ifs.rdbuf();
-  std::string jsonContent = buffer.str();
+  // objcopy will add comments to the JSON file since we redefine symbols
+  size_t brace_pos = offsetgen_output_json.find('{');
+  std::string_view offsetgen_just_json = offsetgen_output_json.substr(brace_pos);
+  rapidjson::MemoryStream ms(offsetgen_just_json.data(), offsetgen_just_json.size());
 
   // 2) Parse with RapidJSON
   rapidjson::Document doc;
-  rapidjson::ParseResult parseRes = doc.Parse(jsonContent.c_str());
+  rapidjson::ParseResult parseRes = doc.ParseStream(ms);
   if (!parseRes) {
     LOG(ERROR) << "JSON parse error: " << rapidjson::GetParseError_En(parseRes.Code())
                << " at offset " << parseRes.Offset() << "\n";
