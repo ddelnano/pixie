@@ -99,8 +99,8 @@ StatusOr<BuildInfo> ReadBuildInfo(const std::string& mod) {
       std::getline(iss, mod_entry.path, '\t');
       std::getline(iss, mod_entry.version, '\t');
       std::getline(iss, mod_entry.sum, '\t');
-      LOG(INFO) << absl::Substitute("mod.path=$0, mod.version=$1, mod.sum=$2", mod_entry.path,
-                                    mod_entry.version, mod_entry.sum);
+      VLOG(1) << absl::Substitute("mod.path=$0, mod.version=$1, mod.sum=$2", mod_entry.path,
+                                  mod_entry.version, mod_entry.sum);
       build_info.main = std::move(mod_entry);
       last_module = &build_info.main;
     } else if (absl::StartsWith(line, "dep\t")) {
@@ -109,8 +109,8 @@ StatusOr<BuildInfo> ReadBuildInfo(const std::string& mod) {
       std::getline(iss, dep.path, '\t');
       std::getline(iss, dep.version, '\t');
       std::getline(iss, dep.sum, '\t');
-      LOG(INFO) << absl::Substitute("dep.path=$0, dep.version=$1, dep.sum=$2", dep.path,
-                                    dep.version, dep.sum);
+      VLOG(1) << absl::Substitute("dep.path=$0, dep.version=$1, dep.sum=$2", dep.path, dep.version,
+                                  dep.sum);
       build_info.deps.push_back(std::move(dep));
       last_module = &build_info.deps.back();
     } else if (absl::StartsWith(line, "=>\t")) {

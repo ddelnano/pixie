@@ -34,6 +34,8 @@
 DECLARE_bool(openssl_force_raw_fptrs);
 DECLARE_bool(openssl_raw_fptrs_enabled);
 
+DECLARE_bool(disable_dwarf_parsing);
+
 namespace px {
 namespace stirling {
 
@@ -63,8 +65,7 @@ StatusOr<struct go_http2_symaddrs_t> GoHTTP2SymAddrs(obj_tools::ElfReader* elf_r
  */
 StatusOr<struct go_tls_symaddrs_t> GoTLSSymAddrs(obj_tools::ElfReader* elf_reader,
                                                  obj_tools::DwarfReader* dwarf_reader,
-                                                 const std::string& go_version,
-                                                 const obj_tools::BuildInfo& build_info);
+                                                 const std::string& go_version);
 
 /**
  * Detects the version of OpenSSL to return the locations of all relevant symbols for OpenSSL uprobe

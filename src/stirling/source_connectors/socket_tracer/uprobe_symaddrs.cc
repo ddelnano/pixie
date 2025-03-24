@@ -47,6 +47,9 @@ DEFINE_bool(openssl_raw_fptrs_enabled, false,
             "If true, allows the openssl tracing implementation to fall back to function pointers "
             "if dlopen/dlsym is unable to find symbols");
 
+DEFINE_bool(disable_dwarf_parsing, true,
+            "Disable parsing of DWARF info for symbol offsets and uprobes");
+
 std::map<std::string, std::map<std::string, std::map<std::string, int32_t>>> g_structsOffsetMap;
 
 std::map<std::string, std::map<std::string, std::map<std::string, std::unique_ptr<location_t>>>>
@@ -106,6 +109,38 @@ StatusOr<location_t> GetArgOffset(const std::string& fn_name, const std::string&
   if (location.type == kLocationTypeStack) {
     location.offset = location.offset + kSPOffset;
   }
+  return location;
+}
+
+location_t GetDwarfArgOffset(const std::map<std::string, obj_tools::ArgInfo>& fn_args_map,
+                             const std::string& arg) {
+  // The information from DWARF assumes SP is 8 bytes larger than the SP
+  // we get from BPF code, so add the correction factor here.
+  constexpr int32_t kSPOffset = 8;
+
+  location_t location;
+
+  auto it = fn_args_map.find(arg);
+  if (it == fn_args_map.end()) {
+    location.type = kLocationTypeInvalid;
+    location.offset = -1;
+    return location;
+  }
+
+  switch (it->second.location.loc_type) {
+    case obj_tools::LocationType::kStack:
+      location.type = kLocationTypeStack;
+      location.offset = it->second.location.offset + kSPOffset;
+      return location;
+    case obj_tools::LocationType::kRegister:
+      location.type = kLocationTypeRegisters;
+      location.offset = it->second.location.offset;
+      return location;
+    default:
+      location.type = kLocationTypeInvalid;
+      location.offset = -1;
+  }
+
   return location;
 }
 
@@ -211,18 +246,31 @@ Status PopulateCommonDebugSymbols(DwarfReader* dwarf_reader, std::string_view ve
                                   const std::string& go_version,
                                   const std::string& google_golang_grpc,
                                   struct go_common_symaddrs_t* symaddrs) {
-  PX_UNUSED(dwarf_reader);
-  PX_UNUSED(vendor_prefix);
+  if (!FLAGS_disable_dwarf_parsing) {
+#define VENDOR_SYMBOL(symbol) absl::StrCat(vendor_prefix, symbol)
 
-  LOG_ASSIGN_STATUSOR(symaddrs->FD_Sysfd_offset,
-                      GetStructOffset("internal/poll.FD", "Sysfd", go_version));
-  LOG_ASSIGN_STATUSOR(symaddrs->tlsConn_conn_offset,
-                      GetStructOffset("crypto/tls.Conn", "conn", go_version));
-  LOG_ASSIGN_STATUSOR(symaddrs->syscallConn_conn_offset,
-                      GetStructOffset("google.golang.org/grpc/credentials/internal.syscallConn",
-                                      "conn", google_golang_grpc));
-  LOG_ASSIGN_STATUSOR(symaddrs->g_goid_offset, GetStructOffset("runtime.g", "goid", go_version));
+    LOG_ASSIGN_STATUSOR(symaddrs->FD_Sysfd_offset,
+                        dwarf_reader->GetStructMemberOffset("internal/poll.FD", "Sysfd"));
+    LOG_ASSIGN_STATUSOR(symaddrs->tlsConn_conn_offset,
+                        dwarf_reader->GetStructMemberOffset("crypto/tls.Conn", "conn"));
+    LOG_ASSIGN_STATUSOR(
+        symaddrs->syscallConn_conn_offset,
+        dwarf_reader->GetStructMemberOffset(
+            VENDOR_SYMBOL("google.golang.org/grpc/credentials/internal.syscallConn"), "conn"));
+    LOG_ASSIGN_STATUSOR(symaddrs->g_goid_offset,
+                        dwarf_reader->GetStructMemberOffset("runtime.g", "goid"));
+#undef VENDOR_SYMBOL
 
+  } else {
+    LOG_ASSIGN_STATUSOR(symaddrs->FD_Sysfd_offset,
+                        GetStructOffset("internal/poll.FD", "Sysfd", go_version));
+    LOG_ASSIGN_STATUSOR(symaddrs->tlsConn_conn_offset,
+                        GetStructOffset("crypto/tls.Conn", "conn", go_version));
+    LOG_ASSIGN_STATUSOR(symaddrs->syscallConn_conn_offset,
+                        GetStructOffset("google.golang.org/grpc/credentials/internal.syscallConn",
+                                        "conn", google_golang_grpc));
+    LOG_ASSIGN_STATUSOR(symaddrs->g_goid_offset, GetStructOffset("runtime.g", "goid", go_version));
+  }
   // List mandatory symaddrs here (symaddrs without which all probes become useless).
   // Returning an error will prevent the probes from deploying.
   if (symaddrs->FD_Sysfd_offset == -1) {
@@ -249,250 +297,475 @@ Status PopulateHTTP2TypeAddrs(ElfReader* elf_reader, std::string_view vendor_pre
   return Status::OK();
 }
 
-Status PopulateHTTP2DebugSymbols(DwarfReader* /*dwarf_reader*/, const std::string& go_version,
+Status PopulateHTTP2DebugSymbols(DwarfReader* dwarf_reader, const std::string& go_version,
                                  const std::string& vendor_prefix,
                                  const obj_tools::BuildInfo& build_info,
                                  struct go_http2_symaddrs_t* symaddrs) {
   // Note: we only return error if a *mandatory* symbol is missing. Currently none are mandatory,
   // because these multiple probes for multiple HTTP2/GRPC libraries. Even if a symbol for one
   // is missing it doesn't mean the other library's probes should not be deployed.
-  std::string golang_x_net_version;
-  std::string google_golang_grpc;
-  for (const auto& dep : build_info.deps) {
-    // Find the related dependencies and strip the "v" prefix
-    if (dep.path == "golang.org/x/net") {
-      golang_x_net_version = dep.version.substr(1);
-    } else if (dep.path == "google.golang.org/grpc") {
-      google_golang_grpc = dep.version.substr(1);
-      LOG(INFO) << "Found grpc dependency: " << dep.path << " " << dep.version << " "
-                << google_golang_grpc;
-    }
-  }
-
+  if (!FLAGS_disable_dwarf_parsing) {
 #define VENDOR_SYMBOL(symbol) absl::StrCat(vendor_prefix, symbol)
 
-  // clang-format off
-  // TODO(ddelnano): Figure out what to do with VENDOR_SYMBOL
+    // clang-format off
   LOG_ASSIGN_STATUSOR(symaddrs->HeaderField_Name_offset,
-                      GetStructOffset("golang.org/x/net/http2/hpack.HeaderField", "Name", golang_x_net_version));
+                    dwarf_reader->GetStructMemberOffset(
+                            VENDOR_SYMBOL("golang.org/x/net/http2/hpack.HeaderField"),
+                            "Name"));
   LOG_ASSIGN_STATUSOR(symaddrs->HeaderField_Value_offset,
-                      GetStructOffset("golang.org/x/net/http2/hpack.HeaderField", "Value", golang_x_net_version));
+                    dwarf_reader->GetStructMemberOffset(
+                            VENDOR_SYMBOL("golang.org/x/net/http2/hpack.HeaderField"),
+                            "Value"));
   LOG_ASSIGN_STATUSOR(symaddrs->http2Server_conn_offset,
-                      GetStructOffset("google.golang.org/grpc/internal/transport.http2Server", "conn", google_golang_grpc));
-
+                    dwarf_reader->GetStructMemberOffset(
+                            VENDOR_SYMBOL("google.golang.org/grpc/internal/transport.http2Server"),
+                            "conn"));
   LOG_ASSIGN_STATUSOR(symaddrs->http2Client_conn_offset,
-                      GetStructOffset("google.golang.org/grpc/internal/transport.http2Client", "conn", google_golang_grpc));
+                    dwarf_reader->GetStructMemberOffset(
+                            VENDOR_SYMBOL("google.golang.org/grpc/internal/transport.http2Client"),
+                            "conn"));
   LOG_ASSIGN_STATUSOR(symaddrs->loopyWriter_framer_offset,
-                      GetStructOffset("google.golang.org/grpc/internal/transport.loopyWriter", "framer", google_golang_grpc));
-
+                    dwarf_reader->GetStructMemberOffset(
+                            VENDOR_SYMBOL("google.golang.org/grpc/internal/transport.loopyWriter"),
+                            "framer"));
   LOG_ASSIGN_STATUSOR(symaddrs->Framer_w_offset,
-                      GetStructOffset("golang.org/x/net/http2.Framer", "w", golang_x_net_version));
-
+                    dwarf_reader->GetStructMemberOffset(
+                            VENDOR_SYMBOL("golang.org/x/net/http2.Framer"),
+                            "w"));
   LOG_ASSIGN_STATUSOR(symaddrs->MetaHeadersFrame_HeadersFrame_offset,
-                      GetStructOffset("golang.org/x/net/http2.MetaHeadersFrame", "HeadersFrame", golang_x_net_version));
+                    dwarf_reader->GetStructMemberOffset(
+                            VENDOR_SYMBOL("golang.org/x/net/http2.MetaHeadersFrame"),
+                            "HeadersFrame"));
   LOG_ASSIGN_STATUSOR(symaddrs->MetaHeadersFrame_Fields_offset,
-                      GetStructOffset("golang.org/x/net/http2.MetaHeadersFrame", "Fields", golang_x_net_version));
+                    dwarf_reader->GetStructMemberOffset(
+                            VENDOR_SYMBOL("golang.org/x/net/http2.MetaHeadersFrame"),
+                            "Fields"));
   LOG_ASSIGN_STATUSOR(symaddrs->HeadersFrame_FrameHeader_offset,
-                      GetStructOffset("golang.org/x/net/http2.HeadersFrame", "FrameHeader", golang_x_net_version));
+                    dwarf_reader->GetStructMemberOffset(
+                            VENDOR_SYMBOL("golang.org/x/net/http2.HeadersFrame"),
+                            "FrameHeader"));
   LOG_ASSIGN_STATUSOR(symaddrs->FrameHeader_Type_offset,
-                      GetStructOffset("golang.org/x/net/http2.FrameHeader", "Type", golang_x_net_version));
+                    dwarf_reader->GetStructMemberOffset(
+                            VENDOR_SYMBOL("golang.org/x/net/http2.FrameHeader"),
+                            "Type"));
   LOG_ASSIGN_STATUSOR(symaddrs->FrameHeader_Flags_offset,
-                      GetStructOffset("golang.org/x/net/http2.FrameHeader", "Flags", golang_x_net_version));
+                    dwarf_reader->GetStructMemberOffset(
+                            VENDOR_SYMBOL("golang.org/x/net/http2.FrameHeader"),
+                            "Flags"));
   LOG_ASSIGN_STATUSOR(symaddrs->FrameHeader_StreamID_offset,
-                      GetStructOffset("golang.org/x/net/http2.FrameHeader", "StreamID", golang_x_net_version));
+                    dwarf_reader->GetStructMemberOffset(
+                            VENDOR_SYMBOL("golang.org/x/net/http2.FrameHeader"),
+                            "StreamID"));
   LOG_ASSIGN_STATUSOR(symaddrs->DataFrame_data_offset,
-                      GetStructOffset("golang.org/x/net/http2.DataFrame", "data", golang_x_net_version));
+                    dwarf_reader->GetStructMemberOffset(
+                            VENDOR_SYMBOL("golang.org/x/net/http2.DataFrame"),
+                            "data"));
   LOG_ASSIGN_STATUSOR(symaddrs->bufWriter_conn_offset,
-                      GetStructOffset("google.golang.org/grpc/internal/transport.bufWriter", "conn", google_golang_grpc));
-
+                    dwarf_reader->GetStructMemberOffset(
+                            VENDOR_SYMBOL("google.golang.org/grpc/internal/transport.bufWriter"),
+                            "conn"));
   LOG_ASSIGN_STATUSOR(symaddrs->http2serverConn_conn_offset,
-                      GetStructOffset("net/http.http2serverConn", "conn", go_version));
-
+                    dwarf_reader->GetStructMemberOffset(
+                            "net/http.http2serverConn",
+                            "conn"));
   LOG_ASSIGN_STATUSOR(symaddrs->http2serverConn_hpackEncoder_offset,
-                      GetStructOffset("net/http.http2serverConn", "hpackEncoder", go_version));
-
+                    dwarf_reader->GetStructMemberOffset(
+                            "net/http.http2serverConn",
+                            "hpackEncoder"));
   LOG_ASSIGN_STATUSOR(symaddrs->http2HeadersFrame_http2FrameHeader_offset,
-                      GetStructOffset("net/http.http2HeadersFrame", "http2FrameHeader", go_version));
-
+                    dwarf_reader->GetStructMemberOffset(
+                            "net/http.http2HeadersFrame",
+                            "http2FrameHeader"));
   LOG_ASSIGN_STATUSOR(symaddrs->http2FrameHeader_Type_offset,
-                      GetStructOffset("net/http.http2FrameHeader", "Type", go_version));
-
+                    dwarf_reader->GetStructMemberOffset(
+                            "net/http.http2FrameHeader",
+                            "Type"));
   LOG_ASSIGN_STATUSOR(symaddrs->http2FrameHeader_Flags_offset,
-                      GetStructOffset("net/http.http2FrameHeader", "Flags", go_version));
-
+                    dwarf_reader->GetStructMemberOffset(
+                            "net/http.http2FrameHeader",
+                            "Flags"));
   LOG_ASSIGN_STATUSOR(symaddrs->http2FrameHeader_StreamID_offset,
-                      GetStructOffset("net/http.http2FrameHeader", "StreamID", go_version));
-
+                    dwarf_reader->GetStructMemberOffset(
+                            "net/http.http2FrameHeader",
+                            "StreamID"));
   LOG_ASSIGN_STATUSOR(symaddrs->http2DataFrame_data_offset,
-                      GetStructOffset("net/http.http2DataFrame", "data", go_version));
-
+                    dwarf_reader->GetStructMemberOffset(
+                            "net/http.http2DataFrame",
+                            "data"));
   LOG_ASSIGN_STATUSOR(symaddrs->http2writeResHeaders_streamID_offset,
-                      GetStructOffset("net/http.http2writeResHeaders", "streamID", go_version));
-
+                    dwarf_reader->GetStructMemberOffset(
+                            "net/http.http2writeResHeaders",
+                            "streamID"));
   LOG_ASSIGN_STATUSOR(symaddrs->http2writeResHeaders_endStream_offset,
-                      GetStructOffset("net/http.http2writeResHeaders", "endStream", go_version));
-
+                    dwarf_reader->GetStructMemberOffset(
+                            "net/http.http2writeResHeaders",
+                            "endStream"));
   LOG_ASSIGN_STATUSOR(symaddrs->http2MetaHeadersFrame_http2HeadersFrame_offset,
-                      GetStructOffset("net/http.http2MetaHeadersFrame", "http2HeadersFrame", go_version));
-
+                    dwarf_reader->GetStructMemberOffset(
+                            "net/http.http2MetaHeadersFrame",
+                            "http2HeadersFrame"));
   LOG_ASSIGN_STATUSOR(symaddrs->http2MetaHeadersFrame_Fields_offset,
-                      GetStructOffset("net/http.http2MetaHeadersFrame", "Fields", go_version));
-
+                    dwarf_reader->GetStructMemberOffset(
+                            "net/http.http2MetaHeadersFrame",
+                            "Fields"));
   LOG_ASSIGN_STATUSOR(symaddrs->http2Framer_w_offset,
-                      GetStructOffset("net/http.http2Framer", "w", go_version));
-
+                    dwarf_reader->GetStructMemberOffset(
+                            "net/http.http2Framer",
+                            "w"));
   LOG_ASSIGN_STATUSOR(symaddrs->http2bufferedWriter_w_offset,
-                      GetStructOffset("net/http.http2bufferedWriter", "w", go_version));
-  // clang-format on
+                    dwarf_reader->GetStructMemberOffset(
+                            "net/http.http2bufferedWriter",
+                            "w"));
+    // clang-format on
 
-  const location_t invalid_loc = {kLocationTypeInvalid, -1};
+    const std::map<std::string, obj_tools::ArgInfo> kEmptyMap;
 
-  // Arguments of net/http.(*http2Framer).WriteDataPadded.
-  {
-    std::string fn = "net/http.(*http2Framer).WriteDataPadded";
-    auto f_loc = GetArgOffset(fn, "f", go_version).ValueOr(invalid_loc);
-    LOG_ASSIGN(symaddrs->http2Framer_WriteDataPadded_f_loc, f_loc);
+    // Arguments of net/http.(*http2Framer).WriteDataPadded.
+    {
+      std::string_view fn = "net/http.(*http2Framer).WriteDataPadded";
+      auto args_map = dwarf_reader->GetFunctionArgInfo(fn).ValueOr(kEmptyMap);
+      LOG_ASSIGN(symaddrs->http2Framer_WriteDataPadded_f_loc, GetDwarfArgOffset(args_map, "f"));
+      LOG_ASSIGN(symaddrs->http2Framer_WriteDataPadded_streamID_loc,
+                 GetDwarfArgOffset(args_map, "streamID"));
+      LOG_ASSIGN(symaddrs->http2Framer_WriteDataPadded_endStream_loc,
+                 GetDwarfArgOffset(args_map, "endStream"));
 
-    auto streamID_loc = GetArgOffset(fn, "streamID", go_version).ValueOr(invalid_loc);
-    LOG_ASSIGN(symaddrs->http2Framer_WriteDataPadded_streamID_loc, streamID_loc);
+      LOG_ASSIGN(symaddrs->http2Framer_WriteDataPadded_data_ptr_loc,
+                 GetDwarfArgOffset(args_map, "data"));
+      symaddrs->http2Framer_WriteDataPadded_data_ptr_loc.offset += kGoArrayPtrOffset;
 
-    auto endStream_loc = GetArgOffset(fn, "endStream", go_version).ValueOr(invalid_loc);
-    LOG_ASSIGN(symaddrs->http2Framer_WriteDataPadded_endStream_loc, endStream_loc);
+      LOG_ASSIGN(symaddrs->http2Framer_WriteDataPadded_data_len_loc,
+                 GetDwarfArgOffset(args_map, "data"));
+      symaddrs->http2Framer_WriteDataPadded_data_len_loc.offset += kGoArrayLenOffset;
+    }
 
-    auto data_ptr_loc = GetArgOffset(fn, "data", go_version).ValueOr(invalid_loc);
-    LOG_ASSIGN(symaddrs->http2Framer_WriteDataPadded_data_ptr_loc, data_ptr_loc);
-    symaddrs->http2Framer_WriteDataPadded_data_ptr_loc.offset += kGoArrayPtrOffset;
+    // Arguments of golang.org/x/net/http2.(*Framer).WriteDataPadded.
+    {
+      std::string fn = VENDOR_SYMBOL("golang.org/x/net/http2.(*Framer).WriteDataPadded");
+      auto args_map = dwarf_reader->GetFunctionArgInfo(fn).ValueOr(kEmptyMap);
+      LOG_ASSIGN(symaddrs->http2_WriteDataPadded_f_loc, GetDwarfArgOffset(args_map, "f"));
+      LOG_ASSIGN(symaddrs->http2_WriteDataPadded_streamID_loc,
+                 GetDwarfArgOffset(args_map, "streamID"));
+      LOG_ASSIGN(symaddrs->http2_WriteDataPadded_endStream_loc,
+                 GetDwarfArgOffset(args_map, "endStream"));
 
-    auto data_len_loc = GetArgOffset(fn, "data", go_version).ValueOr(invalid_loc);
-    LOG_ASSIGN(symaddrs->http2Framer_WriteDataPadded_data_len_loc, data_len_loc);
-    symaddrs->http2Framer_WriteDataPadded_data_len_loc.offset += kGoArrayLenOffset;
-  }
+      LOG_ASSIGN(symaddrs->http2_WriteDataPadded_data_ptr_loc, GetDwarfArgOffset(args_map, "data"));
+      symaddrs->http2_WriteDataPadded_data_ptr_loc.offset += kGoArrayPtrOffset;
 
-  // Arguments of golang.org/x/net/http2.(*Framer).WriteDataPadded.
-  {
-    std::string fn = VENDOR_SYMBOL("golang.org/x/net/http2.(*Framer).WriteDataPadded");
-    LOG(INFO) << "WriteDataPadded fn: " << fn;
-    // TODO(ddelnano): This offset is null and needs to be fixed
-    auto f_loc = GetArgOffset(fn, "f", golang_x_net_version).ValueOr(invalid_loc);
-    LOG_ASSIGN(symaddrs->http2_WriteDataPadded_f_loc, f_loc);
+      LOG_ASSIGN(symaddrs->http2_WriteDataPadded_data_len_loc, GetDwarfArgOffset(args_map, "data"));
+      symaddrs->http2_WriteDataPadded_data_len_loc.offset += kGoArrayLenOffset;
+    }
 
-    auto streamID_loc = GetArgOffset(fn, "streamID", golang_x_net_version).ValueOr(invalid_loc);
-    LOG_ASSIGN(symaddrs->http2_WriteDataPadded_streamID_loc, streamID_loc);
+    // Arguments of net/http.(*http2Framer).checkFrameOrder.
+    {
+      std::string_view fn = "net/http.(*http2Framer).checkFrameOrder";
+      auto args_map = dwarf_reader->GetFunctionArgInfo(fn).ValueOr(kEmptyMap);
+      LOG_ASSIGN(symaddrs->http2Framer_checkFrameOrder_fr_loc, GetDwarfArgOffset(args_map, "fr"));
+      LOG_ASSIGN(symaddrs->http2Framer_checkFrameOrder_f_loc, GetDwarfArgOffset(args_map, "f"));
+    }
 
-    auto endStream_loc = GetArgOffset(fn, "endStream", golang_x_net_version).ValueOr(invalid_loc);
-    LOG_ASSIGN(symaddrs->http2_WriteDataPadded_endStream_loc, endStream_loc);
+    // Arguments of golang.org/x/net/http2.(*Framer).checkFrameOrder.
+    {
+      std::string fn = VENDOR_SYMBOL("golang.org/x/net/http2.(*Framer).checkFrameOrder");
+      auto args_map = dwarf_reader->GetFunctionArgInfo(fn).ValueOr(kEmptyMap);
+      LOG_ASSIGN(symaddrs->http2_checkFrameOrder_fr_loc, GetDwarfArgOffset(args_map, "fr"));
+      LOG_ASSIGN(symaddrs->http2_checkFrameOrder_f_loc, GetDwarfArgOffset(args_map, "f"));
+    }
 
-    auto data_ptr_loc = GetArgOffset(fn, "data", golang_x_net_version).ValueOr(invalid_loc);
-    LOG_ASSIGN(symaddrs->http2_WriteDataPadded_data_ptr_loc, data_ptr_loc);
-    symaddrs->http2_WriteDataPadded_data_ptr_loc.offset += kGoArrayPtrOffset;
+    // Arguments of net/http.(*http2writeResHeaders).writeFrame.
+    {
+      std::string_view fn = "net/http.(*http2writeResHeaders).writeFrame";
+      auto args_map = dwarf_reader->GetFunctionArgInfo(fn).ValueOr(kEmptyMap);
+      LOG_ASSIGN(symaddrs->writeFrame_w_loc, GetDwarfArgOffset(args_map, "w"));
+      LOG_ASSIGN(symaddrs->writeFrame_ctx_loc, GetDwarfArgOffset(args_map, "ctx"));
+    }
 
-    LOG_ASSIGN(symaddrs->http2_WriteDataPadded_data_len_loc, data_ptr_loc);
-    symaddrs->http2_WriteDataPadded_data_len_loc.offset += kGoArrayLenOffset;
-  }
+    // Arguments of golang.org/x/net/http2/hpack.(*Encoder).WriteField.
+    {
+      std::string fn = VENDOR_SYMBOL("golang.org/x/net/http2/hpack.(*Encoder).WriteField");
+      auto args_map = dwarf_reader->GetFunctionArgInfo(fn).ValueOr(kEmptyMap);
+      LOG_ASSIGN(symaddrs->WriteField_e_loc, GetDwarfArgOffset(args_map, "e"));
+      LOG_ASSIGN(symaddrs->WriteField_f_name_loc, GetDwarfArgOffset(args_map, "f"));
+      symaddrs->WriteField_f_name_loc.offset += 0;
 
-  // Arguments of net/http.(*http2Framer).checkFrameOrder.
-  {
-    std::string fn = "net/http.(*http2Framer).checkFrameOrder";
-    auto fr_loc = GetArgOffset(fn, "fr", go_version).ValueOr(invalid_loc);
-    LOG_ASSIGN(symaddrs->http2Framer_checkFrameOrder_fr_loc, fr_loc);
+      LOG_ASSIGN(symaddrs->WriteField_f_value_loc, GetDwarfArgOffset(args_map, "f"));
+      symaddrs->WriteField_f_value_loc.offset += 16;
+    }
 
-    auto f_loc = GetArgOffset(fn, "f", go_version).ValueOr(invalid_loc);
-    LOG_ASSIGN(symaddrs->http2Framer_checkFrameOrder_f_loc, f_loc);
-  }
+    // Arguments of net/http.(*http2serverConn).processHeaders.
+    {
+      std::string_view fn = "net/http.(*http2serverConn).processHeaders";
+      auto args_map = dwarf_reader->GetFunctionArgInfo(fn).ValueOr(kEmptyMap);
+      LOG_ASSIGN(symaddrs->processHeaders_sc_loc, GetDwarfArgOffset(args_map, "sc"));
+      LOG_ASSIGN(symaddrs->processHeaders_f_loc, GetDwarfArgOffset(args_map, "f"));
+    }
 
-  // Arguments of golang.org/x/net/http2.(*Framer).checkFrameOrder.
-  {
-    std::string fn = VENDOR_SYMBOL("golang.org/x/net/http2.(*Framer).checkFrameOrder");
-    auto fr_loc = GetArgOffset(fn, "fr", golang_x_net_version).ValueOr(invalid_loc);
-    LOG_ASSIGN(symaddrs->http2_checkFrameOrder_fr_loc, fr_loc);
+    // Arguments of google.golang.org/grpc/internal/transport.(*http2Server).operateHeaders.
+    {
+      std::string fn =
+          VENDOR_SYMBOL("google.golang.org/grpc/internal/transport.(*http2Server).operateHeaders");
+      auto args_map = dwarf_reader->GetFunctionArgInfo(fn).ValueOr(kEmptyMap);
+      LOG_ASSIGN(symaddrs->http2Server_operateHeaders_t_loc, GetDwarfArgOffset(args_map, "t"));
+      LOG_ASSIGN(symaddrs->http2Server_operateHeaders_frame_loc,
+                 GetDwarfArgOffset(args_map, "frame"));
+    }
 
-    auto f_loc = GetArgOffset(fn, "f", golang_x_net_version).ValueOr(invalid_loc);
-    LOG_ASSIGN(symaddrs->http2_checkFrameOrder_f_loc, f_loc);
-  }
+    // Arguments of google.golang.org/grpc/internal/transport.(*http2Client).operateHeaders.
+    {
+      std::string fn =
+          VENDOR_SYMBOL("google.golang.org/grpc/internal/transport.(*http2Client).operateHeaders");
+      auto args_map = dwarf_reader->GetFunctionArgInfo(fn).ValueOr(kEmptyMap);
+      LOG_ASSIGN(symaddrs->http2Client_operateHeaders_t_loc, GetDwarfArgOffset(args_map, "t"));
+      LOG_ASSIGN(symaddrs->http2Client_operateHeaders_frame_loc,
+                 GetDwarfArgOffset(args_map, "frame"));
+    }
 
-  // Arguments of net/http.(*http2writeResHeaders).writeFrame.
-  {
-    std::string fn = "net/http.(*http2writeResHeaders).writeFrame";
-    auto w_loc = GetArgOffset(fn, "w", go_version).ValueOr(invalid_loc);
-    LOG_ASSIGN(symaddrs->writeFrame_w_loc, w_loc);
+    // Arguments of google.golang.org/grpc/internal/transport.(*loopyWriter).writeHeader.
+    {
+      std::string fn =
+          VENDOR_SYMBOL("google.golang.org/grpc/internal/transport.(*loopyWriter).writeHeader");
+      auto args_map = dwarf_reader->GetFunctionArgInfo(fn).ValueOr(kEmptyMap);
+      LOG_ASSIGN(symaddrs->writeHeader_l_loc, GetDwarfArgOffset(args_map, "l"));
+      LOG_ASSIGN(symaddrs->writeHeader_streamID_loc, GetDwarfArgOffset(args_map, "streamID"));
+      LOG_ASSIGN(symaddrs->writeHeader_endStream_loc, GetDwarfArgOffset(args_map, "endStream"));
 
-    auto ctx_loc = GetArgOffset(fn, "ctx", go_version).ValueOr(invalid_loc);
-    LOG_ASSIGN(symaddrs->writeFrame_ctx_loc, ctx_loc);
-  }
+      LOG_ASSIGN(symaddrs->writeHeader_hf_ptr_loc, GetDwarfArgOffset(args_map, "hf"));
+      symaddrs->writeHeader_hf_ptr_loc.offset += kGoArrayPtrOffset;
 
-  // Arguments of golang.org/x/net/http2/hpack.(*Encoder).WriteField.
-  {
-    // TODO(ddelnano): This is vendor prefixed on the offsetgen side
-    std::string fn = VENDOR_SYMBOL("vendor/golang.org/x/net/http2/hpack.(*Encoder).WriteField");
-    LOG(INFO) << "WriteField fn: " << fn;
-    auto write_field_e_loc = GetArgOffset(fn, "e", golang_x_net_version).ValueOr(invalid_loc);
-    LOG_ASSIGN(symaddrs->WriteField_e_loc, write_field_e_loc);
-
-    auto write_field_f_loc = GetArgOffset(fn, "f", golang_x_net_version).ValueOr(invalid_loc);
-    LOG_ASSIGN(symaddrs->WriteField_f_name_loc, write_field_f_loc);
-    symaddrs->WriteField_f_name_loc.offset += 0;
-
-    LOG_ASSIGN(symaddrs->WriteField_f_value_loc, write_field_f_loc);
-    symaddrs->WriteField_f_value_loc.offset += 16;
-  }
-
-  // Arguments of net/http.(*http2serverConn).processHeaders.
-  {
-    std::string fn = "net/http.(*http2serverConn).processHeaders";
-    auto sc_loc = GetArgOffset(fn, "sc", go_version).ValueOr(invalid_loc);
-    LOG_ASSIGN(symaddrs->processHeaders_sc_loc, sc_loc);
-
-    auto f_loc = GetArgOffset(fn, "f", go_version).ValueOr(invalid_loc);
-    LOG_ASSIGN(symaddrs->processHeaders_f_loc, f_loc);
-  }
-
-  // Arguments of google.golang.org/grpc/internal/transport.(*http2Server).operateHeaders.
-  {
-    std::string fn =
-        VENDOR_SYMBOL("google.golang.org/grpc/internal/transport.(*http2Server).operateHeaders");
-
-    auto t_loc = GetArgOffset(fn, "t", google_golang_grpc).ValueOr(invalid_loc);
-    LOG_ASSIGN(symaddrs->http2Server_operateHeaders_t_loc, t_loc);
-
-    auto frame_loc = GetArgOffset(fn, "frame", google_golang_grpc).ValueOr(invalid_loc);
-    LOG_ASSIGN(symaddrs->http2Server_operateHeaders_frame_loc, frame_loc);
-  }
-
-  // Arguments of google.golang.org/grpc/internal/transport.(*http2Client).operateHeaders.
-  {
-    std::string fn =
-        VENDOR_SYMBOL("google.golang.org/grpc/internal/transport.(*http2Client).operateHeaders");
-
-    auto t_loc = GetArgOffset(fn, "t", google_golang_grpc).ValueOr(invalid_loc);
-    LOG_ASSIGN(symaddrs->http2Client_operateHeaders_t_loc, t_loc);
-
-    auto frame_loc = GetArgOffset(fn, "frame", google_golang_grpc).ValueOr(invalid_loc);
-    LOG_ASSIGN(symaddrs->http2Client_operateHeaders_frame_loc, frame_loc);
-  }
-
-  // Arguments of google.golang.org/grpc/internal/transport.(*loopyWriter).writeHeader.
-  {
-    // TODO(ddelnano): This offset is null and needs to be fixed
-    std::string fn =
-        VENDOR_SYMBOL("google.golang.org/grpc/internal/transport.(*loopyWriter).writeHeader");
-    auto l_loc = GetArgOffset(fn, "l", google_golang_grpc).ValueOr(invalid_loc);
-    LOG_ASSIGN(symaddrs->writeHeader_l_loc, l_loc);
-
-    auto streamID_loc = GetArgOffset(fn, "streamID", google_golang_grpc).ValueOr(invalid_loc);
-    LOG_ASSIGN(symaddrs->writeHeader_streamID_loc, streamID_loc);
-
-    auto endStream_loc = GetArgOffset(fn, "endStream", google_golang_grpc).ValueOr(invalid_loc);
-    LOG_ASSIGN(symaddrs->writeHeader_endStream_loc, endStream_loc);
-
-    auto hf_loc = GetArgOffset(fn, "hf", google_golang_grpc).ValueOr(invalid_loc);
-    LOG_ASSIGN(symaddrs->writeHeader_hf_ptr_loc, hf_loc);
-    symaddrs->writeHeader_hf_ptr_loc.offset += kGoArrayPtrOffset;
-
-    LOG_ASSIGN(symaddrs->writeHeader_hf_len_loc, hf_loc);
-    symaddrs->writeHeader_hf_len_loc.offset += kGoArrayLenOffset;
-  }
+      LOG_ASSIGN(symaddrs->writeHeader_hf_len_loc, GetDwarfArgOffset(args_map, "hf"));
+      symaddrs->writeHeader_hf_len_loc.offset += kGoArrayLenOffset;
+    }
 
 #undef VENDOR_SYMBOL
+
+  } else {
+    std::string golang_x_net_version;
+    std::string google_golang_grpc;
+    for (const auto& dep : build_info.deps) {
+      // Find the related dependencies and strip the "v" prefix
+      if (dep.path == "golang.org/x/net") {
+        golang_x_net_version = dep.version.substr(1);
+      } else if (dep.path == "google.golang.org/grpc") {
+        google_golang_grpc = dep.version.substr(1);
+        LOG(INFO) << "Found grpc dependency: " << dep.path << " " << dep.version << " "
+                  << google_golang_grpc;
+      }
+    }
+
+    // clang-format off
+    LOG_ASSIGN_STATUSOR(symaddrs->HeaderField_Name_offset,
+                        GetStructOffset("golang.org/x/net/http2/hpack.HeaderField", "Name", golang_x_net_version));
+    LOG_ASSIGN_STATUSOR(symaddrs->HeaderField_Value_offset,
+                        GetStructOffset("golang.org/x/net/http2/hpack.HeaderField", "Value", golang_x_net_version));
+    LOG_ASSIGN_STATUSOR(symaddrs->http2Server_conn_offset,
+                        GetStructOffset("google.golang.org/grpc/internal/transport.http2Server", "conn", google_golang_grpc));
+
+    LOG_ASSIGN_STATUSOR(symaddrs->http2Client_conn_offset,
+                        GetStructOffset("google.golang.org/grpc/internal/transport.http2Client", "conn", google_golang_grpc));
+    LOG_ASSIGN_STATUSOR(symaddrs->loopyWriter_framer_offset,
+                        GetStructOffset("google.golang.org/grpc/internal/transport.loopyWriter", "framer", google_golang_grpc));
+
+    LOG_ASSIGN_STATUSOR(symaddrs->Framer_w_offset,
+                        GetStructOffset("golang.org/x/net/http2.Framer", "w", golang_x_net_version));
+
+    LOG_ASSIGN_STATUSOR(symaddrs->MetaHeadersFrame_HeadersFrame_offset,
+                        GetStructOffset("golang.org/x/net/http2.MetaHeadersFrame", "HeadersFrame", golang_x_net_version));
+    LOG_ASSIGN_STATUSOR(symaddrs->MetaHeadersFrame_Fields_offset,
+                        GetStructOffset("golang.org/x/net/http2.MetaHeadersFrame", "Fields", golang_x_net_version));
+    LOG_ASSIGN_STATUSOR(symaddrs->HeadersFrame_FrameHeader_offset,
+                        GetStructOffset("golang.org/x/net/http2.HeadersFrame", "FrameHeader", golang_x_net_version));
+    LOG_ASSIGN_STATUSOR(symaddrs->FrameHeader_Type_offset,
+                        GetStructOffset("golang.org/x/net/http2.FrameHeader", "Type", golang_x_net_version));
+    LOG_ASSIGN_STATUSOR(symaddrs->FrameHeader_Flags_offset,
+                        GetStructOffset("golang.org/x/net/http2.FrameHeader", "Flags", golang_x_net_version));
+    LOG_ASSIGN_STATUSOR(symaddrs->FrameHeader_StreamID_offset,
+                        GetStructOffset("golang.org/x/net/http2.FrameHeader", "StreamID", golang_x_net_version));
+    LOG_ASSIGN_STATUSOR(symaddrs->DataFrame_data_offset,
+                        GetStructOffset("golang.org/x/net/http2.DataFrame", "data", golang_x_net_version));
+    LOG_ASSIGN_STATUSOR(symaddrs->bufWriter_conn_offset,
+                        GetStructOffset("google.golang.org/grpc/internal/transport.bufWriter", "conn", google_golang_grpc));
+
+    LOG_ASSIGN_STATUSOR(symaddrs->http2serverConn_conn_offset,
+                        GetStructOffset("net/http.http2serverConn", "conn", go_version));
+
+    LOG_ASSIGN_STATUSOR(symaddrs->http2serverConn_hpackEncoder_offset,
+                        GetStructOffset("net/http.http2serverConn", "hpackEncoder", go_version));
+
+    LOG_ASSIGN_STATUSOR(symaddrs->http2HeadersFrame_http2FrameHeader_offset,
+                        GetStructOffset("net/http.http2HeadersFrame", "http2FrameHeader", go_version));
+
+    LOG_ASSIGN_STATUSOR(symaddrs->http2FrameHeader_Type_offset,
+                        GetStructOffset("net/http.http2FrameHeader", "Type", go_version));
+
+    LOG_ASSIGN_STATUSOR(symaddrs->http2FrameHeader_Flags_offset,
+                        GetStructOffset("net/http.http2FrameHeader", "Flags", go_version));
+
+    LOG_ASSIGN_STATUSOR(symaddrs->http2FrameHeader_StreamID_offset,
+                        GetStructOffset("net/http.http2FrameHeader", "StreamID", go_version));
+
+    LOG_ASSIGN_STATUSOR(symaddrs->http2DataFrame_data_offset,
+                        GetStructOffset("net/http.http2DataFrame", "data", go_version));
+
+    LOG_ASSIGN_STATUSOR(symaddrs->http2writeResHeaders_streamID_offset,
+                        GetStructOffset("net/http.http2writeResHeaders", "streamID", go_version));
+
+    LOG_ASSIGN_STATUSOR(symaddrs->http2writeResHeaders_endStream_offset,
+                        GetStructOffset("net/http.http2writeResHeaders", "endStream", go_version));
+
+    LOG_ASSIGN_STATUSOR(symaddrs->http2MetaHeadersFrame_http2HeadersFrame_offset,
+                        GetStructOffset("net/http.http2MetaHeadersFrame", "http2HeadersFrame", go_version));
+
+    LOG_ASSIGN_STATUSOR(symaddrs->http2MetaHeadersFrame_Fields_offset,
+                        GetStructOffset("net/http.http2MetaHeadersFrame", "Fields", go_version));
+
+    LOG_ASSIGN_STATUSOR(symaddrs->http2Framer_w_offset,
+                        GetStructOffset("net/http.http2Framer", "w", go_version));
+
+    LOG_ASSIGN_STATUSOR(symaddrs->http2bufferedWriter_w_offset,
+                        GetStructOffset("net/http.http2bufferedWriter", "w", go_version));
+    // clang-format on
+
+    const location_t invalid_loc = {kLocationTypeInvalid, -1};
+
+    // Arguments of net/http.(*http2Framer).WriteDataPadded.
+    {
+      std::string fn = "net/http.(*http2Framer).WriteDataPadded";
+      auto f_loc = GetArgOffset(fn, "f", go_version).ValueOr(invalid_loc);
+      LOG_ASSIGN(symaddrs->http2Framer_WriteDataPadded_f_loc, f_loc);
+
+      auto streamID_loc = GetArgOffset(fn, "streamID", go_version).ValueOr(invalid_loc);
+      LOG_ASSIGN(symaddrs->http2Framer_WriteDataPadded_streamID_loc, streamID_loc);
+
+      auto endStream_loc = GetArgOffset(fn, "endStream", go_version).ValueOr(invalid_loc);
+      LOG_ASSIGN(symaddrs->http2Framer_WriteDataPadded_endStream_loc, endStream_loc);
+
+      auto data_ptr_loc = GetArgOffset(fn, "data", go_version).ValueOr(invalid_loc);
+      LOG_ASSIGN(symaddrs->http2Framer_WriteDataPadded_data_ptr_loc, data_ptr_loc);
+      symaddrs->http2Framer_WriteDataPadded_data_ptr_loc.offset += kGoArrayPtrOffset;
+
+      auto data_len_loc = GetArgOffset(fn, "data", go_version).ValueOr(invalid_loc);
+      LOG_ASSIGN(symaddrs->http2Framer_WriteDataPadded_data_len_loc, data_len_loc);
+      symaddrs->http2Framer_WriteDataPadded_data_len_loc.offset += kGoArrayLenOffset;
+    }
+
+    // Arguments of golang.org/x/net/http2.(*Framer).WriteDataPadded.
+    {
+      std::string fn = "golang.org/x/net/http2.(*Framer).WriteDataPadded";
+      // TODO(ddelnano): This offset is null and needs to be fixed
+      auto f_loc = GetArgOffset(fn, "f", golang_x_net_version).ValueOr(invalid_loc);
+      LOG_ASSIGN(symaddrs->http2_WriteDataPadded_f_loc, f_loc);
+
+      auto streamID_loc = GetArgOffset(fn, "streamID", golang_x_net_version).ValueOr(invalid_loc);
+      LOG_ASSIGN(symaddrs->http2_WriteDataPadded_streamID_loc, streamID_loc);
+
+      auto endStream_loc = GetArgOffset(fn, "endStream", golang_x_net_version).ValueOr(invalid_loc);
+      LOG_ASSIGN(symaddrs->http2_WriteDataPadded_endStream_loc, endStream_loc);
+
+      auto data_ptr_loc = GetArgOffset(fn, "data", golang_x_net_version).ValueOr(invalid_loc);
+      LOG_ASSIGN(symaddrs->http2_WriteDataPadded_data_ptr_loc, data_ptr_loc);
+      symaddrs->http2_WriteDataPadded_data_ptr_loc.offset += kGoArrayPtrOffset;
+
+      LOG_ASSIGN(symaddrs->http2_WriteDataPadded_data_len_loc, data_ptr_loc);
+      symaddrs->http2_WriteDataPadded_data_len_loc.offset += kGoArrayLenOffset;
+    }
+
+    // Arguments of net/http.(*http2Framer).checkFrameOrder.
+    {
+      std::string fn = "net/http.(*http2Framer).checkFrameOrder";
+      auto fr_loc = GetArgOffset(fn, "fr", go_version).ValueOr(invalid_loc);
+      LOG_ASSIGN(symaddrs->http2Framer_checkFrameOrder_fr_loc, fr_loc);
+
+      auto f_loc = GetArgOffset(fn, "f", go_version).ValueOr(invalid_loc);
+      LOG_ASSIGN(symaddrs->http2Framer_checkFrameOrder_f_loc, f_loc);
+    }
+
+    // Arguments of golang.org/x/net/http2.(*Framer).checkFrameOrder.
+    {
+      std::string fn = "golang.org/x/net/http2.(*Framer).checkFrameOrder";
+      auto fr_loc = GetArgOffset(fn, "fr", golang_x_net_version).ValueOr(invalid_loc);
+      LOG_ASSIGN(symaddrs->http2_checkFrameOrder_fr_loc, fr_loc);
+
+      auto f_loc = GetArgOffset(fn, "f", golang_x_net_version).ValueOr(invalid_loc);
+      LOG_ASSIGN(symaddrs->http2_checkFrameOrder_f_loc, f_loc);
+    }
+
+    // Arguments of net/http.(*http2writeResHeaders).writeFrame.
+    {
+      std::string fn = "net/http.(*http2writeResHeaders).writeFrame";
+      auto w_loc = GetArgOffset(fn, "w", go_version).ValueOr(invalid_loc);
+      LOG_ASSIGN(symaddrs->writeFrame_w_loc, w_loc);
+
+      auto ctx_loc = GetArgOffset(fn, "ctx", go_version).ValueOr(invalid_loc);
+      LOG_ASSIGN(symaddrs->writeFrame_ctx_loc, ctx_loc);
+    }
+
+    // Arguments of golang.org/x/net/http2/hpack.(*Encoder).WriteField.
+    {
+      // TODO(ddelnano): This is vendor prefixed on the offsetgen side
+      std::string fn = "vendor/golang.org/x/net/http2/hpack.(*Encoder).WriteField";
+      auto write_field_e_loc = GetArgOffset(fn, "e", golang_x_net_version).ValueOr(invalid_loc);
+      LOG_ASSIGN(symaddrs->WriteField_e_loc, write_field_e_loc);
+
+      auto write_field_f_loc = GetArgOffset(fn, "f", golang_x_net_version).ValueOr(invalid_loc);
+      LOG_ASSIGN(symaddrs->WriteField_f_name_loc, write_field_f_loc);
+      symaddrs->WriteField_f_name_loc.offset += 0;
+
+      LOG_ASSIGN(symaddrs->WriteField_f_value_loc, write_field_f_loc);
+      symaddrs->WriteField_f_value_loc.offset += 16;
+    }
+
+    // Arguments of net/http.(*http2serverConn).processHeaders.
+    {
+      std::string fn = "net/http.(*http2serverConn).processHeaders";
+      auto sc_loc = GetArgOffset(fn, "sc", go_version).ValueOr(invalid_loc);
+      LOG_ASSIGN(symaddrs->processHeaders_sc_loc, sc_loc);
+
+      auto f_loc = GetArgOffset(fn, "f", go_version).ValueOr(invalid_loc);
+      LOG_ASSIGN(symaddrs->processHeaders_f_loc, f_loc);
+    }
+
+    // Arguments of google.golang.org/grpc/internal/transport.(*http2Server).operateHeaders.
+    {
+      std::string fn = "google.golang.org/grpc/internal/transport.(*http2Server).operateHeaders";
+
+      auto t_loc = GetArgOffset(fn, "t", google_golang_grpc).ValueOr(invalid_loc);
+      LOG_ASSIGN(symaddrs->http2Server_operateHeaders_t_loc, t_loc);
+
+      auto frame_loc = GetArgOffset(fn, "frame", google_golang_grpc).ValueOr(invalid_loc);
+      LOG_ASSIGN(symaddrs->http2Server_operateHeaders_frame_loc, frame_loc);
+    }
+
+    // Arguments of google.golang.org/grpc/internal/transport.(*http2Client).operateHeaders.
+    {
+      std::string fn = "google.golang.org/grpc/internal/transport.(*http2Client).operateHeaders";
+
+      auto t_loc = GetArgOffset(fn, "t", google_golang_grpc).ValueOr(invalid_loc);
+      LOG_ASSIGN(symaddrs->http2Client_operateHeaders_t_loc, t_loc);
+
+      auto frame_loc = GetArgOffset(fn, "frame", google_golang_grpc).ValueOr(invalid_loc);
+      LOG_ASSIGN(symaddrs->http2Client_operateHeaders_frame_loc, frame_loc);
+    }
+
+    // Arguments of google.golang.org/grpc/internal/transport.(*loopyWriter).writeHeader.
+    {
+      std::string fn = "google.golang.org/grpc/internal/transport.(*loopyWriter).writeHeader";
+      auto l_loc = GetArgOffset(fn, "l", google_golang_grpc).ValueOr(invalid_loc);
+      LOG_ASSIGN(symaddrs->writeHeader_l_loc, l_loc);
+
+      auto streamID_loc = GetArgOffset(fn, "streamID", google_golang_grpc).ValueOr(invalid_loc);
+      LOG_ASSIGN(symaddrs->writeHeader_streamID_loc, streamID_loc);
+
+      auto endStream_loc = GetArgOffset(fn, "endStream", google_golang_grpc).ValueOr(invalid_loc);
+      LOG_ASSIGN(symaddrs->writeHeader_endStream_loc, endStream_loc);
+
+      auto hf_loc = GetArgOffset(fn, "hf", google_golang_grpc).ValueOr(invalid_loc);
+      LOG_ASSIGN(symaddrs->writeHeader_hf_ptr_loc, hf_loc);
+      symaddrs->writeHeader_hf_ptr_loc.offset += kGoArrayPtrOffset;
+
+      LOG_ASSIGN(symaddrs->writeHeader_hf_len_loc, hf_loc);
+      symaddrs->writeHeader_hf_len_loc.offset += kGoArrayLenOffset;
+    }
+  }
 
   return Status::OK();
 }
@@ -503,7 +776,6 @@ Status PopulateGoTLSDebugSymbols(ElfReader* elf_reader, DwarfReader* dwarf_reade
                                  const std::string& go_version,
                                  struct go_tls_symaddrs_t* symaddrs) {
   PX_UNUSED(elf_reader);
-  PX_UNUSED(dwarf_reader);
 
   PX_ASSIGN_OR_RETURN(SemVer sem_ver_go, GetSemVer(go_version, false));
 
@@ -517,41 +789,67 @@ Status PopulateGoTLSDebugSymbols(ElfReader* elf_reader, DwarfReader* dwarf_reade
     retval1_arg = "~r1";
   }
 
-  PX_ASSIGN_OR_RETURN(auto write_c_loc, GetArgOffset("crypto/tls.(*Conn).Write", "c", go_version));
-  symaddrs->Write_c_loc.type = write_c_loc.type;
-  symaddrs->Write_c_loc.offset = write_c_loc.offset;
+  if (!FLAGS_disable_dwarf_parsing) {
+    const std::map<std::string, obj_tools::ArgInfo> kEmptyMap;
 
-  PX_ASSIGN_OR_RETURN(auto write_b_loc, GetArgOffset("crypto/tls.(*Conn).Write", "b", go_version));
-  symaddrs->Write_b_loc.type = write_b_loc.type;
-  symaddrs->Write_b_loc.offset = write_b_loc.offset;
+    // Arguments of crypto/tls.(*Conn).Write.
+    {
+      std::string_view fn = "crypto/tls.(*Conn).Write";
+      auto args_map = dwarf_reader->GetFunctionArgInfo(fn).ValueOr(kEmptyMap);
+      LOG_ASSIGN(symaddrs->Write_c_loc, GetDwarfArgOffset(args_map, "c"));
+      LOG_ASSIGN(symaddrs->Write_b_loc, GetDwarfArgOffset(args_map, "b"));
+      LOG_ASSIGN(symaddrs->Write_retval0_loc, GetDwarfArgOffset(args_map, retval0_arg));
+      LOG_ASSIGN(symaddrs->Write_retval1_loc, GetDwarfArgOffset(args_map, retval1_arg));
+    }
 
-  PX_ASSIGN_OR_RETURN(auto write_retval0_loc,
-                      GetArgOffset("crypto/tls.(*Conn).Write", retval0_arg, go_version));
-  symaddrs->Write_retval0_loc.type = write_retval0_loc.type;
-  symaddrs->Write_retval0_loc.offset = write_retval0_loc.offset;
+    // Arguments of crypto/tls.(*Conn).Read.
+    {
+      std::string fn = "crypto/tls.(*Conn).Read";
+      auto args_map = dwarf_reader->GetFunctionArgInfo(fn).ValueOr(kEmptyMap);
+      LOG_ASSIGN(symaddrs->Read_c_loc, GetDwarfArgOffset(args_map, "c"));
+      LOG_ASSIGN(symaddrs->Read_b_loc, GetDwarfArgOffset(args_map, "b"));
+      LOG_ASSIGN(symaddrs->Read_retval0_loc, GetDwarfArgOffset(args_map, retval0_arg));
+      LOG_ASSIGN(symaddrs->Read_retval1_loc, GetDwarfArgOffset(args_map, retval1_arg));
+    }
+  } else {
+    PX_ASSIGN_OR_RETURN(auto write_c_loc,
+                        GetArgOffset("crypto/tls.(*Conn).Write", "c", go_version));
+    symaddrs->Write_c_loc.type = write_c_loc.type;
+    symaddrs->Write_c_loc.offset = write_c_loc.offset;
 
-  PX_ASSIGN_OR_RETURN(auto write_retval1_loc,
-                      GetArgOffset("crypto/tls.(*Conn).Write", retval0_arg, go_version));
-  symaddrs->Write_retval1_loc.type = write_retval1_loc.type;
-  symaddrs->Write_retval1_loc.offset = write_retval1_loc.offset;
+    PX_ASSIGN_OR_RETURN(auto write_b_loc,
+                        GetArgOffset("crypto/tls.(*Conn).Write", "b", go_version));
+    symaddrs->Write_b_loc.type = write_b_loc.type;
+    symaddrs->Write_b_loc.offset = write_b_loc.offset;
 
-  PX_ASSIGN_OR_RETURN(auto read_c_loc, GetArgOffset("crypto/tls.(*Conn).Read", "c", go_version));
-  symaddrs->Read_c_loc.type = read_c_loc.type;
-  symaddrs->Read_c_loc.offset = read_c_loc.offset;
+    PX_ASSIGN_OR_RETURN(auto write_retval0_loc,
+                        GetArgOffset("crypto/tls.(*Conn).Write", retval0_arg, go_version));
+    symaddrs->Write_retval0_loc.type = write_retval0_loc.type;
+    symaddrs->Write_retval0_loc.offset = write_retval0_loc.offset;
 
-  PX_ASSIGN_OR_RETURN(auto read_b_loc, GetArgOffset("crypto/tls.(*Conn).Read", "b", go_version));
-  symaddrs->Read_b_loc.type = read_b_loc.type;
-  symaddrs->Read_b_loc.offset = read_b_loc.offset;
+    PX_ASSIGN_OR_RETURN(auto write_retval1_loc,
+                        GetArgOffset("crypto/tls.(*Conn).Write", retval0_arg, go_version));
+    symaddrs->Write_retval1_loc.type = write_retval1_loc.type;
+    symaddrs->Write_retval1_loc.offset = write_retval1_loc.offset;
 
-  PX_ASSIGN_OR_RETURN(auto read_retval0,
-                      GetArgOffset("crypto/tls.(*Conn).Read", retval0_arg, go_version));
-  symaddrs->Read_retval0_loc.type = read_retval0.type;
-  symaddrs->Read_retval0_loc.offset = read_retval0.offset;
+    PX_ASSIGN_OR_RETURN(auto read_c_loc, GetArgOffset("crypto/tls.(*Conn).Read", "c", go_version));
+    symaddrs->Read_c_loc.type = read_c_loc.type;
+    symaddrs->Read_c_loc.offset = read_c_loc.offset;
 
-  PX_ASSIGN_OR_RETURN(auto read_retval1,
-                      GetArgOffset("crypto/tls.(*Conn).Read", retval1_arg, go_version));
-  symaddrs->Read_retval1_loc.type = read_retval1.type;
-  symaddrs->Read_retval1_loc.offset = read_retval1.offset;
+    PX_ASSIGN_OR_RETURN(auto read_b_loc, GetArgOffset("crypto/tls.(*Conn).Read", "b", go_version));
+    symaddrs->Read_b_loc.type = read_b_loc.type;
+    symaddrs->Read_b_loc.offset = read_b_loc.offset;
+
+    PX_ASSIGN_OR_RETURN(auto read_retval0,
+                        GetArgOffset("crypto/tls.(*Conn).Read", retval0_arg, go_version));
+    symaddrs->Read_retval0_loc.type = read_retval0.type;
+    symaddrs->Read_retval0_loc.offset = read_retval0.offset;
+
+    PX_ASSIGN_OR_RETURN(auto read_retval1,
+                        GetArgOffset("crypto/tls.(*Conn).Read", retval1_arg, go_version));
+    symaddrs->Read_retval1_loc.type = read_retval1.type;
+    symaddrs->Read_retval1_loc.offset = read_retval1.offset;
+  }
 
   // List mandatory symaddrs here (symaddrs without which all probes become useless).
   // Returning an error will prevent the probes from deploying.
@@ -567,11 +865,12 @@ StatusOr<struct go_common_symaddrs_t> GoCommonSymAddrs(ElfReader* elf_reader,
                                                        DwarfReader* dwarf_reader,
                                                        const std::string& go_version,
                                                        const obj_tools::BuildInfo& build_info) {
-  PX_UNUSED(go_version);
-  PX_UNUSED(build_info);
   struct go_common_symaddrs_t symaddrs;
 
-  PX_ASSIGN_OR_RETURN(std::string vendor_prefix, InferHTTP2SymAddrVendorPrefix(elf_reader));
+  std::string vendor_prefix = "";
+  if (!FLAGS_disable_dwarf_parsing) {
+    PX_ASSIGN_OR_RETURN(std::string vendor_prefix, InferHTTP2SymAddrVendorPrefix(elf_reader));
+  }
 
   std::string google_golang_grpc;
   for (const auto& dep : build_info.deps) {
@@ -591,10 +890,6 @@ StatusOr<struct go_http2_symaddrs_t> GoHTTP2SymAddrs(ElfReader* elf_reader,
                                                      DwarfReader* dwarf_reader,
                                                      const std::string& go_version,
                                                      const obj_tools::BuildInfo& build_info) {
-  PX_UNUSED(go_version);
-  PX_UNUSED(build_info);
-  PX_UNUSED(dwarf_reader);
-  PX_UNUSED(elf_reader);
   struct go_http2_symaddrs_t symaddrs;
 
   PX_ASSIGN_OR_RETURN(std::string vendor_prefix, InferHTTP2SymAddrVendorPrefix(elf_reader));
@@ -613,10 +908,7 @@ using StructOffsetMap =
     std::map<std::string, std::map<std::string, std::map<std::string, int32_t>>>;
 
 StatusOr<struct go_tls_symaddrs_t> GoTLSSymAddrs(ElfReader* elf_reader, DwarfReader* dwarf_reader,
-                                                 const std::string& go_version,
-                                                 const obj_tools::BuildInfo& build_info) {
-  PX_UNUSED(go_version);
-  PX_UNUSED(build_info);
+                                                 const std::string& go_version) {
   struct go_tls_symaddrs_t symaddrs;
 
   PX_RETURN_IF_ERROR(PopulateGoTLSDebugSymbols(elf_reader, dwarf_reader, go_version, &symaddrs));
@@ -969,24 +1261,27 @@ StatusOr<struct node_tlswrap_symaddrs_t> NodeTLSWrapSymAddrsFromDwarf(DwarfReade
 
 StatusOr<struct node_tlswrap_symaddrs_t> NodeTLSWrapSymAddrs(const std::filesystem::path& node_exe,
                                                              const SemVer& ver) {
+  StatusOr<struct node_tlswrap_symaddrs_t> symaddrs_or;
   // Indexing is disabled, because nodejs has 700+MB debug info file, and it takes >100 seconds to
   // index them.
   //
   // TODO(yzhao): We can implement "selective caching". The input needs to be a collection of symbol
   // patterns, which means only indexing the matched symbols.
-  auto dwarf_reader_or = DwarfReader::CreateWithoutIndexing(node_exe);
+  if (!FLAGS_disable_dwarf_parsing) {
+    auto dwarf_reader_or = DwarfReader::CreateWithoutIndexing(node_exe);
 
-  // Creation might fail if source language cannot be detected, which means that there is no dwarf
-  // info.
-  if (dwarf_reader_or.ok()) {
-    auto symaddrs_or = NodeTLSWrapSymAddrsFromDwarf(dwarf_reader_or.ValueOrDie().get());
-    if (symaddrs_or.ok()) {
-      return symaddrs_or.ConsumeValueOrDie();
+    // Creation might fail if source language cannot be detected, which means that there is no dwarf
+    // info.
+    if (dwarf_reader_or.ok()) {
+      symaddrs_or = NodeTLSWrapSymAddrsFromDwarf(dwarf_reader_or.ValueOrDie().get());
+      if (symaddrs_or.ok()) {
+        return symaddrs_or.ConsumeValueOrDie();
+      }
     }
   }
 
   // Try to lookup hard-coded symbol offsets with version.
-  auto symaddrs_or = NodeTLSWrapSymAddrsFromVersion(ver);
+  symaddrs_or = NodeTLSWrapSymAddrsFromVersion(ver);
   if (symaddrs_or.ok()) {
     return symaddrs_or.ConsumeValueOrDie();
   }

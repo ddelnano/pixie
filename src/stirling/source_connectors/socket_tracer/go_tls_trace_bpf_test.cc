@@ -64,6 +64,7 @@ class GoTLSTraceTest : public testing::SocketTraceBPFTestFixture</* TClientSideT
     // Run the server.
     // The container runner will make sure it is in the ready state before unblocking.
     // Stirling will run after this unblocks, as part of SocketTraceBPFTest SetUp().
+    FLAGS_disable_dwarf_parsing = false;
     PX_CHECK_OK(server_.Run(std::chrono::seconds{60}, {}));
   }
 
@@ -199,6 +200,24 @@ class HTTP2Client {
   SubProcess c_;
 };
 
+class HTTPClient {
+ public:
+  static constexpr std::string_view kClientPath =
+      "src/stirling/testing/demo_apps/go_https/client/testdata/https_client";
+
+  void LaunchClient() {
+    std::string client_path = px::testing::BazelRunfilePath(kClientPath).string();
+
+    CHECK(fs::Exists(client_path));
+
+    PX_CHECK_OK(c_.Start({client_path, "--http2=false", "--iters=2", "--sub_iters=5"}));
+    LOG(INFO) << "Client PID: " << c_.child_pid();
+    CHECK_EQ(0, c_.Wait());
+  }
+
+  SubProcess c_;
+};
+
 class GoTLSTraceRawBinTest
     : public testing::SocketTraceBPFTestFixture</* TClientSideTracing */ false> {
  protected:
@@ -206,24 +225,66 @@ class GoTLSTraceRawBinTest
     // Run the server.
     // The container runner will make sure it is in the ready state before unblocking.
     // Stirling will run after this unblocks, as part of SocketTraceBPFTest SetUp().
+    FLAGS_disable_dwarf_parsing = true;
     server_.LaunchServer();
+  }
+  ~GoTLSTraceRawBinTest() {
+    server_.s_.Kill();
+    if (client_.c_.IsRunning()) {
+      client_.c_.Kill();
+    }
+    if (http_client_.c_.IsRunning()) {
+      http_client_.c_.Kill();
+    }
   }
 
   HTTP2Server server_;
   HTTP2Client client_;
+  HTTPClient http_client_;
 };
 
+TEST_F(GoTLSTraceRawBinTest, BasicHTTP) {
+  // FLAGS_stirling_conn_trace_pid = this->server_.pid();
+
+  this->StartTransferDataThread();
+
+  // Run the client in the network of the server, so they can connect to each other.
+  this->http_client_.LaunchClient();
+
+  this->StopTransferDataThread();
+
+  // Grab the data from Stirling.
+  std::vector<TaggedRecordBatch> tablets =
+      this->ConsumeRecords(SocketTraceConnector::kHTTPTableNum);
+  ASSERT_NOT_EMPTY_AND_GET_RECORDS(const types::ColumnWrapperRecordBatch& record_batch, tablets);
+
+  {
+    const std::vector<size_t> target_record_indices =
+        FindRecordIdxMatchesPID(record_batch, kHTTPUPIDIdx, this->server_.pid());
+
+    std::vector<http::Record> records =
+        ToRecordVector<http::Record>(record_batch, target_record_indices);
+
+    // TODO(oazizi): Add headers checking too.
+    http::Record expected_record = {};
+    expected_record.req.req_path = "/";
+    expected_record.req.req_method = "GET";
+    expected_record.req.body = R"()";
+    expected_record.resp.resp_status = 200;
+    expected_record.resp.resp_message = "OK";
+    expected_record.resp.body = R"({"status":"ok"})";
+
+    EXPECT_THAT(records, Contains(EqHTTPRecord(expected_record)));
+  }
+}
+
 TEST_F(GoTLSTraceRawBinTest, BasicHTTP2) {
-  FLAGS_stirling_conn_trace_pid = this->server_.pid();
+  // FLAGS_stirling_conn_trace_pid = this->server_.pid();
+
   this->StartTransferDataThread();
 
   // Run the client in the network of the server, so they can connect to each other.
   this->client_.LaunchClient();
-  /* PX_CHECK_OK(this->client_.Run( */
-  /*     std::chrono::seconds{10}, */
-  /*     {absl::Substitute("--network=container:$0", this->server_.container_name())}, */
-  /*     {"--http2=true", "--iters=2", "--sub_iters=5"})); */
-  /* this->client_.Wait(); */
 
   this->StopTransferDataThread();
 

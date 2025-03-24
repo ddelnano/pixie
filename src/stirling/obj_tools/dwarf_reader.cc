@@ -34,6 +34,8 @@
 #include "src/stirling/obj_tools/dwarf_utils.h"
 #include "src/stirling/obj_tools/init.h"
 
+DECLARE_bool(disable_dwarf_parsing);
+
 namespace px {
 namespace stirling {
 namespace obj_tools {
@@ -64,6 +66,9 @@ uint8_t kAddressSize = sizeof(void*);
 StatusOr<std::unique_ptr<DwarfReader>> DwarfReader::CreateWithoutIndexing(
     const std::filesystem::path& path) {
   using llvm::MemoryBuffer;
+  if (FLAGS_disable_dwarf_parsing) {
+    return error::Internal("DWARF parsing is explicitly disabled.");
+  }
 
   std::error_code ec;
 
@@ -99,6 +104,9 @@ StatusOr<std::unique_ptr<DwarfReader>> DwarfReader::CreateWithoutIndexing(
 
 StatusOr<std::unique_ptr<DwarfReader>> DwarfReader::CreateIndexingAll(
     const std::filesystem::path& path) {
+  if (FLAGS_disable_dwarf_parsing) {
+    return error::Internal("DWARF parsing is explicitly disabled.");
+  }
   PX_ASSIGN_OR_RETURN(auto dwarf_reader, CreateWithoutIndexing(path));
   dwarf_reader->IndexDIEs(std::nullopt);
   return dwarf_reader;
@@ -106,6 +114,9 @@ StatusOr<std::unique_ptr<DwarfReader>> DwarfReader::CreateIndexingAll(
 
 StatusOr<std::unique_ptr<DwarfReader>> DwarfReader::CreateWithSelectiveIndexing(
     const std::filesystem::path& path, const std::vector<SymbolSearchPattern>& symbol_patterns) {
+  if (FLAGS_disable_dwarf_parsing) {
+    return error::Internal("DWARF parsing is explicitly disabled.");
+  }
   PX_ASSIGN_OR_RETURN(auto dwarf_reader, CreateWithoutIndexing(path));
   dwarf_reader->IndexDIEs(symbol_patterns);
   return dwarf_reader;

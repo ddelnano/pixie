@@ -175,13 +175,11 @@ static __inline void copy_header_field(struct header_field_t* dst, struct gostri
 static __inline void fill_header_field(struct go_grpc_http2_header_event_t* event,
                                        const void* header_field_ptr,
                                        const struct go_http2_symaddrs_t* symaddrs) {
-  bpf_trace_printk("Filling header field\n");
   struct gostring name;
   BPF_PROBE_READ_VAR(name, header_field_ptr + symaddrs->HeaderField_Name_offset);
 
   struct gostring value;
   BPF_PROBE_READ_VAR(value, header_field_ptr + symaddrs->HeaderField_Value_offset);
-  bpf_trace_printk("name: %s", name.ptr);
 
   copy_header_field(&event->name, &name);
   copy_header_field(&event->value, &value);
@@ -233,13 +231,11 @@ static __inline void submit_header(struct pt_regs* ctx, enum http2_probe_type_t 
                                    struct gostring* name_ptr, struct gostring* value_ptr,
                                    const struct go_http2_symaddrs_t* symaddrs) {
   struct go_grpc_event_attr_t* attr = active_write_headers_frame_map.lookup(&encoder_ptr);
-  bpf_trace_printk(" attr: %p", attr);
   if (attr == NULL) {
     return;
   }
 
   struct go_grpc_http2_header_event_t* event = get_header_event();
-  bpf_trace_printk(" event: %p", event);
   if (event == NULL) {
     return;
   }
@@ -669,7 +665,6 @@ int probe_hpack_header_encoder(struct pt_regs* ctx) {
   // Process
   // ------------------------------------------------------
 
-  bpf_trace_printk("calling submit_headers '%s'", name.ptr);
   submit_header(ctx, k_probe_hpack_header_encoder, kHeaderEventWrite, encoder_ptr, &name, &value,
                 symaddrs);
 
@@ -1143,7 +1138,6 @@ int probe_http2_framer_write_data(struct pt_regs* ctx) {
 int probe_http_http2framer_write_data(struct pt_regs* ctx) {
   uint32_t tgid = bpf_get_current_pid_tgid() >> 32;
   struct go_http2_symaddrs_t* symaddrs = http2_symaddrs_map.lookup(&tgid);
-  bpf_trace_printk("go_http2_symaddrs_t %d\n", symaddrs);
   if (symaddrs == NULL) {
     return 0;
   }
@@ -1161,7 +1155,6 @@ int probe_http_http2framer_write_data(struct pt_regs* ctx) {
 
   const void* sp = (const void*)ctx->sp;
   uint64_t* regs = go_regabi_regs(ctx);
-  bpf_trace_printk("go_regabi_regs %d\n", regs);
   if (regs == NULL) {
     return 0;
   }

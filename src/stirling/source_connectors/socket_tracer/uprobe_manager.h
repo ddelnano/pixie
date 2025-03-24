@@ -521,8 +521,7 @@ class UProbeManager {
   StatusOr<int> AttachGoTLSUProbes(const std::string& binary, obj_tools::ElfReader* elf_reader,
                                    obj_tools::DwarfReader* dwarf_reader,
                                    const std::vector<int32_t>& new_pids,
-                                   const std::string& go_version,
-                                   const obj_tools::BuildInfo& build_info);
+                                   const std::string& go_version);
 
   /**
    * Attaches the required probes for OpenSSL tracing to the specified PID, if it uses OpenSSL.
@@ -592,8 +591,7 @@ class UProbeManager {
                                const std::vector<int32_t>& pids, const std::string& go_version,
                                const obj_tools::BuildInfo& build_info);
   Status UpdateGoTLSSymAddrs(obj_tools::ElfReader* elf_reader, obj_tools::DwarfReader* dwarf_reader,
-                             const std::vector<int32_t>& pids, const std::string& go_version,
-                             const obj_tools::BuildInfo& build_info);
+                             const std::vector<int32_t>& pids, const std::string& go_version);
   Status UpdateNodeTLSWrapSymAddrs(int32_t pid, const std::filesystem::path& node_exe,
                                    const SemVer& ver);
 
