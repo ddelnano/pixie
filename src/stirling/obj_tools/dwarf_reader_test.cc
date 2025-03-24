@@ -44,19 +44,6 @@ constexpr std::string_view kCppBinary = "src/stirling/obj_tools/testdata/cc/test
 constexpr std::string_view kGoBinaryUnconventional =
     "src/stirling/obj_tools/testdata/go/sockshop_payments_service";
 
-const std::string kGoHTTPServerBinary1_18 =
-    "src/stirling/testing/demo_apps/go_https/server/golang_1_18_server_binary";
-const std::string kGoHTTPServerBinary1_19 =
-    "src/stirling/testing/demo_apps/go_https/server/golang_1_19_server_binary";
-const std::string kGoHTTPServerBinary1_20 =
-    "src/stirling/testing/demo_apps/go_https/server/golang_1_20_server_binary";
-const std::string kGoHTTPServerBinary1_21 =
-    "src/stirling/testing/demo_apps/go_https/server/golang_1_21_server_binary";
-const std::string kGoHTTPServerBinary1_22 =
-    "src/stirling/testing/demo_apps/go_https/server/golang_1_22_server_binary";
-const std::string kGoHTTPServerBinary1_23 =
-    "src/stirling/testing/demo_apps/go_https/server/golang_1_23_server_binary";
-
 const auto kCPPBinaryPath = px::testing::BazelRunfilePath(kCppBinary);
 const auto kGo1_17BinaryPath = px::testing::BazelRunfilePath(kTestGo1_17Binary);
 const auto kGo1_18BinaryPath = px::testing::BazelRunfilePath(kTestGo1_18Binary);
@@ -87,27 +74,6 @@ struct DwarfReaderTestParam {
   std::string binary_path;
   bool index;
 };
-
-enum location_type_t {
-  kLocationTypeInvalid = 0,
-  kLocationTypeStack = 1,
-  kLocationTypeRegisters = 2
-};
-
-struct location_t {
-  enum location_type_t type;
-  int32_t offset;
-};
-
-inline std::string ToString(const struct location_t& location) {
-  return absl::Substitute("type=$0 offset=$1", magic_enum::enum_name(location.type),
-                          location.offset);
-}
-
-inline std::ostream& operator<<(std::ostream& os, const struct location_t& location) {
-  os << ToString(location);
-  return os;
-}
 
 auto CreateDwarfReader(const std::filesystem::path& path, bool indexing) {
   if (indexing) {
@@ -149,10 +115,6 @@ class GolangDwarfReaderTest : public ::testing::TestWithParam<DwarfReaderTestPar
 };
 
 class GolangDwarfReaderIndexTest : public ::testing::TestWithParam<bool> {
-  std::unique_ptr<DwarfReader> dwarf_reader;
-};
-
-class GolangDwarfReaderIndexTLSTest : public ::testing::TestWithParam<DwarfReaderTestParam> {
   std::unique_ptr<DwarfReader> dwarf_reader;
 };
 
@@ -601,75 +563,15 @@ TEST_P(GolangDwarfReaderIndexTest, FunctionArgInfo) {
                        {LocationType::kRegister, 0, {RegisterName::kRAX, RegisterName::kRBX}},
                        true})));
 }
-#define LOG_ASSIGN(var, val)         \
-  {                                  \
-    var = val;                       \
-    LOG(INFO) << #var << " = " << var; \
-  }
-
-location_t GetArgOffset(const std::map<std::string, ArgInfo>& fn_args_map, const std::string& arg) {
-
-  constexpr int32_t kSPOffset = 8;
-  location_t location;
-
-  auto it = fn_args_map.find(arg);
-  if (it == fn_args_map.end()) {
-    location.type = kLocationTypeInvalid;
-    location.offset = -1;
-    return location;
-  }
-
-  switch (it->second.location.loc_type) {
-    case obj_tools::LocationType::kStack:
-      location.type = kLocationTypeStack;
-      location.offset = it->second.location.offset + kSPOffset;
-      return location;
-    case obj_tools::LocationType::kRegister:
-      location.type = kLocationTypeRegisters;
-      location.offset = it->second.location.offset;
-      return location;
-    default:
-      location.type = kLocationTypeInvalid;
-      location.offset = -1;
-  }
-
-  return location;
-}
-
-TEST_P(GolangDwarfReaderIndexTLSTest, TLSFunctionArgInfo) {
-  auto param = GetParam();
-  auto index = param.index;
-  auto binary_path = param.binary_path;
-  std::string retval0_arg = "~r0";
-  std::string retval1_arg = "~r1";
-  ASSERT_OK_AND_ASSIGN(std::unique_ptr<DwarfReader> dwarf_reader,
-                       CreateDwarfReader(binary_path, index));
-  ASSERT_OK_AND_ASSIGN(auto args_map,
-      dwarf_reader->GetFunctionArgInfo("crypto/tls.(*Conn).Write"));
-  PX_UNUSED(args_map);
-  ASSERT_OK_AND_ASSIGN(auto read_args_map,
-      dwarf_reader->GetFunctionArgInfo("crypto/tls.(*Conn).Read"));
-  PX_UNUSED(read_args_map);
-    /* location_t Write_b_loc; */
-    /* location_t Write_c_loc; */
-    /* location_t Write_retval0_loc; */
-    /* location_t Write_retval1_loc; */
-    /* LOG_ASSIGN(Write_c_loc, GetArgOffset(args_map, "c")); */
-    /* LOG_ASSIGN(Write_b_loc, GetArgOffset(args_map, "b")); */
-    /* LOG_ASSIGN(Write_retval0_loc, GetArgOffset(args_map, retval0_arg)); */
-    /* LOG_ASSIGN(Write_retval1_loc, GetArgOffset(args_map, retval1_arg)); */
-}
-
-#undef LOG_ASSIGN
 
 INSTANTIATE_TEST_SUITE_P(CppDwarfReaderParameterizedTest, CppDwarfReaderTest,
                          ::testing::Values(DwarfReaderTestParam{kCPPBinaryPath, true},
                                            DwarfReaderTestParam{kCPPBinaryPath, false}));
 
 INSTANTIATE_TEST_SUITE_P(GolangDwarfReaderParameterizedTest, GolangDwarfReaderTest,
-                         /* ::testing::Values(DwarfReaderTestParam{kGo1_17BinaryPath, true}, */
-                         /*                   DwarfReaderTestParam{kGo1_17BinaryPath, false}, */
-                         ::testing::Values(DwarfReaderTestParam{kGo1_18BinaryPath, true},
+                         ::testing::Values(DwarfReaderTestParam{kGo1_17BinaryPath, true},
+                                           DwarfReaderTestParam{kGo1_17BinaryPath, false},
+                                           DwarfReaderTestParam{kGo1_18BinaryPath, true},
                                            DwarfReaderTestParam{kGo1_18BinaryPath, false},
                                            DwarfReaderTestParam{kGo1_19BinaryPath, true},
                                            DwarfReaderTestParam{kGo1_19BinaryPath, false},
@@ -681,14 +583,6 @@ INSTANTIATE_TEST_SUITE_P(GolangDwarfReaderParameterizedTest, GolangDwarfReaderTe
                                            DwarfReaderTestParam{kGo1_22BinaryPath, false},
                                            DwarfReaderTestParam{kGo1_23BinaryPath, true},
                                            DwarfReaderTestParam{kGo1_23BinaryPath, false}));
-
-INSTANTIATE_TEST_SUITE_P(GolangDwarfReaderIndexParameterizedTLSTest, GolangDwarfReaderIndexTLSTest,
-                         ::testing::Values(DwarfReaderTestParam{kGoHTTPServerBinary1_18, true},
-                                           DwarfReaderTestParam{kGoHTTPServerBinary1_19, true},
-                                           DwarfReaderTestParam{kGoHTTPServerBinary1_20, true},
-                                           DwarfReaderTestParam{kGoHTTPServerBinary1_21, true},
-                                           DwarfReaderTestParam{kGoHTTPServerBinary1_22, true},
-                                           DwarfReaderTestParam{kGoHTTPServerBinary1_23, true}));
 
 INSTANTIATE_TEST_SUITE_P(GolangDwarfReaderParameterizedIndexTest, GolangDwarfReaderIndexTest,
                          ::testing::Values(true, false));

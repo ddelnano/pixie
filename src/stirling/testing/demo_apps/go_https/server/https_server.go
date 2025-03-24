@@ -26,15 +26,12 @@ import (
 
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-	"golang.org/x/net/http2/hpack"
 )
 
 const (
 	httpPort  = 50100
 	httpsPort = 50101
 )
-
-var enc hpack.Encoder
 
 func basicHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-Type", "application/json")

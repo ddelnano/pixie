@@ -21,17 +21,17 @@
 
 #pragma once
 
-  /* bpf_trace_printk(#symaddr);                      \ */
-  /* bpf_trace_printk("%s: %d\n", #symaddr, symaddr); \ */
+/* bpf_trace_printk(#symaddr);                      \ */
+/* bpf_trace_printk("%s: %d\n", #symaddr, symaddr); \ */
 // Utility macro for use in BPF code, so the probe can exit if the symbol doesn't exist.
-#define REQUIRE_SYMADDR(symaddr, retval)           \
-  if (symaddr == -1) {                             \
-    return retval;                                 \
+#define REQUIRE_SYMADDR(symaddr, retval) \
+  if (symaddr == -1) {                   \
+    return retval;                       \
   }
 
-  /* bpf_trace_printk(#loc);                  \ */
-  /* bpf_trace_printk("%s: %d\n", #loc, loc); \ */
-#define REQUIRE_LOCATION(loc, retval)      \
-  if (loc.type == kLocationTypeInvalid) {  \
-    return retval;                         \
+/* bpf_trace_printk(#loc);                  \ */
+/* bpf_trace_printk("%s: %d\n", #loc, loc); \ */
+#define REQUIRE_LOCATION(loc, retval)     \
+  if (loc.type == kLocationTypeInvalid) { \
+    return retval;                        \
   }

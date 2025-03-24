@@ -47,17 +47,10 @@ DEFINE_bool(openssl_raw_fptrs_enabled, false,
             "If true, allows the openssl tracing implementation to fall back to function pointers "
             "if dlopen/dlsym is unable to find symbols");
 
-std::map<std::string,
-    std::map<std::string,
-        std::map<std::string, int32_t>
-    >
-> g_structsOffsetMap;
+std::map<std::string, std::map<std::string, std::map<std::string, int32_t>>> g_structsOffsetMap;
 
-std::map<std::string,
-    std::map<std::string,
-        std::map<std::string, std::unique_ptr<location_t>>
-    >
-> g_funcsLocationMap;
+std::map<std::string, std::map<std::string, std::map<std::string, std::unique_ptr<location_t>>>>
+    g_funcsLocationMap;
 
 namespace px {
 namespace stirling {
@@ -69,7 +62,8 @@ namespace {
 constexpr int kGoArrayPtrOffset = 0;
 constexpr int kGoArrayLenOffset = 8;
 
-StatusOr<int32_t> GetStructOffset(const std::string& st_name, const std::string& field_name, const std::string& go_version) {
+StatusOr<int32_t> GetStructOffset(const std::string& st_name, const std::string& field_name,
+                                  const std::string& go_version) {
   auto& structs_map = GetStructsOffsetMap();
   auto struct_map = structs_map.find(st_name);
   if (struct_map == structs_map.end()) {
@@ -86,7 +80,8 @@ StatusOr<int32_t> GetStructOffset(const std::string& st_name, const std::string&
   return version_map->second;
 }
 
-StatusOr<location_t> GetArgOffset(const std::string& fn_name, const std::string& arg_name, const std::string& go_version) {
+StatusOr<location_t> GetArgOffset(const std::string& fn_name, const std::string& arg_name,
+                                  const std::string& go_version) {
   constexpr int32_t kSPOffset = 8;
 
   auto& fns_map = GetFuncsLocationMap();
@@ -213,13 +208,19 @@ Status PopulateCommonTypeAddrs(ElfReader* elf_reader, std::string_view vendor_pr
 }
 
 Status PopulateCommonDebugSymbols(DwarfReader* dwarf_reader, std::string_view vendor_prefix,
-                                  const std::string& go_version, const std::string& google_golang_grpc, struct go_common_symaddrs_t* symaddrs) {
+                                  const std::string& go_version,
+                                  const std::string& google_golang_grpc,
+                                  struct go_common_symaddrs_t* symaddrs) {
   PX_UNUSED(dwarf_reader);
   PX_UNUSED(vendor_prefix);
 
-  LOG_ASSIGN_STATUSOR(symaddrs->FD_Sysfd_offset, GetStructOffset("internal/poll.FD", "Sysfd", go_version));
-  LOG_ASSIGN_STATUSOR(symaddrs->tlsConn_conn_offset, GetStructOffset("crypto/tls.Conn", "conn", go_version));
-  LOG_ASSIGN_STATUSOR(symaddrs->syscallConn_conn_offset, GetStructOffset("google.golang.org/grpc/credentials/internal.syscallConn", "conn", google_golang_grpc));
+  LOG_ASSIGN_STATUSOR(symaddrs->FD_Sysfd_offset,
+                      GetStructOffset("internal/poll.FD", "Sysfd", go_version));
+  LOG_ASSIGN_STATUSOR(symaddrs->tlsConn_conn_offset,
+                      GetStructOffset("crypto/tls.Conn", "conn", go_version));
+  LOG_ASSIGN_STATUSOR(symaddrs->syscallConn_conn_offset,
+                      GetStructOffset("google.golang.org/grpc/credentials/internal.syscallConn",
+                                      "conn", google_golang_grpc));
   LOG_ASSIGN_STATUSOR(symaddrs->g_goid_offset, GetStructOffset("runtime.g", "goid", go_version));
 
   // List mandatory symaddrs here (symaddrs without which all probes become useless).
@@ -248,8 +249,10 @@ Status PopulateHTTP2TypeAddrs(ElfReader* elf_reader, std::string_view vendor_pre
   return Status::OK();
 }
 
-Status PopulateHTTP2DebugSymbols(DwarfReader* /*dwarf_reader*/, const std::string& go_version, const std::string& vendor_prefix,
-                                 const obj_tools::BuildInfo& build_info, struct go_http2_symaddrs_t* symaddrs) {
+Status PopulateHTTP2DebugSymbols(DwarfReader* /*dwarf_reader*/, const std::string& go_version,
+                                 const std::string& vendor_prefix,
+                                 const obj_tools::BuildInfo& build_info,
+                                 struct go_http2_symaddrs_t* symaddrs) {
   // Note: we only return error if a *mandatory* symbol is missing. Currently none are mandatory,
   // because these multiple probes for multiple HTTP2/GRPC libraries. Even if a symbol for one
   // is missing it doesn't mean the other library's probes should not be deployed.
@@ -261,7 +264,8 @@ Status PopulateHTTP2DebugSymbols(DwarfReader* /*dwarf_reader*/, const std::strin
       golang_x_net_version = dep.version.substr(1);
     } else if (dep.path == "google.golang.org/grpc") {
       google_golang_grpc = dep.version.substr(1);
-      LOG(INFO) << "Found grpc dependency: " << dep.path << " " << dep.version << " " << google_golang_grpc;
+      LOG(INFO) << "Found grpc dependency: " << dep.path << " " << dep.version << " "
+                << google_golang_grpc;
     }
   }
 
@@ -350,12 +354,10 @@ Status PopulateHTTP2DebugSymbols(DwarfReader* /*dwarf_reader*/, const std::strin
     LOG_ASSIGN(symaddrs->http2Framer_WriteDataPadded_f_loc, f_loc);
 
     auto streamID_loc = GetArgOffset(fn, "streamID", go_version).ValueOr(invalid_loc);
-    LOG_ASSIGN(symaddrs->http2Framer_WriteDataPadded_streamID_loc,
-               streamID_loc);
+    LOG_ASSIGN(symaddrs->http2Framer_WriteDataPadded_streamID_loc, streamID_loc);
 
     auto endStream_loc = GetArgOffset(fn, "endStream", go_version).ValueOr(invalid_loc);
-    LOG_ASSIGN(symaddrs->http2Framer_WriteDataPadded_endStream_loc,
-               endStream_loc);
+    LOG_ASSIGN(symaddrs->http2Framer_WriteDataPadded_endStream_loc, endStream_loc);
 
     auto data_ptr_loc = GetArgOffset(fn, "data", go_version).ValueOr(invalid_loc);
     LOG_ASSIGN(symaddrs->http2Framer_WriteDataPadded_data_ptr_loc, data_ptr_loc);
@@ -376,7 +378,7 @@ Status PopulateHTTP2DebugSymbols(DwarfReader* /*dwarf_reader*/, const std::strin
 
     auto streamID_loc = GetArgOffset(fn, "streamID", golang_x_net_version).ValueOr(invalid_loc);
     LOG_ASSIGN(symaddrs->http2_WriteDataPadded_streamID_loc, streamID_loc);
-    
+
     auto endStream_loc = GetArgOffset(fn, "endStream", golang_x_net_version).ValueOr(invalid_loc);
     LOG_ASSIGN(symaddrs->http2_WriteDataPadded_endStream_loc, endStream_loc);
 
@@ -498,8 +500,8 @@ Status PopulateHTTP2DebugSymbols(DwarfReader* /*dwarf_reader*/, const std::strin
 }  // namespace
 
 Status PopulateGoTLSDebugSymbols(ElfReader* elf_reader, DwarfReader* dwarf_reader,
-                                 const std::string& go_version, struct go_tls_symaddrs_t* symaddrs) {
-
+                                 const std::string& go_version,
+                                 struct go_tls_symaddrs_t* symaddrs) {
   PX_UNUSED(elf_reader);
   PX_UNUSED(dwarf_reader);
 
@@ -523,11 +525,13 @@ Status PopulateGoTLSDebugSymbols(ElfReader* elf_reader, DwarfReader* dwarf_reade
   symaddrs->Write_b_loc.type = write_b_loc.type;
   symaddrs->Write_b_loc.offset = write_b_loc.offset;
 
-  PX_ASSIGN_OR_RETURN(auto write_retval0_loc, GetArgOffset("crypto/tls.(*Conn).Write", retval0_arg, go_version));
+  PX_ASSIGN_OR_RETURN(auto write_retval0_loc,
+                      GetArgOffset("crypto/tls.(*Conn).Write", retval0_arg, go_version));
   symaddrs->Write_retval0_loc.type = write_retval0_loc.type;
   symaddrs->Write_retval0_loc.offset = write_retval0_loc.offset;
 
-  PX_ASSIGN_OR_RETURN(auto write_retval1_loc, GetArgOffset("crypto/tls.(*Conn).Write", retval0_arg, go_version));
+  PX_ASSIGN_OR_RETURN(auto write_retval1_loc,
+                      GetArgOffset("crypto/tls.(*Conn).Write", retval0_arg, go_version));
   symaddrs->Write_retval1_loc.type = write_retval1_loc.type;
   symaddrs->Write_retval1_loc.offset = write_retval1_loc.offset;
 
@@ -539,11 +543,13 @@ Status PopulateGoTLSDebugSymbols(ElfReader* elf_reader, DwarfReader* dwarf_reade
   symaddrs->Read_b_loc.type = read_b_loc.type;
   symaddrs->Read_b_loc.offset = read_b_loc.offset;
 
-  PX_ASSIGN_OR_RETURN(auto read_retval0, GetArgOffset("crypto/tls.(*Conn).Read", retval0_arg, go_version));
+  PX_ASSIGN_OR_RETURN(auto read_retval0,
+                      GetArgOffset("crypto/tls.(*Conn).Read", retval0_arg, go_version));
   symaddrs->Read_retval0_loc.type = read_retval0.type;
   symaddrs->Read_retval0_loc.offset = read_retval0.offset;
 
-  PX_ASSIGN_OR_RETURN(auto read_retval1, GetArgOffset("crypto/tls.(*Conn).Read", retval1_arg, go_version));
+  PX_ASSIGN_OR_RETURN(auto read_retval1,
+                      GetArgOffset("crypto/tls.(*Conn).Read", retval1_arg, go_version));
   symaddrs->Read_retval1_loc.type = read_retval1.type;
   symaddrs->Read_retval1_loc.offset = read_retval1.offset;
 
@@ -575,7 +581,8 @@ StatusOr<struct go_common_symaddrs_t> GoCommonSymAddrs(ElfReader* elf_reader,
   }
 
   PX_RETURN_IF_ERROR(PopulateCommonTypeAddrs(elf_reader, vendor_prefix, &symaddrs));
-  PX_RETURN_IF_ERROR(PopulateCommonDebugSymbols(dwarf_reader, vendor_prefix, go_version, google_golang_grpc, &symaddrs));
+  PX_RETURN_IF_ERROR(PopulateCommonDebugSymbols(dwarf_reader, vendor_prefix, go_version,
+                                                google_golang_grpc, &symaddrs));
 
   return symaddrs;
 }
@@ -593,25 +600,21 @@ StatusOr<struct go_http2_symaddrs_t> GoHTTP2SymAddrs(ElfReader* elf_reader,
   PX_ASSIGN_OR_RETURN(std::string vendor_prefix, InferHTTP2SymAddrVendorPrefix(elf_reader));
   PX_RETURN_IF_ERROR(PopulateHTTP2TypeAddrs(elf_reader, vendor_prefix, &symaddrs));
 
-  PX_RETURN_IF_ERROR(PopulateHTTP2DebugSymbols(dwarf_reader, go_version, vendor_prefix, build_info, &symaddrs));
+  PX_RETURN_IF_ERROR(
+      PopulateHTTP2DebugSymbols(dwarf_reader, go_version, vendor_prefix, build_info, &symaddrs));
 
   return symaddrs;
 }
 
 using FuncArgMap =
-std::map<std::string,
     std::map<std::string,
-        std::map<std::string, std::unique_ptr<location_t>>
-    >
->;
-using StructOffsetMap = std::map<std::string,
-    std::map<std::string,
-        std::map<std::string, int32_t>
-    >
->;
+             std::map<std::string, std::map<std::string, std::unique_ptr<location_t>>>>;
+using StructOffsetMap =
+    std::map<std::string, std::map<std::string, std::map<std::string, int32_t>>>;
 
 StatusOr<struct go_tls_symaddrs_t> GoTLSSymAddrs(ElfReader* elf_reader, DwarfReader* dwarf_reader,
-    const std::string& go_version, const obj_tools::BuildInfo& build_info) {
+                                                 const std::string& go_version,
+                                                 const obj_tools::BuildInfo& build_info) {
   PX_UNUSED(go_version);
   PX_UNUSED(build_info);
   struct go_tls_symaddrs_t symaddrs;
@@ -991,19 +994,13 @@ StatusOr<struct node_tlswrap_symaddrs_t> NodeTLSWrapSymAddrs(const std::filesyst
   return error::NotFound("Nodejs version cannot be older than 12.3.1, got '$0'", ver.ToString());
 }
 
-std::map<std::string,
-    std::map<std::string,
-        std::map<std::string, int32_t>
-    >
->& GetStructsOffsetMap() {
+std::map<std::string, std::map<std::string, std::map<std::string, int32_t>>>&
+GetStructsOffsetMap() {
   return g_structsOffsetMap;
 }
 
-std::map<std::string,
-    std::map<std::string,
-        std::map<std::string, std::unique_ptr<location_t>>
-    >
->& GetFuncsLocationMap() {
+std::map<std::string, std::map<std::string, std::map<std::string, std::unique_ptr<location_t>>>>&
+GetFuncsLocationMap() {
   return g_funcsLocationMap;
 }
 

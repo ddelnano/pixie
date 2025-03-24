@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include <map>
+#include <memory>
 #include <string>
 
 #include "src/common/base/base.h"
@@ -84,17 +86,10 @@ px::Status PopulateGoTLSDebugSymbols(obj_tools::ElfReader* elf_reader,
                                      obj_tools::DwarfReader* dwarf_reader,
                                      struct go_tls_symaddrs_t* symaddrs);
 
-std::map<std::string,
-    std::map<std::string,
-        std::map<std::string, int32_t>
-    >
->& GetStructsOffsetMap();
+std::map<std::string, std::map<std::string, std::map<std::string, int32_t>>>& GetStructsOffsetMap();
 
-std::map<std::string,
-    std::map<std::string,
-        std::map<std::string, std::unique_ptr<location_t>>
-    >
->& GetFuncsLocationMap();
+std::map<std::string, std::map<std::string, std::map<std::string, std::unique_ptr<location_t>>>>&
+GetFuncsLocationMap();
 
 }  // namespace stirling
 }  // namespace px

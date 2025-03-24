@@ -75,7 +75,8 @@ TEST(ReadGoBuildVersionTest, BuildinfoWithModules) {
 
   auto& build_info = pair.second;
   // Validate main module path.
-  EXPECT_THAT(build_info.path, StrEq("go.opentelemetry.io/auto/internal/tools/inspect/cmd/offsetgen"));
+  EXPECT_THAT(build_info.path,
+              StrEq("go.opentelemetry.io/auto/internal/tools/inspect/cmd/offsetgen"));
 
   // Validate main module metadata.
   EXPECT_THAT(build_info.main.path, StrEq("go.opentelemetry.io/auto/internal/tools"));
@@ -86,77 +87,65 @@ TEST(ReadGoBuildVersionTest, BuildinfoWithModules) {
             << ", Main Module=" << build_info.main.path << "@" << build_info.main.version;
 
   for (const auto& dep : build_info.deps) {
-      LOG(INFO) << "Dependency: " << dep.path << "@" << dep.version;
+    LOG(INFO) << "Dependency: " << dep.path << "@" << dep.version;
   }
 
   // Validate module dependencies.
-  EXPECT_THAT(build_info.deps, UnorderedElementsAre(
-      Field(&Module::path, StrEq("github.com/Masterminds/semver/v3")),
-      Field(&Module::path, StrEq("github.com/cilium/ebpf")),
-      Field(&Module::path, StrEq("github.com/distribution/reference")),
-      Field(&Module::path, StrEq("github.com/docker/docker")),
-      Field(&Module::path, StrEq("github.com/docker/go-connections")),
-      Field(&Module::path, StrEq("github.com/docker/go-units")),
-      Field(&Module::path, StrEq("github.com/felixge/httpsnoop")),
-      Field(&Module::path, StrEq("github.com/go-logr/logr")),
-      Field(&Module::path, StrEq("github.com/go-logr/stdr")),
-      Field(&Module::path, StrEq("github.com/gogo/protobuf")),
-      Field(&Module::path, StrEq("github.com/moby/docker-image-spec")),
-      Field(&Module::path, StrEq("github.com/opencontainers/go-digest")),
-      Field(&Module::path, StrEq("github.com/opencontainers/image-spec")),
-      Field(&Module::path, StrEq("github.com/pkg/errors")),
-      Field(&Module::path, StrEq("go.opentelemetry.io/auto")),
-      Field(&Module::path, StrEq("go.opentelemetry.io/auto/sdk")),
-      Field(&Module::path, StrEq("go.opentelemetry.io/collector/pdata")),
-      Field(&Module::path, StrEq("go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp")),
-      Field(&Module::path, StrEq("go.opentelemetry.io/otel")),
-      Field(&Module::path, StrEq("go.opentelemetry.io/otel/metric")),
-      Field(&Module::path, StrEq("go.opentelemetry.io/otel/trace")),
-      Field(&Module::path, StrEq("go.uber.org/multierr")),
-      Field(&Module::path, StrEq("golang.org/x/arch")),
-      Field(&Module::path, StrEq("golang.org/x/net")),
-      Field(&Module::path, StrEq("golang.org/x/sync")),
-      Field(&Module::path, StrEq("golang.org/x/sys")),
-      Field(&Module::path, StrEq("golang.org/x/text")),
-      Field(&Module::path, StrEq("google.golang.org/genproto/googleapis/rpc")),
-      Field(&Module::path, StrEq("google.golang.org/grpc")),
-      Field(&Module::path, StrEq("google.golang.org/protobuf"))
-  ));
+  EXPECT_THAT(build_info.deps,
+              UnorderedElementsAre(
+                  Field(&Module::path, StrEq("github.com/Masterminds/semver/v3")),
+                  Field(&Module::path, StrEq("github.com/cilium/ebpf")),
+                  Field(&Module::path, StrEq("github.com/distribution/reference")),
+                  Field(&Module::path, StrEq("github.com/docker/docker")),
+                  Field(&Module::path, StrEq("github.com/docker/go-connections")),
+                  Field(&Module::path, StrEq("github.com/docker/go-units")),
+                  Field(&Module::path, StrEq("github.com/felixge/httpsnoop")),
+                  Field(&Module::path, StrEq("github.com/go-logr/logr")),
+                  Field(&Module::path, StrEq("github.com/go-logr/stdr")),
+                  Field(&Module::path, StrEq("github.com/gogo/protobuf")),
+                  Field(&Module::path, StrEq("github.com/moby/docker-image-spec")),
+                  Field(&Module::path, StrEq("github.com/opencontainers/go-digest")),
+                  Field(&Module::path, StrEq("github.com/opencontainers/image-spec")),
+                  Field(&Module::path, StrEq("github.com/pkg/errors")),
+                  Field(&Module::path, StrEq("go.opentelemetry.io/auto")),
+                  Field(&Module::path, StrEq("go.opentelemetry.io/auto/sdk")),
+                  Field(&Module::path, StrEq("go.opentelemetry.io/collector/pdata")),
+                  Field(&Module::path,
+                        StrEq("go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp")),
+                  Field(&Module::path, StrEq("go.opentelemetry.io/otel")),
+                  Field(&Module::path, StrEq("go.opentelemetry.io/otel/metric")),
+                  Field(&Module::path, StrEq("go.opentelemetry.io/otel/trace")),
+                  Field(&Module::path, StrEq("go.uber.org/multierr")),
+                  Field(&Module::path, StrEq("golang.org/x/arch")),
+                  Field(&Module::path, StrEq("golang.org/x/net")),
+                  Field(&Module::path, StrEq("golang.org/x/sync")),
+                  Field(&Module::path, StrEq("golang.org/x/sys")),
+                  Field(&Module::path, StrEq("golang.org/x/text")),
+                  Field(&Module::path, StrEq("google.golang.org/genproto/googleapis/rpc")),
+                  Field(&Module::path, StrEq("google.golang.org/grpc")),
+                  Field(&Module::path, StrEq("google.golang.org/protobuf"))));
 
   // Validate replaced modules.
-  EXPECT_THAT(build_info.deps, Contains(
-      AllOf(
-          Field(&Module::path, StrEq("go.opentelemetry.io/auto")),
-          Field(&Module::replace, Pointee(AllOf(
-            Field(&Module::path, StrEq("../../")),
-            Field(&Module::version, StrEq("(devel)"))
-        )))
-      )
-  ));
+  EXPECT_THAT(build_info.deps,
+              Contains(AllOf(Field(&Module::path, StrEq("go.opentelemetry.io/auto")),
+                             Field(&Module::replace,
+                                   Pointee(AllOf(Field(&Module::path, StrEq("../../")),
+                                                 Field(&Module::version, StrEq("(devel)"))))))));
 
-  EXPECT_THAT(build_info.deps, Contains(
-      AllOf(
-          Field(&Module::path, StrEq("go.opentelemetry.io/auto/sdk")),
-          Field(&Module::replace, Pointee(AllOf(
-            Field(&Module::path, StrEq("../../sdk")),
-            Field(&Module::version, StrEq("(devel)"))
-        )))
-      )
-  ));
+  EXPECT_THAT(build_info.deps,
+              Contains(AllOf(Field(&Module::path, StrEq("go.opentelemetry.io/auto/sdk")),
+                             Field(&Module::replace,
+                                   Pointee(AllOf(Field(&Module::path, StrEq("../../sdk")),
+                                                 Field(&Module::version, StrEq("(devel)"))))))));
 
   // Validate build settings.
-  EXPECT_THAT(build_info.settings, UnorderedElementsAre(
-      Pair(StrEq("-buildmode"), StrEq("exe")),
-      Pair(StrEq("-compiler"), StrEq("gc")),
-      Pair(StrEq("CGO_ENABLED"), StrEq("1")),
-      Pair(StrEq("CGO_CFLAGS"), StrEq("")),
-      Pair(StrEq("CGO_CPPFLAGS"), StrEq("")),
-      Pair(StrEq("CGO_CXXFLAGS"), StrEq("")),
-      Pair(StrEq("CGO_LDFLAGS"), StrEq("")),
-      Pair(StrEq("GOARCH"), StrEq("amd64")),
-      Pair(StrEq("GOOS"), StrEq("linux")),
-      Pair(StrEq("GOAMD64"), StrEq("v1"))
-  ));
+  EXPECT_THAT(build_info.settings,
+              UnorderedElementsAre(
+                  Pair(StrEq("-buildmode"), StrEq("exe")), Pair(StrEq("-compiler"), StrEq("gc")),
+                  Pair(StrEq("CGO_ENABLED"), StrEq("1")), Pair(StrEq("CGO_CFLAGS"), StrEq("")),
+                  Pair(StrEq("CGO_CPPFLAGS"), StrEq("")), Pair(StrEq("CGO_CXXFLAGS"), StrEq("")),
+                  Pair(StrEq("CGO_LDFLAGS"), StrEq("")), Pair(StrEq("GOARCH"), StrEq("amd64")),
+                  Pair(StrEq("GOOS"), StrEq("linux")), Pair(StrEq("GOAMD64"), StrEq("v1"))));
 }
 
 TEST(ReadGoBuildVersionTest, BuildinfoLittleEndiani386) {

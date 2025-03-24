@@ -585,17 +585,14 @@ class UProbeManager {
                                std::filesystem::path container_lib, uint32_t pid);
   Status UpdateGoCommonSymAddrs(obj_tools::ElfReader* elf_reader,
                                 obj_tools::DwarfReader* dwarf_reader,
-                                const std::vector<int32_t>& pids,
-                                const std::string& go_version,
+                                const std::vector<int32_t>& pids, const std::string& go_version,
                                 const obj_tools::BuildInfo& build_info);
   Status UpdateGoHTTP2SymAddrs(obj_tools::ElfReader* elf_reader,
                                obj_tools::DwarfReader* dwarf_reader,
-                               const std::vector<int32_t>& pids,
-                               const std::string& go_version,
+                               const std::vector<int32_t>& pids, const std::string& go_version,
                                const obj_tools::BuildInfo& build_info);
   Status UpdateGoTLSSymAddrs(obj_tools::ElfReader* elf_reader, obj_tools::DwarfReader* dwarf_reader,
-                             const std::vector<int32_t>& pids,
-                             const std::string& go_version,
+                             const std::vector<int32_t>& pids, const std::string& go_version,
                              const obj_tools::BuildInfo& build_info);
   Status UpdateNodeTLSWrapSymAddrs(int32_t pid, const std::filesystem::path& node_exe,
                                    const SemVer& ver);

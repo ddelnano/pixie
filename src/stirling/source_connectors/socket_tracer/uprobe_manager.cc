@@ -20,6 +20,7 @@
 
 #include <fcntl.h>
 #include <openssl/md5.h>
+#include <rapidjson/error/en.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -29,8 +30,6 @@
 #include <filesystem>
 #include <map>
 #include <tuple>
-
-#include <rapidjson/error/en.h>
 
 #include "src/common/base/base.h"
 #include "src/common/base/utils.h"
@@ -62,33 +61,21 @@ DEFINE_string(
 namespace px {
 namespace stirling {
 
-/* extern std::map<std::string, */
-/*     std::map<std::string, */
-/*         std::map<std::string, int32_t> */
-/*     > */
-/* > g_structsOffsetMap; */
-
-/* extern std::map<std::string, */
-/*     std::map<std::string, */
-/*         std::map<std::string, std::unique_ptr<location_t>> */
-/*     > */
-/* > g_funcsLocationMap; */
-
+using ::px::stirling::obj_tools::BuildInfo;
 using ::px::stirling::obj_tools::DwarfReader;
 using ::px::stirling::obj_tools::ElfReader;
-using ::px::stirling::obj_tools::BuildInfo;
 using ::px::system::GetKernelVersion;
 using ::px::system::KernelVersion;
 using ::px::system::KernelVersionOrder;
 using ::px::system::ProcPidRootPath;
 
 location_type_t parseLocationType(const std::string& loc) {
-    if (loc == "stack") {
-        return kLocationTypeStack;
-    } else if (loc == "registers") {
-        return kLocationTypeRegisters;
-    }
-    return kLocationTypeInvalid;
+  if (loc == "stack") {
+    return kLocationTypeStack;
+  } else if (loc == "registers") {
+    return kLocationTypeRegisters;
+  }
+  return kLocationTypeInvalid;
 }
 
 /**
@@ -100,26 +87,24 @@ location_type_t parseLocationType(const std::string& loc) {
  *     - Otherwise, return -1
  */
 int32_t parseOffsetOnly(const rapidjson::Value& val) {
-    if (val.IsNull()) {
-        return -1;
-    }
-    else if (val.IsNumber()) {
-        // bare integer
-        int64_t bigVal = val.GetInt64();
-        return static_cast<int32_t>(bigVal); // watch for overflow
-    }
-    else if (val.IsObject()) {
-        // e.g. { "location": "...", "offset": 42 }
-        const auto& obj = val.GetObject();
-        if (obj.HasMember("offset") && obj["offset"].IsNumber()) {
-            int64_t bigVal = obj["offset"].GetInt64();
-            return static_cast<int32_t>(bigVal);
-        } else {
-            return -1;
-        }
-    }
-    // If it's a string, array, etc., treat it as unknown => -1
+  if (val.IsNull()) {
     return -1;
+  } else if (val.IsNumber()) {
+    // bare integer
+    int64_t bigVal = val.GetInt64();
+    return static_cast<int32_t>(bigVal);  // watch for overflow
+  } else if (val.IsObject()) {
+    // e.g. { "location": "...", "offset": 42 }
+    const auto& obj = val.GetObject();
+    if (obj.HasMember("offset") && obj["offset"].IsNumber()) {
+      int64_t bigVal = obj["offset"].GetInt64();
+      return static_cast<int32_t>(bigVal);
+    } else {
+      return -1;
+    }
+  }
+  // If it's a string, array, etc., treat it as unknown => -1
+  return -1;
 }
 
 /**
@@ -128,48 +113,46 @@ int32_t parseOffsetOnly(const rapidjson::Value& val) {
  *     - offsetOut => -1 if null; store the integer or the object's "offset" otherwise
  *     - locOut => nullptr if null, otherwise a valid location_t pointer
  */
-void parseOffsetAndLocation(const rapidjson::Value& val,
-                            int32_t& offsetOut,
-                            std::unique_ptr<location_t>& locOut)
-{
-    offsetOut = -1;
-    locOut.reset(); // ensures nullptr
+// NOLINTNEXTLINE : runtime/references.
+void parseOffsetAndLocation(const rapidjson::Value& val, int32_t& offsetOut,
+                            // NOLINTNEXTLINE : runtime/references.
+                            std::unique_ptr<location_t>& locOut) {
+  offsetOut = -1;
+  locOut.reset();  // ensures nullptr
 
-    if (val.IsNull()) {
-        // offset = -1, loc => nullptr
-        return;
+  if (val.IsNull()) {
+    // offset = -1, loc => nullptr
+    return;
+  } else if (val.IsNumber()) {
+    // bare integer
+    int64_t bigVal = val.GetInt64();
+    offsetOut = static_cast<int32_t>(bigVal);
+
+    auto tmp = std::make_unique<location_t>();
+    tmp->type = kLocationTypeInvalid;  // no explicit location
+    tmp->offset = offsetOut;
+    locOut = std::move(tmp);
+  } else if (val.IsObject()) {
+    // e.g. { "location":"stack", "offset": 42 }
+    const auto& obj = val.GetObject();
+
+    int32_t tmpOffset = -1;
+    if (obj.HasMember("offset") && obj["offset"].IsNumber()) {
+      int64_t bigVal = obj["offset"].GetInt64();
+      tmpOffset = static_cast<int32_t>(bigVal);
     }
-    else if (val.IsNumber()) {
-        // bare integer
-        int64_t bigVal = val.GetInt64();
-        offsetOut = static_cast<int32_t>(bigVal);
-
-        auto tmp = std::make_unique<location_t>();
-        tmp->type = kLocationTypeInvalid; // no explicit location
-        tmp->offset = offsetOut;
-        locOut = std::move(tmp);
+    location_type_t t = kLocationTypeInvalid;
+    if (obj.HasMember("location") && obj["location"].IsString()) {
+      t = parseLocationType(obj["location"].GetString());
     }
-    else if (val.IsObject()) {
-        // e.g. { "location":"stack", "offset": 42 }
-        const auto& obj = val.GetObject();
 
-        int32_t tmpOffset = -1;
-        if (obj.HasMember("offset") && obj["offset"].IsNumber()) {
-            int64_t bigVal = obj["offset"].GetInt64();
-            tmpOffset = static_cast<int32_t>(bigVal);
-        }
-        location_type_t t = kLocationTypeInvalid;
-        if (obj.HasMember("location") && obj["location"].IsString()) {
-            t = parseLocationType(obj["location"].GetString());
-        }
-
-        offsetOut = tmpOffset;
-        auto tmp = std::make_unique<location_t>();
-        tmp->type = t;
-        tmp->offset = tmpOffset;
-        locOut = std::move(tmp);
-    }
-    // else string/array => offsetOut=-1, loc=nullptr
+    offsetOut = tmpOffset;
+    auto tmp = std::make_unique<location_t>();
+    tmp->type = t;
+    tmp->offset = tmpOffset;
+    locOut = std::move(tmp);
+  }
+  // else string/array => offsetOut=-1, loc=nullptr
 }
 
 /**
@@ -178,100 +161,96 @@ void parseOffsetAndLocation(const rapidjson::Value& val,
  *   - For each "structName" -> "fieldName" -> "versionKey"
  *     parse a single offset ( -1 if null or unknown )
  */
-void parseStructsObject(const rapidjson::Value& structsVal)
-{
-    for (auto itr = structsVal.MemberBegin(); itr != structsVal.MemberEnd(); ++itr) {
-        std::string structName = itr->name.GetString();
-        if (!itr->value.IsObject()) {
-            continue;
-        }
-        const auto& fieldMapObj = itr->value.GetObject(); // e.g. "data", "Flags", etc.
-
-        for (auto fieldIt = fieldMapObj.MemberBegin(); fieldIt != fieldMapObj.MemberEnd(); ++fieldIt) {
-            std::string fieldName = fieldIt->name.GetString();
-            if (!fieldIt->value.IsObject()) {
-                continue;
-            }
-            const auto& versionsObj = fieldIt->value.GetObject();
-
-            for (auto verIt = versionsObj.MemberBegin(); verIt != versionsObj.MemberEnd(); ++verIt) {
-                std::string versionKey = verIt->name.GetString();
-                int32_t off = parseOffsetOnly(verIt->value);
-                auto& offsetMap = GetStructsOffsetMap();
-                offsetMap[structName][fieldName][versionKey] = off;
-            }
-        }
+void parseStructsObject(const rapidjson::Value& structsVal) {
+  for (auto itr = structsVal.MemberBegin(); itr != structsVal.MemberEnd(); ++itr) {
+    std::string structName = itr->name.GetString();
+    if (!itr->value.IsObject()) {
+      continue;
     }
+    const auto& fieldMapObj = itr->value.GetObject();  // e.g. "data", "Flags", etc.
+
+    for (auto fieldIt = fieldMapObj.MemberBegin(); fieldIt != fieldMapObj.MemberEnd(); ++fieldIt) {
+      std::string fieldName = fieldIt->name.GetString();
+      if (!fieldIt->value.IsObject()) {
+        continue;
+      }
+      const auto& versionsObj = fieldIt->value.GetObject();
+
+      for (auto verIt = versionsObj.MemberBegin(); verIt != versionsObj.MemberEnd(); ++verIt) {
+        std::string versionKey = verIt->name.GetString();
+        int32_t off = parseOffsetOnly(verIt->value);
+        auto& offsetMap = GetStructsOffsetMap();
+        offsetMap[structName][fieldName][versionKey] = off;
+      }
+    }
+  }
 }
 
-void parseFuncsObject(const rapidjson::Value& funcsVal)
-{
-    for (auto itr = funcsVal.MemberBegin(); itr != funcsVal.MemberEnd(); ++itr) {
-        std::string funcName = itr->name.GetString();
-        if (!itr->value.IsObject()) {
-            continue;
-        }
-        const auto& argMapObj = itr->value.GetObject(); // e.g. "data", "Flags", etc.
-
-        for (auto argIt = argMapObj.MemberBegin(); argIt != argMapObj.MemberEnd(); ++argIt) {
-            std::string argName = argIt->name.GetString();
-            if (!argIt->value.IsObject()) {
-                continue;
-            }
-            const auto& versionsObj = argIt->value.GetObject();
-
-            for (auto verIt = versionsObj.MemberBegin(); verIt != versionsObj.MemberEnd(); ++verIt) {
-                std::string versionKey = verIt->name.GetString();
-
-                int32_t offsetVal = -1;
-                std::unique_ptr<location_t> locPtr;
-                parseOffsetAndLocation(verIt->value, offsetVal, locPtr);
-
-                auto& locationMap = GetFuncsLocationMap();
-                locationMap[funcName][argName][versionKey] = std::move(locPtr);
-            }
-        }
+void parseFuncsObject(const rapidjson::Value& funcsVal) {
+  for (auto itr = funcsVal.MemberBegin(); itr != funcsVal.MemberEnd(); ++itr) {
+    std::string funcName = itr->name.GetString();
+    if (!itr->value.IsObject()) {
+      continue;
     }
+    const auto& argMapObj = itr->value.GetObject();  // e.g. "data", "Flags", etc.
+
+    for (auto argIt = argMapObj.MemberBegin(); argIt != argMapObj.MemberEnd(); ++argIt) {
+      std::string argName = argIt->name.GetString();
+      if (!argIt->value.IsObject()) {
+        continue;
+      }
+      const auto& versionsObj = argIt->value.GetObject();
+
+      for (auto verIt = versionsObj.MemberBegin(); verIt != versionsObj.MemberEnd(); ++verIt) {
+        std::string versionKey = verIt->name.GetString();
+
+        int32_t offsetVal = -1;
+        std::unique_ptr<location_t> locPtr;
+        parseOffsetAndLocation(verIt->value, offsetVal, locPtr);
+
+        auto& locationMap = GetFuncsLocationMap();
+        locationMap[funcName][argName][versionKey] = std::move(locPtr);
+      }
+    }
+  }
 }
 
 static void InitSymAddrs() {
-    auto fname = "/home/ddelnano/code/opentelemetry-go-instrumentation/output_nested.json";
-    std::ifstream ifs(fname);
-    if (!ifs) {
-        LOG(ERROR) << "Could not open file: " << fname;
-        return;
-    }
-    std::stringstream buffer;
-    buffer << ifs.rdbuf();
-    std::string jsonContent = buffer.str();
-
-    // 2) Parse with RapidJSON
-    rapidjson::Document doc;
-    rapidjson::ParseResult parseRes = doc.Parse(jsonContent.c_str());
-    if (!parseRes) {
-        LOG(ERROR) << "JSON parse error: "
-                  << rapidjson::GetParseError_En(parseRes.Code())
-                  << " at offset " << parseRes.Offset() << "\n";
-        return;
-    }
-
-    // 3) We expect top-level "structs" and "funcs". Parse each if present:
-    if (doc.HasMember("structs") && doc["structs"].IsObject()) {
-        parseStructsObject(doc["structs"]);
-    }
-    if (doc.HasMember("funcs") && doc["funcs"].IsObject()) {
-        parseFuncsObject(doc["funcs"]);
-    }
-    LOG(INFO) << "g_structsOffsetMap: " << GetStructsOffsetMap().size() << "\n";
-    LOG(INFO) << "g_funcsLocationMap: " << GetFuncsLocationMap().size() << "\n";
+  auto fname = "/home/ddelnano/code/opentelemetry-go-instrumentation/output_nested.json";
+  std::ifstream ifs(fname);
+  if (!ifs) {
+    LOG(ERROR) << "Could not open file: " << fname;
     return;
+  }
+  std::stringstream buffer;
+  buffer << ifs.rdbuf();
+  std::string jsonContent = buffer.str();
+
+  // 2) Parse with RapidJSON
+  rapidjson::Document doc;
+  rapidjson::ParseResult parseRes = doc.Parse(jsonContent.c_str());
+  if (!parseRes) {
+    LOG(ERROR) << "JSON parse error: " << rapidjson::GetParseError_En(parseRes.Code())
+               << " at offset " << parseRes.Offset() << "\n";
+    return;
+  }
+
+  // 3) We expect top-level "structs" and "funcs". Parse each if present:
+  if (doc.HasMember("structs") && doc["structs"].IsObject()) {
+    parseStructsObject(doc["structs"]);
+  }
+  if (doc.HasMember("funcs") && doc["funcs"].IsObject()) {
+    parseFuncsObject(doc["funcs"]);
+  }
+  LOG(INFO) << "g_structsOffsetMap: " << GetStructsOffsetMap().size() << "\n";
+  LOG(INFO) << "g_funcsLocationMap: " << GetFuncsLocationMap().size() << "\n";
+  return;
 }
 
 void InitSymaddrsOnce() {
   static std::once_flag initialized;
   std::call_once(initialized, InitSymAddrs);
 }
-
 
 constexpr std::string_view kUprobeSkippedMessage =
     "binary filename '$0' contained in uprobe opt out list, skipping.";
@@ -413,7 +392,8 @@ Status UProbeManager::UpdateGoTLSSymAddrs(ElfReader* elf_reader, DwarfReader* dw
                                           const std::vector<int32_t>& pids,
                                           const std::string& go_version,
                                           const BuildInfo& build_info) {
-  PX_ASSIGN_OR_RETURN(struct go_tls_symaddrs_t symaddrs, GoTLSSymAddrs(elf_reader, dwarf_reader, go_version, build_info));
+  PX_ASSIGN_OR_RETURN(struct go_tls_symaddrs_t symaddrs,
+                      GoTLSSymAddrs(elf_reader, dwarf_reader, go_version, build_info));
 
   for (auto& pid : pids) {
     PX_RETURN_IF_ERROR(go_tls_symaddrs_map_->SetValue(pid, symaddrs));
@@ -1118,7 +1098,8 @@ int UProbeManager::DeployGoUProbes(const absl::flat_hash_set<md::UPID>& pids) {
 
     std::unique_ptr<DwarfReader> dwarf_reader = dwarf_reader_status.ConsumeValueOrDie();
     auto null_dwarf_reader = nullptr;
-    Status s = UpdateGoCommonSymAddrs(elf_reader.get(), null_dwarf_reader, pid_vec, go_version, build_info);
+    Status s = UpdateGoCommonSymAddrs(elf_reader.get(), null_dwarf_reader, pid_vec, go_version,
+                                      build_info);
     if (!s.ok()) {
       VLOG(1) << absl::Substitute(
           "Golang binary $0 does not have the mandatory symbols (e.g. TCPConn).", binary);
@@ -1128,8 +1109,8 @@ int UProbeManager::DeployGoUProbes(const absl::flat_hash_set<md::UPID>& pids) {
     // GoTLS Probes.
     if (!cfg_disable_go_tls_tracing_) {
       VLOG(1) << absl::Substitute("Attempting to attach Go TLS uprobes to binary $0", binary);
-      StatusOr<int> attach_status =
-          AttachGoTLSUProbes(binary, elf_reader.get(), null_dwarf_reader, pid_vec, go_version, build_info);
+      StatusOr<int> attach_status = AttachGoTLSUProbes(binary, elf_reader.get(), null_dwarf_reader,
+                                                       pid_vec, go_version, build_info);
       if (!attach_status.ok()) {
         monitor_.AppendSourceStatusRecord("socket_tracer", attach_status.status(),
                                           "AttachGoTLSUProbes");
@@ -1142,8 +1123,8 @@ int UProbeManager::DeployGoUProbes(const absl::flat_hash_set<md::UPID>& pids) {
 
     // Go HTTP2 Probes.
     if (!cfg_disable_go_tls_tracing_ && cfg_enable_http2_tracing_) {
-      StatusOr<int> attach_status =
-          AttachGoHTTP2UProbes(binary, elf_reader.get(), dwarf_reader.get(), pid_vec, go_version, build_info);
+      StatusOr<int> attach_status = AttachGoHTTP2UProbes(
+          binary, elf_reader.get(), dwarf_reader.get(), pid_vec, go_version, build_info);
       if (!attach_status.ok()) {
         monitor_.AppendSourceStatusRecord("socket_tracer", attach_status.status(),
                                           "AttachGoHTTP2UProbes");

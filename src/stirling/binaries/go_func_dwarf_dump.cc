@@ -37,8 +37,12 @@ using px::utils::ToJSONString;
 //-----------------------------------------------------------------------------
 
 DEFINE_string(binary, "", "The binary to parse. Required argument");
-DEFINE_string(func_names, "", "Comma separated list of function args to parse. Required argument. Example: foo,bar");
-DEFINE_string(output_pb_file, "", "File path for uprobepb protobuf output. If empty, arg details will be printed to stdout.");
+DEFINE_string(
+    func_names, "",
+    "Comma separated list of function args to parse. Required argument. Example: foo,bar");
+DEFINE_string(
+    output_pb_file, "",
+    "File path for uprobepb protobuf output. If empty, arg details will be printed to stdout.");
 DEFINE_bool(json_output, true, "Whether to use JSON output when printing to stdout");
 
 /* namespace px::stirling::obj_tools { */
@@ -63,8 +67,8 @@ int main(int argc, char** argv) {
   px::EnvironmentGuard env_guard(&argc, argv);
 
   if (FLAGS_binary.empty() || FLAGS_func_names.empty()) {
-    LOG(FATAL) << absl::Substitute("Expected --binary and --func_names arguments to be provided. Instead received $0",
-                                   *argv);
+    LOG(FATAL) << absl::Substitute(
+        "Expected --binary and --func_names arguments to be provided. Instead received $0", *argv);
   }
 
   StatusOr<std::unique_ptr<ElfReader>> elf_reader_status = ElfReader::Create(FLAGS_binary);
@@ -90,7 +94,8 @@ int main(int argc, char** argv) {
   auto only_print = FLAGS_output_pb_file.empty();
   for (const auto& func_name : absl::StrSplit(FLAGS_func_names, ',')) {
     if (func_name.empty()) {
-      LOG(FATAL) << absl::Substitute("Empty function name provided in --func_names: $0", FLAGS_func_names);
+      LOG(FATAL) << absl::Substitute("Empty function name provided in --func_names: $0",
+                                     FLAGS_func_names);
     }
     auto args_or_status = dwarf_reader->GetFunctionArgInfo(func_name);
 

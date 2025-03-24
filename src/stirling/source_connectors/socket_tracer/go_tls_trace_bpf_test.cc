@@ -106,10 +106,9 @@ struct GoBoringCryptoTLSClientServerContainers {
   using GoTLSClientContainer = ::px::stirling::testing::GoBoringCryptoTLSClientContainer;
 };
 
-typedef ::testing::Types<GoBoringCryptoTLSClientServerContainers,
-                         Go1_19TLSClientServerContainers, Go1_20TLSClientServerContainers,
-                         Go1_21TLSClientServerContainers, Go1_22TLSClientServerContainers,
-                         Go1_23TLSClientServerContainers>
+typedef ::testing::Types<GoBoringCryptoTLSClientServerContainers, Go1_19TLSClientServerContainers,
+                         Go1_20TLSClientServerContainers, Go1_21TLSClientServerContainers,
+                         Go1_22TLSClientServerContainers, Go1_23TLSClientServerContainers>
     GoVersions;
 TYPED_TEST_SUITE(GoTLSTraceTest, GoVersions);
 
@@ -157,7 +156,7 @@ TYPED_TEST(GoTLSTraceTest, BasicHTTP) {
 class HTTP2Server {
  public:
   static constexpr std::string_view kServerPath =
-      "src/stirling/testing/demo_apps/go_https/server/https_server";
+      "src/stirling/testing/demo_apps/go_https/server/testdata/https_server";
 
   HTTP2Server() = default;
 
@@ -167,7 +166,9 @@ class HTTP2Server {
     LOG(INFO) << "Server path: " << server_path;
     CHECK(fs::Exists(server_path));
 
-    PX_CHECK_OK(s_.Start({server_path, "--cert=src/stirling/testing/demo_apps/go_https/server/server.crt", "--key=src/stirling/testing/demo_apps/go_https/server/server.key"}));
+    PX_CHECK_OK(
+        s_.Start({server_path, "--cert=src/stirling/testing/demo_apps/go_https/server/server.crt",
+                  "--key=src/stirling/testing/demo_apps/go_https/server/server.key"}));
     LOG(INFO) << "Server PID: " << s_.child_pid();
 
     // Give some time for the server to start up.
@@ -182,7 +183,7 @@ class HTTP2Server {
 class HTTP2Client {
  public:
   static constexpr std::string_view kClientPath =
-      "src/stirling/testing/demo_apps/go_https/client/https_client";
+      "src/stirling/testing/demo_apps/go_https/client/testdata/https_client";
 
   void LaunchClient() {
     /* std::string client_path = absl::Substitute(kClientPath, go_version); */
@@ -198,7 +199,8 @@ class HTTP2Client {
   SubProcess c_;
 };
 
-class GoTLSTraceRawBinTest : public testing::SocketTraceBPFTestFixture</* TClientSideTracing */ false> {
+class GoTLSTraceRawBinTest
+    : public testing::SocketTraceBPFTestFixture</* TClientSideTracing */ false> {
  protected:
   GoTLSTraceRawBinTest() {
     // Run the server.

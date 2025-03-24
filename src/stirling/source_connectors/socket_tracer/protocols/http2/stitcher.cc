@@ -31,7 +31,8 @@ void ProcessHTTP2Streams(HTTP2StreamsContainer* http2_streams_container,
   auto iter = streams.begin();
   while (iter != streams.end()) {
     auto& stream = iter->second;
-    LOG(INFO) << "Stream ended: " << stream.StreamEnded() << " has headers: " << stream.HasHeaders();
+    LOG(INFO) << "Stream ended: " << stream.StreamEnded()
+              << " has headers: " << stream.HasHeaders();
     if (
         // This is true when the stream_end headers event were received from bpf. In practice,
         // this event can be received earlier than other headers events, even if they were

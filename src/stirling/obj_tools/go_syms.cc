@@ -19,8 +19,6 @@
 #include "src/stirling/obj_tools/go_syms.h"
 #include "src/stirling/utils/binary_decoder.h"
 
-#include <utility>
-
 namespace px {
 namespace stirling {
 namespace obj_tools {
@@ -71,19 +69,19 @@ StatusOr<std::string> ReadGoString(ElfReader* elf_reader, uint64_t ptr_size, uin
 }
 
 StatusOr<std::string> ExtractSemVer(const std::string& input) {
-    size_t go_pos = input.find("go"); // Find "go"
-    if (go_pos == std::string::npos) {
-        LOG(ERROR) << "Prefix 'go' not found in input.";
-        return error::NotFound("Prefix 'go' not found in input.");
-    }
+  size_t go_pos = input.find("go");  // Find "go"
+  if (go_pos == std::string::npos) {
+    LOG(ERROR) << "Prefix 'go' not found in input.";
+    return error::NotFound("Prefix 'go' not found in input.");
+  }
 
-    size_t start = go_pos + 2; // Move past "go"
-    size_t end = input.find(" ", start); // Find space delimiter after version
-    if (end == std::string::npos) {
-        end = input.size(); // If no space, take the rest of the string
-    }
+  size_t start = go_pos + 2;            // Move past "go"
+  size_t end = input.find(" ", start);  // Find space delimiter after version
+  if (end == std::string::npos) {
+    end = input.size();  // If no space, take the rest of the string
+  }
 
-    return input.substr(start, end - start);
+  return input.substr(start, end - start);
 }
 
 StatusOr<BuildInfo> ReadBuildInfo(const std::string& mod) {
@@ -117,7 +115,8 @@ StatusOr<BuildInfo> ReadBuildInfo(const std::string& mod) {
       last_module = &build_info.deps.back();
     } else if (absl::StartsWith(line, "=>\t")) {
       if (last_module == nullptr) {
-        return error::InvalidArgument("Unexpected module replacement line with no preceding module.");
+        return error::InvalidArgument(
+            "Unexpected module replacement line with no preceding module.");
       }
       std::istringstream iss(line.substr(3));
       std::unique_ptr<Module> replacement = std::make_unique<Module>();
@@ -219,8 +218,8 @@ StatusOr<std::pair<std::string, BuildInfo>> ReadGoBuildVersion(ElfReader* elf_re
 
   PX_ASSIGN_OR_RETURN(auto version, ReadGoString(elf_reader, ptr_size, ptr_addr, read_ptr));
 
-  PX_ASSIGN_OR_RETURN(uint64_t mod_ptr_addr,
-                      elf_reader->VirtualAddrToBinaryAddr(read_ptr(runtime_version_vaddr) + ptr_size));
+  PX_ASSIGN_OR_RETURN(uint64_t mod_ptr_addr, elf_reader->VirtualAddrToBinaryAddr(
+                                                 read_ptr(runtime_version_vaddr) + ptr_size));
   auto mod_status = ReadGoString(elf_reader, ptr_size, mod_ptr_addr, read_ptr);
   if (mod_status.ok()) {
     std::string mod = mod_status.ValueOrDie();

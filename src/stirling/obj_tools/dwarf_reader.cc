@@ -959,7 +959,7 @@ StatusOr<std::map<std::string, ArgInfo>> DwarfReader::GetFunctionArgInfo(
   absl::flat_hash_set<std::string> arg_names;
   for (const auto& die : GetParamDIEs(function_die)) {
     std::string arg_name = die.getShortName();
-    VLOG(1) << function_symbol_name << " arg: " <<arg_name;
+    VLOG(1) << function_symbol_name << " arg: " << arg_name;
 
     // TODO(chengruizhe): This is a hack that deals with duplicate DWARF entries in Go 1.18
     //  binaries. Remove once this issue is resolved. https://github.com/golang/go/issues/51725

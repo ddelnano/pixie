@@ -19,6 +19,9 @@
 #include <rapidjson/document.h>
 #include <rapidjson/error/en.h>
 
+#include <cstdint>
+#include <string>
+
 #include "src/common/base/base.h"
 #include "src/common/base/env.h"
 #include "src/common/json/json.h"
@@ -40,33 +43,27 @@ using px::utils::ToJSONString;
 //-----------------------------------------------------------------------------
 
 /* DEFINE_string(binary, "", "The binary to parse. Required argument"); */
-/* DEFINE_string(func_names, "", "Comma separated list of function args to parse. Required argument. Example: foo,bar"); */
-/* DEFINE_string(output_pb_file, "", "File path for uprobepb protobuf output. If empty, arg details will be printed to stdout."); */
+/* DEFINE_string(func_names, "", "Comma separated list of function args to parse. Required argument.
+ * Example: foo,bar"); */
+/* DEFINE_string(output_pb_file, "", "File path for uprobepb protobuf output. If empty, arg details
+ * will be printed to stdout."); */
 /* DEFINE_bool(json_output, true, "Whether to use JSON output when printing to stdout"); */
 
 // Global maps for "structs" offsets & location data:
-static std::map<std::string,
-    std::map<std::string,
-        std::map<std::string, int32_t>
-    >
-> g_structsOffsetMap;
+static std::map<std::string, std::map<std::string, std::map<std::string, int32_t>>>
+    g_structsOffsetMap;
 
 static std::map<std::string,
-    std::map<std::string,
-        std::map<std::string, std::unique_ptr<location_t>>
-    >
-> g_funcsLocationMap;
-
-#include <string>
-#include <cstdint>
+                std::map<std::string, std::map<std::string, std::unique_ptr<location_t>>>>
+    g_funcsLocationMap;
 
 location_type_t parseLocationType(const std::string& loc) {
-    if (loc == "stack") {
-        return kLocationTypeStack;
-    } else if (loc == "registers") {
-        return kLocationTypeRegisters;
-    }
-    return kLocationTypeInvalid;
+  if (loc == "stack") {
+    return kLocationTypeStack;
+  } else if (loc == "registers") {
+    return kLocationTypeRegisters;
+  }
+  return kLocationTypeInvalid;
 }
 
 /**
@@ -78,26 +75,24 @@ location_type_t parseLocationType(const std::string& loc) {
  *     - Otherwise, return -1
  */
 int32_t parseOffsetOnly(const rapidjson::Value& val) {
-    if (val.IsNull()) {
-        return -1;
-    }
-    else if (val.IsNumber()) {
-        // bare integer
-        int64_t bigVal = val.GetInt64();
-        return static_cast<int32_t>(bigVal); // watch for overflow
-    }
-    else if (val.IsObject()) {
-        // e.g. { "location": "...", "offset": 42 }
-        const auto& obj = val.GetObject();
-        if (obj.HasMember("offset") && obj["offset"].IsNumber()) {
-            int64_t bigVal = obj["offset"].GetInt64();
-            return static_cast<int32_t>(bigVal);
-        } else {
-            return -1;
-        }
-    }
-    // If it's a string, array, etc., treat it as unknown => -1
+  if (val.IsNull()) {
     return -1;
+  } else if (val.IsNumber()) {
+    // bare integer
+    int64_t bigVal = val.GetInt64();
+    return static_cast<int32_t>(bigVal);  // watch for overflow
+  } else if (val.IsObject()) {
+    // e.g. { "location": "...", "offset": 42 }
+    const auto& obj = val.GetObject();
+    if (obj.HasMember("offset") && obj["offset"].IsNumber()) {
+      int64_t bigVal = obj["offset"].GetInt64();
+      return static_cast<int32_t>(bigVal);
+    } else {
+      return -1;
+    }
+  }
+  // If it's a string, array, etc., treat it as unknown => -1
+  return -1;
 }
 
 /**
@@ -106,48 +101,46 @@ int32_t parseOffsetOnly(const rapidjson::Value& val) {
  *     - offsetOut => -1 if null; store the integer or the object's "offset" otherwise
  *     - locOut => nullptr if null, otherwise a valid location_t pointer
  */
-void parseOffsetAndLocation(const rapidjson::Value& val,
-                            int32_t& offsetOut,
-                            std::unique_ptr<location_t>& locOut)
-{
-    offsetOut = -1;
-    locOut.reset(); // ensures nullptr
+// NOLINTNEXTLINE : runtime/references.
+void parseOffsetAndLocation(const rapidjson::Value& val, int32_t& offsetOut,
+                            // NOLINTNEXTLINE : runtime/references.
+                            std::unique_ptr<location_t>& locOut) {
+  offsetOut = -1;
+  locOut.reset();  // ensures nullptr
 
-    if (val.IsNull()) {
-        // offset = -1, loc => nullptr
-        return;
+  if (val.IsNull()) {
+    // offset = -1, loc => nullptr
+    return;
+  } else if (val.IsNumber()) {
+    // bare integer
+    int64_t bigVal = val.GetInt64();
+    offsetOut = static_cast<int32_t>(bigVal);
+
+    auto tmp = std::make_unique<location_t>();
+    tmp->type = kLocationTypeInvalid;  // no explicit location
+    tmp->offset = offsetOut;
+    locOut = std::move(tmp);
+  } else if (val.IsObject()) {
+    // e.g. { "location":"stack", "offset": 42 }
+    const auto& obj = val.GetObject();
+
+    int32_t tmpOffset = -1;
+    if (obj.HasMember("offset") && obj["offset"].IsNumber()) {
+      int64_t bigVal = obj["offset"].GetInt64();
+      tmpOffset = static_cast<int32_t>(bigVal);
     }
-    else if (val.IsNumber()) {
-        // bare integer
-        int64_t bigVal = val.GetInt64();
-        offsetOut = static_cast<int32_t>(bigVal);
-
-        auto tmp = std::make_unique<location_t>();
-        tmp->type = kLocationTypeInvalid; // no explicit location
-        tmp->offset = offsetOut;
-        locOut = std::move(tmp);
+    location_type_t t = kLocationTypeInvalid;
+    if (obj.HasMember("location") && obj["location"].IsString()) {
+      t = parseLocationType(obj["location"].GetString());
     }
-    else if (val.IsObject()) {
-        // e.g. { "location":"stack", "offset": 42 }
-        const auto& obj = val.GetObject();
 
-        int32_t tmpOffset = -1;
-        if (obj.HasMember("offset") && obj["offset"].IsNumber()) {
-            int64_t bigVal = obj["offset"].GetInt64();
-            tmpOffset = static_cast<int32_t>(bigVal);
-        }
-        location_type_t t = kLocationTypeInvalid;
-        if (obj.HasMember("location") && obj["location"].IsString()) {
-            t = parseLocationType(obj["location"].GetString());
-        }
-
-        offsetOut = tmpOffset;
-        auto tmp = std::make_unique<location_t>();
-        tmp->type = t;
-        tmp->offset = tmpOffset;
-        locOut = std::move(tmp);
-    }
-    // else string/array => offsetOut=-1, loc=nullptr
+    offsetOut = tmpOffset;
+    auto tmp = std::make_unique<location_t>();
+    tmp->type = t;
+    tmp->offset = tmpOffset;
+    locOut = std::move(tmp);
+  }
+  // else string/array => offsetOut=-1, loc=nullptr
 }
 
 /**
@@ -156,29 +149,28 @@ void parseOffsetAndLocation(const rapidjson::Value& val,
  *   - For each "structName" -> "fieldName" -> "versionKey"
  *     parse a single offset ( -1 if null or unknown )
  */
-void parseStructsObject(const rapidjson::Value& structsVal)
-{
-    for (auto itr = structsVal.MemberBegin(); itr != structsVal.MemberEnd(); ++itr) {
-        std::string structName = itr->name.GetString();
-        if (!itr->value.IsObject()) {
-            continue;
-        }
-        const auto& fieldMapObj = itr->value.GetObject(); // e.g. "data", "Flags", etc.
-
-        for (auto fieldIt = fieldMapObj.MemberBegin(); fieldIt != fieldMapObj.MemberEnd(); ++fieldIt) {
-            std::string fieldName = fieldIt->name.GetString();
-            if (!fieldIt->value.IsObject()) {
-                continue;
-            }
-            const auto& versionsObj = fieldIt->value.GetObject();
-
-            for (auto verIt = versionsObj.MemberBegin(); verIt != versionsObj.MemberEnd(); ++verIt) {
-                std::string versionKey = verIt->name.GetString();
-                int32_t off = parseOffsetOnly(verIt->value);
-                g_structsOffsetMap[structName][fieldName][versionKey] = off;
-            }
-        }
+void parseStructsObject(const rapidjson::Value& structsVal) {
+  for (auto itr = structsVal.MemberBegin(); itr != structsVal.MemberEnd(); ++itr) {
+    std::string structName = itr->name.GetString();
+    if (!itr->value.IsObject()) {
+      continue;
     }
+    const auto& fieldMapObj = itr->value.GetObject();  // e.g. "data", "Flags", etc.
+
+    for (auto fieldIt = fieldMapObj.MemberBegin(); fieldIt != fieldMapObj.MemberEnd(); ++fieldIt) {
+      std::string fieldName = fieldIt->name.GetString();
+      if (!fieldIt->value.IsObject()) {
+        continue;
+      }
+      const auto& versionsObj = fieldIt->value.GetObject();
+
+      for (auto verIt = versionsObj.MemberBegin(); verIt != versionsObj.MemberEnd(); ++verIt) {
+        std::string versionKey = verIt->name.GetString();
+        int32_t off = parseOffsetOnly(verIt->value);
+        g_structsOffsetMap[structName][fieldName][versionKey] = off;
+      }
+    }
+  }
 }
 
 /**
@@ -187,41 +179,40 @@ void parseStructsObject(const rapidjson::Value& structsVal)
  *   - For each "funcName" -> "argName" -> "versionKey"
  *     parse offset and location data
  */
-void parseFuncsObject(const rapidjson::Value& funcsVal)
-{
-    for (auto itr = funcsVal.MemberBegin(); itr != funcsVal.MemberEnd(); ++itr) {
-        std::string funcName = itr->name.GetString();
-        if (!itr->value.IsObject()) {
-            continue;
-        }
-        const auto& argMapObj = itr->value.GetObject(); // e.g. "data", "Flags", etc.
-
-        for (auto argIt = argMapObj.MemberBegin(); argIt != argMapObj.MemberEnd(); ++argIt) {
-            std::string argName = argIt->name.GetString();
-            if (!argIt->value.IsObject()) {
-                continue;
-            }
-            const auto& versionsObj = argIt->value.GetObject();
-
-            for (auto verIt = versionsObj.MemberBegin(); verIt != versionsObj.MemberEnd(); ++verIt) {
-                std::string versionKey = verIt->name.GetString();
-
-                int32_t offsetVal = -1;
-                std::unique_ptr<location_t> locPtr;
-                parseOffsetAndLocation(verIt->value, offsetVal, locPtr);
-
-                g_funcsLocationMap[funcName][argName][versionKey] = std::move(locPtr);
-            }
-        }
+void parseFuncsObject(const rapidjson::Value& funcsVal) {
+  for (auto itr = funcsVal.MemberBegin(); itr != funcsVal.MemberEnd(); ++itr) {
+    std::string funcName = itr->name.GetString();
+    if (!itr->value.IsObject()) {
+      continue;
     }
-}
+    const auto& argMapObj = itr->value.GetObject();  // e.g. "data", "Flags", etc.
 
+    for (auto argIt = argMapObj.MemberBegin(); argIt != argMapObj.MemberEnd(); ++argIt) {
+      std::string argName = argIt->name.GetString();
+      if (!argIt->value.IsObject()) {
+        continue;
+      }
+      const auto& versionsObj = argIt->value.GetObject();
+
+      for (auto verIt = versionsObj.MemberBegin(); verIt != versionsObj.MemberEnd(); ++verIt) {
+        std::string versionKey = verIt->name.GetString();
+
+        int32_t offsetVal = -1;
+        std::unique_ptr<location_t> locPtr;
+        parseOffsetAndLocation(verIt->value, offsetVal, locPtr);
+
+        g_funcsLocationMap[funcName][argName][versionKey] = std::move(locPtr);
+      }
+    }
+  }
+}
 
 /* int main(int argc, char** argv) { */
 /*   px::EnvironmentGuard env_guard(&argc, argv); */
 
 /*   if (FLAGS_binary.empty() || FLAGS_func_names.empty()) { */
-/*     LOG(FATAL) << absl::Substitute("Expected --binary and --func_names arguments to be provided. Instead received $0", */
+/*     LOG(FATAL) << absl::Substitute("Expected --binary and --func_names arguments to be provided.
+ * Instead received $0", */
 /*                                    *argv); */
 /*   } */
 
@@ -248,12 +239,14 @@ void parseFuncsObject(const rapidjson::Value& funcsVal)
 /*   auto only_print = FLAGS_output_pb_file.empty(); */
 /*   for (const auto& func_name : absl::StrSplit(FLAGS_func_names, ',')) { */
 /*     if (func_name.empty()) { */
-/*       LOG(FATAL) << absl::Substitute("Empty function name provided in --func_names: $0", FLAGS_func_names); */
+/*       LOG(FATAL) << absl::Substitute("Empty function name provided in --func_names: $0",
+ * FLAGS_func_names); */
 /*     } */
 /*     auto args_or_status = dwarf_reader->GetFunctionArgInfo(func_name); */
 
 /*     if (!args_or_status.ok()) { */
-/*       LOG(ERROR) << absl::Substitute("debug symbol parsing failed with: $0", args_or_status.msg()); */
+/*       LOG(ERROR) << absl::Substitute("debug symbol parsing failed with: $0",
+ * args_or_status.msg()); */
 /*     } */
 /*     auto args = args_or_status.ConsumeValueOrDie(); */
 /*     if (only_print) { */
@@ -271,7 +264,8 @@ void parseFuncsObject(const rapidjson::Value& funcsVal)
 /*     return 0; */
 /*   } */
 
-/*   std::fstream outfile(FLAGS_output_pb_file, std::ios::out | std::ios::trunc | std::ios::binary); */
+/*   std::fstream outfile(FLAGS_output_pb_file, std::ios::out | std::ios::trunc | std::ios::binary);
+ */
 /*   if (!outfile.is_open()) { */
 /*     char const* const err_msg = "Failed to open output file: $0."; */
 /*     LOG(ERROR) << absl::Substitute(err_msg, FLAGS_output_pb_file); */
@@ -283,82 +277,81 @@ void parseFuncsObject(const rapidjson::Value& funcsVal)
 /*   /1* } *1/ */
 /* } */
 
-int main(int argc, char** argv) 
-{
-    if (argc < 2) {
-        std::cerr << "Usage: " << argv[0] << " <input.json>\n";
-        return 1;
-    }
+int main(int argc, char** argv) {
+  if (argc < 2) {
+    std::cerr << "Usage: " << argv[0] << " <input.json>\n";
+    return 1;
+  }
 
-    // 1) Read the entire file
-    std::ifstream ifs(argv[1]);
-    if (!ifs) {
-        std::cerr << "Could not open file: " << argv[1] << "\n";
-        return 1;
-    }
-    std::stringstream buffer;
-    buffer << ifs.rdbuf();
-    std::string jsonContent = buffer.str();
+  // 1) Read the entire file
+  std::ifstream ifs(argv[1]);
+  if (!ifs) {
+    std::cerr << "Could not open file: " << argv[1] << "\n";
+    return 1;
+  }
+  std::stringstream buffer;
+  buffer << ifs.rdbuf();
+  std::string jsonContent = buffer.str();
 
-    // 2) Parse with RapidJSON
-    rapidjson::Document doc;
-    rapidjson::ParseResult parseRes = doc.Parse(jsonContent.c_str());
-    LOG(INFO) << "jsonContent: " << jsonContent.c_str();
-    if (!parseRes) {
-        std::cerr << "JSON parse error: "
-                  << rapidjson::GetParseError_En(parseRes.Code())
-                  << " at offset " << parseRes.Offset() << "\n";
-        return 1;
-    }
+  // 2) Parse with RapidJSON
+  rapidjson::Document doc;
+  rapidjson::ParseResult parseRes = doc.Parse(jsonContent.c_str());
+  LOG(INFO) << "jsonContent: " << jsonContent.c_str();
+  if (!parseRes) {
+    std::cerr << "JSON parse error: " << rapidjson::GetParseError_En(parseRes.Code())
+              << " at offset " << parseRes.Offset() << "\n";
+    return 1;
+  }
 
-    // 3) We expect top-level "structs" and "funcs". Parse each if present:
-    if (doc.HasMember("structs") && doc["structs"].IsObject()) {
-        parseStructsObject(doc["structs"]);
-    }
-    if (doc.HasMember("funcs") && doc["funcs"].IsObject()) {
-        parseFuncsObject(doc["funcs"]);
-    }
+  // 3) We expect top-level "structs" and "funcs". Parse each if present:
+  if (doc.HasMember("structs") && doc["structs"].IsObject()) {
+    parseStructsObject(doc["structs"]);
+  }
+  if (doc.HasMember("funcs") && doc["funcs"].IsObject()) {
+    parseFuncsObject(doc["funcs"]);
+  }
 
-    // 4) Now we have data in:
-    //    g_structsOffsetMap, g_structsLocationMap,
-    //    g_funcsLocationMap
+  // 4) Now we have data in:
+  //    g_structsOffsetMap, g_structsLocationMap,
+  //    g_funcsLocationMap
 
-    // Example usage: 
-    int32_t offVal = g_structsOffsetMap["golang.org/x/net/http2.DataFrame"]["data"]["0.2.0"];
-    std::cout << "DataFrame.data.0.2.0 => offset = " << offVal << "\n";
+  // Example usage:
+  int32_t offVal = g_structsOffsetMap["golang.org/x/net/http2.DataFrame"]["data"]["0.2.0"];
+  std::cout << "DataFrame.data.0.2.0 => offset = " << offVal << "\n";
 
-    {
-        LOG(INFO) << "Assertion with null struct offset";
-        int32_t offNullVal = g_structsOffsetMap["golang.org/x/net/http2.DataFrame"]["data"]["0.1.0"];
-        assert(offNullVal == -1 && "Expected -1 for null offset");
-    }
+  {
+    LOG(INFO) << "Assertion with null struct offset";
+    int32_t offNullVal = g_structsOffsetMap["golang.org/x/net/http2.DataFrame"]["data"]["0.1.0"];
+    assert(offNullVal == -1 && "Expected -1 for null offset");
+  }
 
-    {
-        LOG(INFO) << "Assertion with existing struct offset";
-        int32_t offNullVal = g_structsOffsetMap["golang.org/x/net/http2.FrameHeader"]["Flags"]["0.1.0"];
-        assert(offNullVal == 2 && "Expected 2 for null offset");
-    }
+  {
+    LOG(INFO) << "Assertion with existing struct offset";
+    int32_t offNullVal = g_structsOffsetMap["golang.org/x/net/http2.FrameHeader"]["Flags"]["0.1.0"];
+    assert(offNullVal == 2 && "Expected 2 for null offset");
+  }
 
-    {
-        LOG(INFO) << "Assertion with null func arg";
-        auto data_loc = std::move(g_funcsLocationMap["golang.org/x/net/http2.(*Framer).WriteDataPadded"]["data"]["0.1.0"]);
-        assert(data_loc.get() == nullptr && "Expected null pointer");
-        /* assert(data_loc->offset == -1 && "Expected -1 for null offset"); */
-        /* assert(data_loc->type == nullptr && "Expected nullptr"); */
-    }
+  {
+    LOG(INFO) << "Assertion with null func arg";
+    auto data_loc = std::move(
+        g_funcsLocationMap["golang.org/x/net/http2.(*Framer).WriteDataPadded"]["data"]["0.1.0"]);
+    assert(data_loc.get() == nullptr && "Expected null pointer");
+    /* assert(data_loc->offset == -1 && "Expected -1 for null offset"); */
+    /* assert(data_loc->type == nullptr && "Expected nullptr"); */
+  }
 
-    {
-        LOG(INFO) << "Assertion with existing func arg";
-        auto c_loc = std::move(g_funcsLocationMap["crypto/tls.(*Conn).Read"]["c"]["1.19.0"]);
-        assert(c_loc.get() != nullptr && "Expected non-null pointer");
-        assert(c_loc->offset == 0 && "Expected 0 for null offset");
-        assert(c_loc->type == kLocationTypeRegisters && "Expected kLocationTypeRegisters");
+  {
+    LOG(INFO) << "Assertion with existing func arg";
+    auto c_loc = std::move(g_funcsLocationMap["crypto/tls.(*Conn).Read"]["c"]["1.19.0"]);
+    assert(c_loc.get() != nullptr && "Expected non-null pointer");
+    assert(c_loc->offset == 0 && "Expected 0 for null offset");
+    assert(c_loc->type == kLocationTypeRegisters && "Expected kLocationTypeRegisters");
 
-        auto b_loc = std::move(g_funcsLocationMap["crypto/tls.(*Conn).Read"]["b"]["1.19.0"]);
-        assert(b_loc.get() != nullptr && "Expected non-null pointer");
-        assert(b_loc->offset == 8 && "Expected 8 for null offset");
-        assert(b_loc->type == kLocationTypeRegisters && "Expected kLocationTypeRegisters");
-    }
+    auto b_loc = std::move(g_funcsLocationMap["crypto/tls.(*Conn).Read"]["b"]["1.19.0"]);
+    assert(b_loc.get() != nullptr && "Expected non-null pointer");
+    assert(b_loc->offset == 8 && "Expected 8 for null offset");
+    assert(b_loc->type == kLocationTypeRegisters && "Expected kLocationTypeRegisters");
+  }
 
-    return 0;
+  return 0;
 }
