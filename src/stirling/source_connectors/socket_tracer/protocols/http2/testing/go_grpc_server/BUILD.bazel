@@ -36,6 +36,17 @@ pl_go_binary(
     embed = [":grpc_server_lib"],
 )
 
+filegroup(
+    name = "server_binary_with_certs",
+    srcs = [
+        "server_binary",
+    ],
+    data = [
+        "https-server.crt",
+        "https-server.key",
+    ],
+)
+
 [
     go_cross_binary(
         name = pl_go_sdk_version_template_to_label("golang_%s_grpc_server", sdk_version),
