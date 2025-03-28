@@ -20,6 +20,7 @@ usage() {
   echo "This script downloads all of the files listed in the mappings section of a heap profile."
   echo ""
   echo "Usage: $0 <heap_profile> <node_name> [<gcloud ssh opts>...]"
+  echo "Common gcloud ssh options include --project."
   exit 1
 }
 set -e
@@ -44,7 +45,8 @@ mkdir -p "$output_dir"
 mappings=$(awk 'BEGIN{m=0} /MAPPED_LIBRARIES/{m=1} { if(m) { print $6 }}' "$heap_profile" | grep "^/" | sort | uniq)
 
 err_file="$output_dir/gcloud_error.log"
-procs=$(gcloud compute ssh --zone us-west1-a --internal-ip --command='ps ax' "$node_name" "${@:3}" 2> "$err_file") || cat "$err_file" && rm "$err_file"
+zone=$(gcloud compute instances list "${@:3}" --filter="$node_name" --format="table(name, zone)"| tail -n 1 | awk '{print $2}')
+procs=$(gcloud compute ssh --zone "$zone" --command='ps ax' "$node_name" "${@:3}" 2> "$err_file") || cat "$err_file" && rm "$err_file"
 
 # Find the mapping that corresponds to a process on the node.
 # We assume that the process was started by running one of the files in the mappings
@@ -52,7 +54,7 @@ procs=$(gcloud compute ssh --zone us-west1-a --internal-ip --command='ps ax' "$n
 for fname in $mappings
 do
   bname=$(basename "$fname")
-  matching_proc=$(echo "$procs" | grep -E "$bname" || true)
+  matching_proc=$(echo "$procs" | grep "$bname" || true)
   if [[ -n "$matching_proc" ]]; then
     pid=$(echo "$matching_proc" | awk '{ print $1 }')
     matched_file="$fname"
@@ -79,15 +81,15 @@ output_on_err() {
 }
 
 # Create tar archive on node.
-output_on_err gcloud compute ssh --zone us-west1-a --internal-ip --command="$create_tar_cmd" "$node_name" "${@:3}"
+output_on_err gcloud compute ssh  --zone "$zone" --command="$create_tar_cmd" "$node_name" "${@:3}"
 
 # Copy archive to local machine.
-output_on_err gcloud compute scp --zone us-west1-a --internal-ip "${@:3}" "$USER@$node_name:~/$tar_file" "${output_dir}/$tar_file"
+output_on_err gcloud compute scp --zone "$zone" "${@:3}" "$USER@$node_name:~/$tar_file" "${output_dir}/$tar_file"
 
 # Cleanup tar archive on node.
-output_on_err gcloud compute ssh --zone us-west1-a --internal-ip --command="rm ~/$tar_file" "$node_name" "${@:3}"
+output_on_err gcloud compute ssh --zone "$zone" --command="rm ~/$tar_file" "$node_name" "${@:3}"
 
 tar --strip-components=1 -C "$output_dir" -xzf "${output_dir}/$tar_file"
 
 echo "Dumped mapped binaries to $output_dir"
-echo "Run 'PPROF_BINARY_PATH=$output_dir ~/go/bin/pprof -http=localhost:8888 $heap_profile' to visualize the profile."
+echo "Run 'PPROF_BINARY_PATH=$output_dir pprof -http=localhost:8888 $heap_profile' to visualize the profile."

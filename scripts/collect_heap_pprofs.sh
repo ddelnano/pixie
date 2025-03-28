@@ -19,7 +19,10 @@
 usage() {
   echo "This script downloads all of the files listed in the mappings section of a heap profile."
   echo ""
-  echo "Usage: $0 <heap_profile_dir> <vizier_cluster_id>"
+  echo "Usage: $0 <heap_profile_dir> <vizier_cluster_id> [<gcloud ssh opts>...]"
+  echo "<heap_profile_dir> : the directory where the heap profile and memory mapped files will be stored. It will be created if it does not exist."
+  echo "<vizier_cluster_id> : the ID of the Vizier cluster to connect to."
+  echo "Common gcloud ssh options include --project."
   exit 1
 }
 
@@ -30,13 +33,22 @@ cluster_id="$2"
 script_dir=$(dirname $(realpath "$0"))
 repo_root=$(git rev-parse --show-toplevel)
 
+if [ -z "$heap_profile_dir" ] || [ -z "$cluster_id" ]; then
+  usage
+fi
+
 mkdir -p "$heap_profile_dir"
 
-pxl_heap_output_file="$1/raw_output_from_hot_table_test.json"
+pxl_heap_output_file="${heap_profile_dir}/raw_output_from_hot_table_test.json"
 
 px run -o json -c "$cluster_id" -f "${repo_root}/src/pxl_scripts/px/collect_heap_dumps.pxl"  > "$pxl_heap_output_file"
 
-"${script_dir}"/process_raw_heap_pxl_output.sh "$pxl_heap_output_file"
+while IFS= read -r line; do
+    hostname=$(echo "$line" | jq -r '.hostname')
+    heap_content=$(echo "$line" | jq -r '.heap')
+    echo "$heap_content" > "${heap_profile_dir}/${hostname}.txt"
+    echo "Wrote ${heap_profile_dir}/${hostname}.txt"
+done < "$pxl_heap_output_file"
 
 nodes=()
 for file in "${heap_profile_dir}"/*.txt; do
@@ -47,5 +59,5 @@ for file in "${heap_profile_dir}"/*.txt; do
 done
 
 for node in "${nodes[@]}"; do
-  "${script_dir}/download_heap_prof_mapped_files.sh" "${heap_profile_dir}/${node}.txt" "$node"
+  "${script_dir}/download_heap_prof_mapped_files.sh" "${heap_profile_dir}/${node}.txt" "$node" "${@:3}"
 done
