@@ -71,6 +71,7 @@ spec:
         image: vizier-pem_image:latest
         args:
         - --disable_dwarf_parsing=1
+          - --elf_reader_max_file_size=146800640
         - --stirling_socket_tracer_percpu_bw_scaling_factor=0
         - --stirling_socket_tracer_max_total_data_bw=104857600 # 100MB
         - --stirling_socket_tracer_max_total_control_bw=10485760 # 10MB
@@ -91,14 +92,16 @@ spec:
           value: "0"
         - name: PX_STIRLING_ENABLE_TLS_TRACING
           value: "0"
+        - name: PL_TABLE_STORE_HTTP_EVENTS_PERCENT
+          value: "25"
         - name: PL_TABLE_STORE_DATA_LIMIT_MB
-          value: "100"
+          value: "70"
         - name: PL_DATASTREAM_BUFFER_SPIKE_SIZE
           value: "20971520" # 20MB
         - name: PL_DATASTREAM_BUFFER_MAX_GAP_SIZE
           value: "5242880" # 5MB
         - name: PX_TOTAL_CONN_TRACKER_MEM_USAGE
-          value: "104857600" # 100MB
+          value: "52428800" # 50MB
         - name: TCMALLOC_SAMPLE_PARAMETER
           value: "1048576"
         - name: PL_CLIENT_TLS_CERT
