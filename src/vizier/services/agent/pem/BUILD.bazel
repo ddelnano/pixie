@@ -68,6 +68,8 @@ container_image(
     layers = ["//src/stirling:bpf_layer"],
 )
 
+# TODO: Use this as a base image and add the shell script to detect the PEM's 100 exit code
+# to detect when to restart it.
 cc_image(
     name = "pem_image",
     base = ":pem_base_image",

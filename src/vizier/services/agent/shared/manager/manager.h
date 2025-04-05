@@ -170,6 +170,7 @@ class Manager : public BaseManager {
 
   // The timer to manage metadata updates.
   px::event::TimerUPtr metadata_update_timer_;
+  px::event::TimerUPtr memory_watchdog_timer_;
 
   bool stop_called_ = false;
 

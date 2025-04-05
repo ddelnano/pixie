@@ -29,6 +29,10 @@
 
 DEFINE_bool(test_only_force_cgroup2_mode, false,
             "Flag to force assume cgroup2 fs for testing purposes");
+DEFINE_uint64(stirling_restart_pem_with_percent_memory_limit, 0,
+              "The percent of memory limit to use when restarting PEM. This is used to "
+              "determine the amount of memory to allocate for the PEM process. If set to 0, "
+              "the default value will be used.");
 
 namespace px {
 namespace md {
@@ -82,6 +86,34 @@ StatusOr<std::string> FindSelfCGroupProcs(std::string_view base_path) {
   }
 
   return error::NotFound("Could not find self as a template.");
+}
+
+StatusOr<size_t> FindSelfCGroupMemoryCurrent(std::string_view base_path) {
+  PX_ASSIGN_OR_RETURN(auto self_procs_path, FindSelfCGroupProcs(base_path));
+
+  auto memory_current_path = absl::StrReplaceAll(self_procs_path, {{"cgroup.procs", "memory.current"}});
+  auto memory_content = ReadFileToString(memory_current_path).ValueOr("");
+  size_t memory_current;
+  if (absl::SimpleAtoi(memory_content, &memory_current)) {
+    return memory_current;
+  }
+
+  return error::NotFound("Could not find memory.current for self cgroup procs path: $0",
+                         self_procs_path);
+}
+
+StatusOr<size_t> FindSelfCGroupMemoryMax(std::string_view base_path) {
+  PX_ASSIGN_OR_RETURN(auto self_procs_path, FindSelfCGroupProcs(base_path));
+
+  auto memory_max_path = absl::StrReplaceAll(self_procs_path, {{"cgroup.procs", "memory.max"}});
+  auto memory_content = ReadFileToString(memory_max_path).ValueOr("");
+  size_t memory_max;
+  if (absl::SimpleAtoi(memory_content, &memory_max)) {
+    return memory_max;
+  }
+
+  return error::NotFound("Could not find memory.max for self cgroup procs path: $0",
+                         self_procs_path);
 }
 
 StatusOr<CGroupTemplateSpec> CreateCGroupTemplateSpecFromPath(std::string_view path) {
