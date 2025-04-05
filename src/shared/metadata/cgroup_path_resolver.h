@@ -91,6 +91,12 @@ StatusOr<std::string> CGroupBasePath(std::string_view sysfs_path);
 StatusOr<std::string> FindSelfCGroupProcs(std::string_view base_path);
 
 /**
+ * Finds the cgroup.procs file for the current process, assuming it is in a pod.
+ */
+StatusOr<size_t> FindSelfCGroupMemoryCurrent(std::string_view base_path);
+StatusOr<size_t> FindSelfCGroupMemoryMax(std::string_view base_path);
+
+/**
  * Given a path to a sample cgroup.procs file for a K8s pod,
  * this function produces a templated spec from which paths for other pods can be generated.
  */

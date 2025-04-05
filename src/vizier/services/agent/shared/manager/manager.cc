@@ -68,6 +68,10 @@ DEFINE_string(vizier_name, gflags::StringFromEnv("PL_VIZIER_NAME", ""),
 DEFINE_string(vizier_namespace, gflags::StringFromEnv("PL_POD_NAMESPACE", ""),
               "The namespace in which vizier is deployed.");
 
+DEFINE_int32(stirling_memory_percent_to_trigger_restart,
+             gflags::Int32FromEnv("PL_STIRLING_MEMORY_PERCENT_TO_TRIGGER_RESTART", 90),
+             "The percent of memory usage to trigger a restart of the agent.");
+
 namespace px {
 namespace vizier {
 namespace agent {
@@ -296,6 +300,43 @@ Status Manager::PostRegisterHook(uint32_t asid) {
   // Register the Carnot callback for metadata.
   carnot_->RegisterAgentMetadataCallback(
       std::bind(&px::md::AgentMetadataStateManager::CurrentAgentMetadataState, mds_manager_.get()));
+
+  if (FLAGS_stirling_memory_percent_to_trigger_restart > 0) {
+    memory_watchdog_timer_ = dispatcher_->CreateTimer([this]() {
+      LOG(INFO) << "Memory watchdog timer expired. Checking agent memory use to see if we need to restart.";
+
+      auto memory_current_s = md::FindSelfCGroupMemoryCurrent(px::system::Config::GetInstance().sysfs_path().string());
+      if (!memory_current_s.ok()) {
+        LOG(ERROR) << "Failed to get memory current: " << memory_current_s.status().ToString();
+        return;
+      }
+      auto memory_current = memory_current_s.ConsumeValueOrDie();
+      
+      auto memory_max_s = md::FindSelfCGroupMemoryMax(px::system::Config::GetInstance().sysfs_path().string());
+      if (!memory_max_s.ok()) {
+        LOG(ERROR) << "Failed to get memory max: " << memory_max_s.status().ToString();
+        return;
+      }
+      auto memory_max = memory_max_s.ConsumeValueOrDie();
+
+      LOG(INFO) << "Memory current: " << memory_current << ", Memory max: " << memory_max;
+
+      auto percent_used = static_cast<double>(memory_current) / static_cast<double>(memory_max);
+
+      // TODO: This should use a difference calculation to ensure that the double math works properly
+      if (percent_used > FLAGS_stirling_memory_percent_to_trigger_restart / 100.0) {
+        LOG(INFO) << "Memory usage exceeded threshold. Restarting agent.";
+        // Restart the agent.
+
+        // TODO: Use error code that is unique and have the pem container image's entrypoint script
+        // specifically check to see if the exit code is 100. If so, run the PEM process again
+        std::exit(100);
+      }
+
+      // After timer runs, reschedule to trigger in another 5 seconds.
+      memory_watchdog_timer_->EnableTimer(std::chrono::seconds(5));
+    });
+  }
 
   // Call the derived class post-register hook.
   PX_CHECK_OK(PostRegisterHookImpl());
