@@ -183,7 +183,6 @@ Status Manager::Init() {
 Status Manager::Run() {
   running_ = true;
   dispatcher_->Run(px::event::Dispatcher::RunType::Block);
-  LOG(INFO) << "Manager::Run: exiting event loop";
   running_ = false;
   return Status::OK();
 }
@@ -297,49 +296,6 @@ Status Manager::PostRegisterHook(uint32_t asid) {
   // Register the Carnot callback for metadata.
   carnot_->RegisterAgentMetadataCallback(
       std::bind(&px::md::AgentMetadataStateManager::CurrentAgentMetadataState, mds_manager_.get()));
-  memory_watchdog_timer_ = dispatcher_->CreateTimer([this]() {
-    LOG(INFO) << "Memory watchdog timer expired. Restarting agent.";
-    auto status = Stop(std::chrono::seconds(5));
-    LOG(INFO) << "Stopped agent.";
-
-    for (auto& handler : message_handlers_) {
-      PX_CHECK_OK(handler.second->Stop());
-    }
-    LOG_IF(ERROR, !status.ok()) << status.msg();
-    dispatcher_->Stop();
-    LOG(INFO) << "Calling dispatcher->Stop()";
-    // Disable all timers
-    tablestore_compaction_timer_->DisableTimer();
-    tablestore_compaction_timer_.reset();
-
-    memory_metrics_timer_->DisableTimer();
-    memory_metrics_timer_.reset();
-
-    metrics_push_timer_->DisableTimer();
-    metrics_push_timer_.reset();
-
-    chan_cache_garbage_collect_timer_->DisableTimer();
-    chan_cache_garbage_collect_timer_.reset();
-
-    metadata_update_timer_->DisableTimer();
-    metadata_update_timer_.reset();
-
-    memory_watchdog_timer_->DisableTimer();
-    memory_watchdog_timer_.reset();
-
-    agent_nats_connector_.reset();
-    k8s_nats_connector_.reset();
-    metrics_nats_connector_.reset();
-    PX_CHECK_OK(heartbeat_handler_->Stop());
-    PX_CHECK_OK(registration_handler_->Stop());
-
-    dispatcher_->Exit();
-    LOG(INFO) << "Calling Exit()";
-
-    LOG(INFO) << "Restarting agent.";
-  });
-  LOG(INFO) << "Setting memory watchdog timer";
-  memory_watchdog_timer_->EnableTimer(std::chrono::seconds(5));
 
   // Call the derived class post-register hook.
   PX_CHECK_OK(PostRegisterHookImpl());

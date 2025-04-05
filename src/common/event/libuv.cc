@@ -46,7 +46,7 @@ class LibuvRunnableAsyncTask : public RunnableAsyncTask {
   /**
    * Run queues work on the event queue to run on the threadpool.
    */
-  void Run() override { PX_UNUSED(uv_queue_work(loop_, &work_, WorkCB, AfterWorkCB) == 0); }
+  void Run() override { ECHECK(uv_queue_work(loop_, &work_, WorkCB, AfterWorkCB) == 0); }
 
  private:
   static void inline WorkCB(uv_work_t* req) {
@@ -64,16 +64,7 @@ class LibuvRunnableAsyncTask : public RunnableAsyncTask {
   uv_work_t work_;
 };
 
-void OnUVWalkClose(uv_handle_t* handle, void* /*arg*/) {
-    if (uv_is_closing(handle)) {
-      LOG(INFO) << "uv_handle_t is already closing";
-      return;
-    }
-    const char* type_name = uv_handle_type_name(handle->type);
-    LOG(INFO) << "uv_handle_t closing " << type_name;
-    uv_close(handle, nullptr);
-    LOG(INFO) << "uv_close finished";
-}
+void OnUVWalkClose(uv_handle_t* handle, void* /*arg*/) { uv_close(handle, nullptr); }
 
 }  // namespace
 
@@ -133,9 +124,7 @@ void LibuvScheduler::Run(Dispatcher::RunType type) {
     default:
       CHECK(0) << "Unsupported run mode";
   }
-  LOG(INFO) << LogEntry("Running loop");
-  auto i = uv_run(&uv_loop_, mode);
-  LOG(INFO) << LogEntry("Loop finished") << " i: " << i;
+  uv_run(&uv_loop_, mode);
 }
 
 LibuvScheduler::LibuvScheduler(std::string_view name) : name_(std::string(name)) {
@@ -155,23 +144,18 @@ LibuvScheduler::LibuvScheduler(std::string_view name) : name_(std::string(name))
 void LibuvScheduler::LoopExit() {
   // Should signal run loop to exit, and also wait for exit to complete.
   if (int rc = uv_loop_close(&uv_loop_); rc != 0) {
-    LOG(INFO) << LogEntry("uv_loop_close failed: ") << uv_strerror(rc);
     if (rc == UV_EBUSY) {
-      uv_stop(&uv_loop_);
       uv_walk(&uv_loop_, OnUVWalkClose, NULL);
       // Give it a chance to cleanup.
-      /* Run(Dispatcher::RunType::Block); */
-      LOG(INFO) << LogEntry("Trying to let main uv_run loop finish");
+      Run(Dispatcher::RunType::Block);
     } else {
       CHECK(0) << "Got unexpected error closing event loop: " << uv_strerror(rc);
     }
   }
 
-  LOG(INFO) << LogEntry("calling uv_loop_close again, potentially");
   if (int rc = uv_loop_close(&uv_loop_); rc != 0) {
     LOG(ERROR) << "Failed to close event loop " << uv_strerror(rc);
   }
-  LOG(INFO) << LogEntry("uv_loop_close finished");
 }
 
 void LibuvScheduler::Stop() {
@@ -193,22 +177,9 @@ std::string LibuvScheduler::LogEntry(std::string_view entry) {
 
 //----- Dispatcher
 
-void LibuvDispatcher::LoopExit() {
-  base_scheduler_.LoopExit();
-}
-
-void LibuvDispatcher::Exit() {
-  stopped_ = true;
-  LOG(INFO) << LogEntry("Exit called");
-  int rc = uv_async_send(&ev_close_async_handler_);
-  CHECK(rc == 0) << "Failed to exit scheduler";
-}
+void LibuvDispatcher::Exit() { base_scheduler_.LoopExit(); }
 
 void LibuvDispatcher::Post(PostCB cb) {
-  if (stopped_) {
-    LOG(WARNING) << "Post called after dispatcher stopped";
-    return;
-  }
   bool activate = false;
   {
     absl::MutexLock lock(&post_lock_);
@@ -249,7 +220,6 @@ void LibuvDispatcher::UpdateMonotonicTime() {
 
 LibuvDispatcher::LibuvDispatcher(std::string_view name, const API& api, TimeSystem* time_system)
     : name_(std::string(name)),
-      stopped_(false),
       api_(api),
       base_scheduler_(name),
       scheduler_(time_system->CreateScheduler(&base_scheduler_)),
@@ -262,22 +232,11 @@ LibuvDispatcher::LibuvDispatcher(std::string_view name, const API& api, TimeSyst
     LibuvDispatcher* d = reinterpret_cast<LibuvDispatcher*>(h->data);
     d->RunPostCallbacks();
   });
-  ev_close_async_handler_.data = this;
-  uv_async_init(base_scheduler_.uv_loop(), &ev_close_async_handler_, [](uv_async_t* h) {
-    LibuvDispatcher* d = reinterpret_cast<LibuvDispatcher*>(h->data);
-    LOG(INFO) << d->LogEntry("uv_close_async_handler called");
-    d->LoopExit();
-  });
   // Don't block the event loop if this is the only reference.
   uv_unref(reinterpret_cast<uv_handle_t*>(&post_async_handler_));
-  uv_unref(reinterpret_cast<uv_handle_t*>(&ev_close_async_handler_));
 }
 
 TimerUPtr LibuvDispatcher::CreateTimer(TimerCB cb) {
-  if (stopped_) {
-    LOG(FATAL) << "CreateTimer called after dispatcher stopped";
-    return nullptr;
-  }
   CHECK(IsCorrectThread());
   return scheduler_->CreateTimer(cb, this);
 }
@@ -303,10 +262,6 @@ void LibuvDispatcher::Stop() {
 }
 
 RunnableAsyncTaskUPtr LibuvDispatcher::CreateAsyncTask(std::unique_ptr<AsyncTask> task) {
-  if (stopped_) {
-    LOG(FATAL) << "CreateAsyncTask called after dispatcher stopped";
-    return nullptr;
-  }
   return base_scheduler_.CreateAsyncTask(std::move(task));
 }
 

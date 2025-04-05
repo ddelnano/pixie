@@ -56,12 +56,6 @@ class TracepointManager : public Manager::MessageHandler {
   Status HandleMessage(std::unique_ptr<messages::VizierMessage> msg) override;
   std::string DebugString() const;
 
-  Status Stop() override {
-    tracepoint_monitor_timer_->DisableTimer();
-    tracepoint_monitor_timer_.release();
-    return Status::OK();
-  }
-
  private:
   // The tracepoint Monitor that is responsible for watching and updating the state of
   // active tracepoints.

@@ -40,15 +40,6 @@ class HeartbeatMessageHandler : public Manager::MessageHandler {
   void DisableHeartbeats();
   void EnableHeartbeats();
 
-  Status Stop() override {
-    heartbeat_send_timer_->DisableTimer();
-    heartbeat_send_timer_.release();
-
-    heartbeat_watchdog_timer_->DisableTimer();
-    heartbeat_watchdog_timer_.release();
-    return Status::OK();
-  }
-
  private:
   void ConsumeAgentPIDUpdates(messages::AgentUpdateInfo* update_info);
   void ProcessPIDStartedEvent(const px::md::PIDStartedEvent& ev,
@@ -107,10 +98,6 @@ class HeartbeatNackMessageHandler : public Manager::MessageHandler {
   ~HeartbeatNackMessageHandler() override = default;
 
   Status HandleMessage(std::unique_ptr<messages::VizierMessage> msg) override;
-
-  Status Stop() override {
-    return Status::OK();
-  }
 
  private:
   HeartbeatReregisterHook reregister_hook_;

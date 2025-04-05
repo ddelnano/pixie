@@ -92,7 +92,6 @@ class LibuvDispatcher : public Dispatcher {
   RunnableAsyncTaskUPtr CreateAsyncTask(std::unique_ptr<AsyncTask> task) override;
   MonotonicTimePoint ApproximateMonotonicTime() const override;
   void UpdateMonotonicTime() override;
-  void LoopExit();
   std::string LogEntry(std::string_view entry);
   uv_loop_t* uv_loop() { return base_scheduler_.uv_loop(); }
 
@@ -112,9 +111,7 @@ class LibuvDispatcher : public Dispatcher {
   absl::Mutex post_lock_;
   std::list<PostCB> post_callbacks_ ABSL_GUARDED_BY(post_lock_);
   uv_async_t post_async_handler_;
-  uv_async_t ev_close_async_handler_;
 
-  std::atomic<bool> stopped_ = false;
   const API& api_;
   LibuvScheduler base_scheduler_;
   SchedulerUPtr scheduler_;
