@@ -45,6 +45,15 @@ class ExecuteQueryMessageHandler : public Manager::MessageHandler {
 
   Status HandleMessage(std::unique_ptr<messages::VizierMessage> msg) override;
 
+  Status Stop() override {
+    // Stop all running queries.
+    for (auto& [_, task] : running_queries_) {
+      task.reset();
+    }
+    running_queries_.clear();
+    return Status::OK();
+  }
+
  protected:
   /**
    * HandleQueryExecutionComplete can be called by the async task to signal that work has been

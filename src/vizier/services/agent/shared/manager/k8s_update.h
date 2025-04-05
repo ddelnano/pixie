@@ -51,6 +51,12 @@ class K8sUpdateHandler : public Manager::MessageHandler {
 
   Status HandleMessage(std::unique_ptr<messages::VizierMessage> msg) override;
 
+  Status Stop() override {
+    missing_metadata_request_timer_->DisableTimer();
+    missing_metadata_request_timer_.release();
+    return Status::OK();
+  }
+
  private:
   Status HandleMissingK8sMetadataResponse(const MissingK8sMetadataResponse& update);
   Status HandleK8sUpdate(const ResourceUpdate& update);

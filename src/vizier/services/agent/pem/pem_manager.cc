@@ -84,6 +84,15 @@ Status PEMManager::PostRegisterHookImpl() {
 Status PEMManager::StopImpl(std::chrono::milliseconds) {
   stirling_->Stop();
   stirling_.reset();
+
+  clock_converter_timer_->DisableTimer();
+  clock_converter_timer_.reset();
+
+  node_memory_timer_->DisableTimer();
+  node_memory_timer_.reset();
+
+  PX_UNUSED(tracepoint_manager_->Stop());
+
   return Status::OK();
 }
 

@@ -42,6 +42,35 @@ using ::px::vizier::agent::DefaultDeathHandler;
 using ::px::vizier::agent::PEMManager;
 using ::px::vizier::agent::TerminationHandler;
 
+PX_SUPPRESS_WARNINGS_START();
+void ContinuousRun(sole::uuid agent_id,
+                   const px::system::KernelInfo& kernel_info) {
+  auto manager =
+      PEMManager::Create(agent_id, FLAGS_pod_name, FLAGS_host_ip, FLAGS_nats_url, kernel_info)
+          .ConsumeValueOrDie();
+
+  TerminationHandler::set_manager(manager.get());
+
+  LOG(INFO) << "Starting agent manager";
+  auto status = manager->Run();
+  LOG_IF(ERROR, !status.ok()) << "manager->Run() failed: " << status.ToString();
+  LOG(INFO) << "manager->Run() returned, stopping manager";
+  auto stop_status = manager->Stop(std::chrono::seconds{5});
+  LOG_IF(ERROR, !stop_status.ok())
+      << "manager->Stop() failed: " << stop_status.ToString();
+
+  // Clear the manager, because it has been stopped.
+  TerminationHandler::set_manager(nullptr);
+  manager.reset();
+
+  /* if (manager->restart_requested()) { */
+  if (true) {
+    LOG(INFO) << "Restarting agent manager";
+    ContinuousRun(agent_id, kernel_info);
+    LOG(INFO) << "Agent manager restarted";
+  }
+}
+
 int main(int argc, char** argv) {
   px::EnvironmentGuard env_guard(&argc, argv);
 
@@ -84,17 +113,10 @@ int main(int argc, char** argv) {
       kernel_version,
       kernel_headers_installed,
   };
-  auto manager =
-      PEMManager::Create(agent_id, FLAGS_pod_name, FLAGS_host_ip, FLAGS_nats_url, kernel_info)
-          .ConsumeValueOrDie();
 
-  TerminationHandler::set_manager(manager.get());
-
-  PX_CHECK_OK(manager->Run());
-  PX_CHECK_OK(manager->Stop(std::chrono::seconds{5}));
-
-  // Clear the manager, because it has been stopped.
-  TerminationHandler::set_manager(nullptr);
+  ContinuousRun(agent_id, kernel_info);
+  LOG(INFO) << "Agent manager stopped";
 
   return 0;
 }
+PX_SUPPRESS_WARNINGS_START();

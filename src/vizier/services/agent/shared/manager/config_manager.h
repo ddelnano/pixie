@@ -37,6 +37,10 @@ class ConfigManager : public Manager::MessageHandler {
 
   Status HandleMessage(std::unique_ptr<messages::VizierMessage> msg) override;
 
+  Status Stop() override {
+    return Status::OK();
+  }
+
  private:
   px::event::Dispatcher* dispatcher_;
   Manager::VizierNATSConnector* nats_conn_;

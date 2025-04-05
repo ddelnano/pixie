@@ -104,6 +104,8 @@ class Manager : public BaseManager {
 
   Status Stop(std::chrono::milliseconds timeout) final;
 
+  bool restart_requested() const { return restart_requested_; }
+
  protected:
   // Protect constructor since we need to use Init on this class.
   Manager(sole::uuid agent_id, std::string_view pod_name, std::string_view host_ip,
@@ -170,6 +172,7 @@ class Manager : public BaseManager {
 
   // The timer to manage metadata updates.
   px::event::TimerUPtr metadata_update_timer_;
+  px::event::TimerUPtr memory_watchdog_timer_;
 
   bool stop_called_ = false;
 
@@ -200,6 +203,7 @@ class Manager : public BaseManager {
 
   // The controller is still running. Force stopping will cause un-graceful termination.
   std::atomic<bool> running_ = false;
+  std::atomic<bool> restart_requested_ = false;
 
   // The base agent contains the following components.
   std::unique_ptr<carnot::Carnot> carnot_;
@@ -249,6 +253,8 @@ class Manager::MessageHandler {
    * Do not call blocking operators while handling the message.
    */
   virtual Status HandleMessage(std::unique_ptr<messages::VizierMessage> msg) = 0;
+
+  virtual Status Stop() = 0;
 
  protected:
   const Info* agent_info() const { return agent_info_; }

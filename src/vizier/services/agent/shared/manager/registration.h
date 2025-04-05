@@ -43,6 +43,15 @@ class RegistrationHandler : public Manager::MessageHandler {
   void RegisterAgent() { return RegisterAgent(/*reregister*/ false); }
   void ReregisterAgent() { return RegisterAgent(/*reregister*/ true); }
 
+  Status Stop() override {
+    registration_timeout_->DisableTimer();
+    registration_timeout_.release();
+
+    registration_wait_->DisableTimer();
+    registration_wait_.release();
+    return Status::OK();
+  }
+
  private:
   void RegisterAgent(bool reregister);
   Status DispatchRegistration();
