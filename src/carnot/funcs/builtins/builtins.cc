@@ -25,10 +25,10 @@
 #include "src/carnot/funcs/builtins/pii_ops.h"
 #include "src/carnot/funcs/builtins/regex_ops.h"
 #include "src/carnot/funcs/builtins/request_path_ops.h"
+#include "src/carnot/funcs/builtins/sql_ops.h"
 #include "src/carnot/funcs/builtins/string_ops.h"
 #include "src/carnot/funcs/builtins/uri_ops.h"
 #include "src/carnot/funcs/builtins/util_ops.h"
-#include "src/carnot/funcs/builtins/sql_ops.h"
 
 #include "src/carnot/udf/registry.h"
 

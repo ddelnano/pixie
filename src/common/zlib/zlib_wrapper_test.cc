@@ -18,8 +18,8 @@
 
 #include "src/common/zlib/zlib_wrapper.h"
 #include <zlib.h>
-#include <string>
 #include <iostream>
+#include <string>
 
 #include "src/common/testing/testing.h"
 
@@ -32,6 +32,7 @@ class ZlibTest : public ::testing::Test {
       0xc9, 0xc8, 0x2c, 0x56, 0x00, 0xa2, 0x44, 0x85, 0x92, 0xd4, 0xe2,
       0x12, 0x2e, 0x00, 0x8c, 0x2d, 0xc0, 0xfa, 0x0f, 0x00, 0x00, 0x00};
   inline static const std::string expected_result_ = "This is a test\n";
+
  public:
   std::string GetCompressedString() {
     return std::string(reinterpret_cast<const char*>(compressed_str_bytes_),
@@ -70,7 +71,7 @@ TEST_F(ZlibTest, corrupted_data_test) {
   std::string corrupted_data = GetCompressedString();
   corrupted_data[15] = 0xFF;
   corrupted_data[16] = 0xFF;
-  
+
   auto result = px::zlib::Inflate(corrupted_data);
   EXPECT_FALSE(result.ok());
   EXPECT_EQ(result.status().code(), px::statuspb::INTERNAL);
@@ -81,11 +82,13 @@ TEST_F(ZlibTest, corrupted_data_test) {
 // Test handling of large compressed data
 TEST_F(ZlibTest, large_data_test) {
   // Create a large input string
-  std::string large_input(1024 * 1024, 'A'); // 1MB of 'A's
-  
+  std::string large_input(1024 * 1024, 'A');  // 1MB of 'A's
+
   // Compress it first
   z_stream zs = {};
-  ASSERT_EQ(deflateInit2(&zs, Z_DEFAULT_COMPRESSION, Z_DEFLATED, MAX_WBITS + 16, 8, Z_DEFAULT_STRATEGY), Z_OK);
+  ASSERT_EQ(
+      deflateInit2(&zs, Z_DEFAULT_COMPRESSION, Z_DEFLATED, MAX_WBITS + 16, 8, Z_DEFAULT_STRATEGY),
+      Z_OK);
 
   zs.next_in = reinterpret_cast<Bytef*>(const_cast<char*>(large_input.data()));
   zs.avail_in = large_input.size();
@@ -106,12 +109,13 @@ TEST_F(ZlibTest, large_data_test) {
   std::string truncated = compressed.substr(0, compressed.size() / 2);
   auto result = px::zlib::Inflate(truncated);
   EXPECT_TRUE(result.ok());
-  
+
   std::string decompressed = result.ValueOrDie();
   EXPECT_TRUE(decompressed.find("[PARTIAL DECOMPRESSION]") != std::string::npos);
-  EXPECT_EQ(decompressed.substr(decompressed.length() - std::string("[PARTIAL DECOMPRESSION] ").length()), 
-            "[PARTIAL DECOMPRESSION] ");
-  
+  EXPECT_EQ(
+      decompressed.substr(decompressed.length() - std::string("[PARTIAL DECOMPRESSION] ").length()),
+      "[PARTIAL DECOMPRESSION] ");
+
   std::cout << "\nLarge data decompression result (first 50 chars): '";
   if (decompressed.size() > 50) {
     std::cout << decompressed.substr(0, 50) << "...'" << std::endl;
@@ -126,12 +130,13 @@ TEST_F(ZlibTest, truncated_data_test) {
   std::string truncated_data = GetCompressedString().substr(0, 20);
   auto result = px::zlib::Inflate(truncated_data);
   EXPECT_TRUE(result.ok());
-  
+
   std::string decompressed = result.ValueOrDie();
   EXPECT_TRUE(decompressed.find("[PARTIAL DECOMPRESSION]") != std::string::npos);
-  EXPECT_EQ(decompressed.substr(decompressed.length() - std::string("[PARTIAL DECOMPRESSION] ").length()), 
-            "[PARTIAL DECOMPRESSION] ");
-  
+  EXPECT_EQ(
+      decompressed.substr(decompressed.length() - std::string("[PARTIAL DECOMPRESSION] ").length()),
+      "[PARTIAL DECOMPRESSION] ");
+
   std::cout << "\nTruncated data decompression result: '" << decompressed << "'" << std::endl;
 }
 

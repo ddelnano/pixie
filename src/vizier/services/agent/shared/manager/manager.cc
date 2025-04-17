@@ -303,33 +303,38 @@ Status Manager::PostRegisterHook(uint32_t asid) {
 
   if (FLAGS_stirling_memory_percent_to_trigger_restart > 0) {
     memory_watchdog_timer_ = dispatcher_->CreateTimer([this]() {
-      auto memory_current_s = md::FindSelfCGroupMemoryCurrent(px::system::Config::GetInstance().sysfs_path().string());
+      auto memory_current_s =
+          md::FindSelfCGroupMemoryCurrent(px::system::Config::GetInstance().sysfs_path().string());
       if (!memory_current_s.ok()) {
         LOG(ERROR) << "Failed to get memory current: " << memory_current_s.status().ToString();
         memory_watchdog_timer_->EnableTimer(std::chrono::milliseconds(100));
         return;
       }
       auto memory_current = memory_current_s.ConsumeValueOrDie();
-      
-      auto memory_max_s = md::FindSelfCGroupMemoryMax(px::system::Config::GetInstance().sysfs_path().string());
+
+      auto memory_max_s =
+          md::FindSelfCGroupMemoryMax(px::system::Config::GetInstance().sysfs_path().string());
       if (!memory_max_s.ok()) {
         LOG(ERROR) << "Failed to get memory max: " << memory_max_s.status().ToString();
-        memory_watchdog_timer_->EnableTimer(std::chrono::milliseconds(100)); 
+        memory_watchdog_timer_->EnableTimer(std::chrono::milliseconds(100));
         return;
       }
       auto memory_max = memory_max_s.ConsumeValueOrDie();
 
       auto percent_used = static_cast<double>(memory_current) / static_cast<double>(memory_max);
 
-      // TODO: This should use a difference calculation to ensure that the double math works properly
+      // TODO: This should use a difference calculation to ensure that the double math works
+      // properly
       if (percent_used > FLAGS_stirling_memory_percent_to_trigger_restart / 100.0) {
         LOG(INFO) << "Memory usage exceeded threshold. Performing graceful restart.";
-        
+
         auto s = Stop(std::chrono::milliseconds{500});
         if (!s.ok()) {
-          LOG(ERROR) << "Failed to gracefully stop agent manager during memory-triggered restart: " << s.ToString();
+          LOG(ERROR) << "Failed to gracefully stop agent manager during memory-triggered restart: "
+                     << s.ToString();
         } else {
-          LOG(INFO) << "Successfully stopped agent manager, exiting with code 100 for container restart";
+          LOG(INFO)
+              << "Successfully stopped agent manager, exiting with code 100 for container restart";
         }
 
         // Exit with special code that signals the container to restart us

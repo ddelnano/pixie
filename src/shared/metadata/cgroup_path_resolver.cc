@@ -75,11 +75,10 @@ StatusOr<std::vector<std::string>> CGroupBasePaths(std::string_view sysfs_path) 
 StatusOr<std::string> FindSelfCGroupProcs(std::string_view base_path) {
   const int pid = getpid();
   std::error_code ec;
-  
+
   try {
     for (const auto& entry : std::filesystem::recursive_directory_iterator(
              base_path, std::filesystem::directory_options::skip_permission_denied, ec)) {
-
       if (ec || !entry.exists(ec)) continue;
       if (entry.path().filename() != "cgroup.procs") continue;
 
@@ -91,7 +90,7 @@ StatusOr<std::string> FindSelfCGroupProcs(std::string_view base_path) {
         if (!absl::SimpleAtoi(absl::StripAsciiWhitespace(line), &file_pid)) continue;
         if (file_pid == pid) return entry.path().string();
       }
-             }
+    }
   } catch (const std::filesystem::filesystem_error& e) {
     LOG(WARNING) << "Filesystem error during cgroup discovery: " << e.what();
   }
