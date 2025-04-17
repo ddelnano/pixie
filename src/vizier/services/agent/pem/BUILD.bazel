@@ -17,7 +17,6 @@
 load("@io_bazel_rules_docker//cc:image.bzl", "cc_image")
 load("@io_bazel_rules_docker//container:container.bzl", "container_image")
 load("//bazel:pl_build_system.bzl", "pl_cc_binary", "pl_cc_library", "pl_cc_test")
-
 package(default_visibility = ["//src/vizier:__subpackages__"])
 
 pl_cc_library(
@@ -66,10 +65,18 @@ container_image(
     name = "pem_base_image",
     base = "//:pl_cc_base_image",
     layers = ["//src/stirling:bpf_layer"],
+    files = [
+        "@busybox//file:busybox",
+    ],
+    symlinks = {
+        "/bin/bash": "/busybox",
+        "/bin/sh": "/busybox",
+        "/bin/sleep": "/busybox",
+        "/bin/awk": "/busybox",
+        "/bin/date": "/busybox"
+    },
 )
 
-# TODO: Use this as a base image and add the shell script to detect the PEM's 100 exit code
-# to detect when to restart it.
 cc_image(
     name = "pem_image",
     base = ":pem_base_image",
@@ -79,3 +86,18 @@ cc_image(
         "//src/vizier:__subpackages__",
     ],
 )
+
+container_image(
+    name = "pem_with_script",
+    base = ":pem_base_image",
+    files = [
+        "//src/vizier/services/agent/pem:run_pem.sh",
+        ":pem",
+    ],
+    entrypoint = ["/run_pem.sh"],
+    visibility = [
+        "//k8s:__subpackages__",
+        "//src/vizier:__subpackages__",
+    ],
+)
+
