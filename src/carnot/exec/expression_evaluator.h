@@ -68,8 +68,9 @@ class ExpressionEvaluator {
    * @param output A pointer to the output Rowbatch. This function expects a valid output RowBatch.
    * @return Status of the evaluation.
    */
-  virtual Status Evaluate(ExecState* exec_state, const table_store::schema::RowBatch& input,
-                          table_store::schema::RowBatch* output) = 0;
+  template<typename T>
+  virtual Status Evaluate(ExecState* exec_state, const table_store::schema::RowBatch<T>& input,
+                          table_store::schema::RowBatch<T>* output) = 0;
 
   /**
    * Close should be called when this evaluator will no longer be used. Calling Evaluate or Open
@@ -94,7 +95,8 @@ enum class ScalarExpressionEvaluatorType : uint8_t {
 /**
  * Base class for all scalar expression evaluators.
  */
-class ScalarExpressionEvaluator : public ExpressionEvaluator {
+template<typename T>
+class ScalarExpressionEvaluator : public ExpressionEvaluator<T> {
  public:
   explicit ScalarExpressionEvaluator(plan::ConstScalarExpressionVector expressions,
                                      udf::FunctionContext* function_ctx)
@@ -110,17 +112,17 @@ class ScalarExpressionEvaluator : public ExpressionEvaluator {
       const plan::ConstScalarExpressionVector& expressions,
       const ScalarExpressionEvaluatorType& type, udf::FunctionContext* function_ctx);
 
-  Status Evaluate(ExecState* exec_state, const table_store::schema::RowBatch& input,
-                  table_store::schema::RowBatch* output) override;
+  Status Evaluate(ExecState* exec_state, const table_store::schema::RowBatch<T>& input,
+                  table_store::schema::RowBatch<T>* output) override;
   std::string DebugString() override;
 
  protected:
   // Function called for each individual expression in expressions_.
   // Implement in derived class.
   virtual Status EvaluateSingleExpression(ExecState* exec_state,
-                                          const table_store::schema::RowBatch& input,
+                                          const table_store::schema::RowBatch<T>& input,
                                           const plan::ScalarExpression& expr,
-                                          table_store::schema::RowBatch* output) = 0;
+                                          table_store::schema::RowBatch<T>* output) = 0;
   Status InitFuncsInExpression(ExecState* exec_state,
                                std::shared_ptr<const plan::ScalarExpression> expr);
   plan::ConstScalarExpressionVector expressions_;
@@ -132,7 +134,8 @@ class ScalarExpressionEvaluator : public ExpressionEvaluator {
  * A scalar expression evaluator thar uses native C++ vectors for intermediate state.
  * (The input is always assumed to be RowBatches with arrow::Arrays).
  */
-class VectorNativeScalarExpressionEvaluator : public ScalarExpressionEvaluator {
+template<typename T>
+class VectorNativeScalarExpressionEvaluator : public ScalarExpressionEvaluator<T> {
  public:
   explicit VectorNativeScalarExpressionEvaluator(
       const plan::ConstScalarExpressionVector& expressions, udf::FunctionContext* function_ctx)
@@ -142,13 +145,13 @@ class VectorNativeScalarExpressionEvaluator : public ScalarExpressionEvaluator {
   Status Close(ExecState* exec_state) override;
 
   StatusOr<types::SharedColumnWrapper> EvaluateSingleExpression(
-      ExecState* exec_state, const table_store::schema::RowBatch& input,
+      ExecState* exec_state, const table_store::schema::RowBatch<T>& input,
       const plan::ScalarExpression& expr);
 
  protected:
-  Status EvaluateSingleExpression(ExecState* exec_state, const table_store::schema::RowBatch& input,
+  Status EvaluateSingleExpression(ExecState* exec_state, const table_store::schema::RowBatch<T>& input,
                                   const plan::ScalarExpression& expr,
-                                  table_store::schema::RowBatch* output) override;
+                                  table_store::schema::RowBatch<T>* output) override;
 };
 
 /**
@@ -164,9 +167,9 @@ class ArrowNativeScalarExpressionEvaluator : public ScalarExpressionEvaluator {
   Status Close(ExecState* exec_state) override;
 
  protected:
-  Status EvaluateSingleExpression(ExecState* exec_state, const table_store::schema::RowBatch& input,
+  Status EvaluateSingleExpression(ExecState* exec_state, const table_store::schema::RowBatch<T>& input,
                                   const plan::ScalarExpression& expr,
-                                  table_store::schema::RowBatch* output) override;
+                                  table_store::schema::RowBatch<T>* output) override;
 };
 
 }  // namespace exec

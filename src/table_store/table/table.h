@@ -183,7 +183,7 @@ class Table : public NotCopyable {
     // `NextBatchReady()` and `GetNextRowBatch(...)`, and then the row batch after the expired one
     // is past the stopping condition. In this case `GetNextRowBatch(...)` will return an error.
     bool NextBatchReady();
-    StatusOr<std::unique_ptr<schema::RowBatch>> GetNextRowBatch(const std::vector<int64_t>& cols);
+    StatusOr<std::unique_ptr<schema::RowBatch<arrow::Array>>> GetNextRowBatch(const std::vector<int64_t>& cols);
     // In the case of StopType == Infinite, this function always returns false.
     bool Done();
     // Change the StopSpec of the cursor.
@@ -235,7 +235,7 @@ class Table : public NotCopyable {
    * @param cols a vector of column indices to get data for.
    * @return a unique ptr to a RowBatch with the requested data.
    */
-  StatusOr<std::unique_ptr<schema::RowBatch>> GetNextRowBatch(
+  StatusOr<std::unique_ptr<schema::RowBatch<arrow::Array>>> GetNextRowBatch(
       Cursor* cursor, const std::vector<int64_t>& cols) const;
 
   /**
@@ -272,7 +272,7 @@ class Table : public NotCopyable {
    * Writes a row batch to the table.
    * @param rb Rowbatch to write to the table.
    */
-  Status WriteRowBatch(const schema::RowBatch& rb);
+  Status WriteRowBatch(const schema::RowBatch<arrow::Array>& rb);
 
   /**
    * Transfers the given record batch (from Stirling) into the Table.

@@ -162,7 +162,7 @@ std::optional<internal::RowID> Table::Cursor::StopRowID() const {
   return stop_.stop_row_id;
 }
 
-StatusOr<std::unique_ptr<schema::RowBatch>> Table::Cursor::GetNextRowBatch(
+StatusOr<std::unique_ptr<schema::RowBatch<arrow::Array>>> Table::Cursor::GetNextRowBatch(
     const std::vector<int64_t>& cols) {
   return table_->GetNextRowBatch(this, cols);
 }
@@ -209,7 +209,7 @@ Status Table::ToProto(table_store::schemapb::Table* table_proto) const {
   return Status::OK();
 }
 
-StatusOr<std::unique_ptr<schema::RowBatch>> Table::GetNextRowBatch(
+StatusOr<std::unique_ptr<schema::RowBatch<arrow::Array>>> Table::GetNextRowBatch(
     Cursor* cursor, const std::vector<int64_t>& cols) const {
   DCHECK(!cursor->Done()) << "Calling GetNextRowBatch on an exhausted Cursor";
   absl::base_internal::SpinLockHolder cold_lock(&cold_lock_);
@@ -262,7 +262,7 @@ Status Table::ExpireRowBatches(int64_t row_batch_size) {
   return Status::OK();
 }
 
-Status Table::WriteRowBatch(const schema::RowBatch& rb) {
+Status Table::WriteRowBatch(const schema::RowBatch<arrow::Array>& rb) {
   // Don't write empty row batches.
   if (rb.num_columns() == 0 || rb.ColumnAt(0)->length() == 0) {
     return Status::OK();

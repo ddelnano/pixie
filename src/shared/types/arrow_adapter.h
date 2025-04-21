@@ -19,6 +19,7 @@
 #pragma once
 
 #include <arrow/array.h>
+#include <arrow/table.h>
 #include <arrow/memory_pool.h>
 
 #include <algorithm>

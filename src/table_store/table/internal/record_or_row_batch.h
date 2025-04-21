@@ -44,7 +44,7 @@ class RecordOrRowBatch {
  public:
   explicit RecordOrRowBatch(RecordBatchWithCache&& record_batch)
       : batch_(std::move(record_batch)) {}
-  explicit RecordOrRowBatch(const schema::RowBatch& row_batch) : batch_(row_batch) {}
+  explicit RecordOrRowBatch(const schema::RowBatch<arrow::Array>& row_batch) : batch_(row_batch) {}
 
   RecordOrRowBatch(RecordOrRowBatch&&) = default;
 
@@ -98,7 +98,7 @@ class RecordOrRowBatch {
    */
   Status AddBatchSliceToRowBatch(size_t row_start, size_t batch_size,
                                  const std::vector<int64_t>& cols,
-                                 schema::RowBatch* output_rb) const;
+                                 schema::RowBatch<arrow::Array>* output_rb) const;
 
   /**
    * UnsafeAppendColumnToBuilder appends a slice of a column of this record or row batch to the
@@ -126,7 +126,7 @@ class RecordOrRowBatch {
   std::vector<uint64_t> GetVariableSizedColumnRowBytes(size_t col_idx) const;
 
  private:
-  std::variant<RecordBatchWithCache, schema::RowBatch> batch_;
+  std::variant<RecordBatchWithCache, schema::RowBatch<arrow::Array>> batch_;
   int64_t row_offset_ = 0;
 };
 

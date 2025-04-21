@@ -90,12 +90,12 @@ class StoreWithRowTimeAccounting {
    * @return a unique_ptr to the RowBatch or nullptr if there are no more rows in this store that
    * match the parameters above. On error returns a Status.
    */
-  StatusOr<std::unique_ptr<schema::RowBatch>> GetNextRowBatch(
+  StatusOr<std::unique_ptr<schema::RowBatch<arrow::Array>>> GetNextRowBatch(
       RowID* last_read_row_id, BatchHints* hints, std::optional<RowID> stop_row_id,
       const std::vector<int64_t>& cols) const {
     auto start_row_id = *last_read_row_id + 1;
     if (batches_.empty() || start_row_id < FirstRowID() || start_row_id > LastRowID()) {
-      return std::unique_ptr<schema::RowBatch>(nullptr);
+      return std::unique_ptr<schema::RowBatch<arrow::Array>>(nullptr);
     }
     if (DCHECK_IS_ON() && stop_row_id.has_value()) {
       DCHECK_LT(start_row_id, stop_row_id.value());
@@ -125,7 +125,7 @@ class StoreWithRowTimeAccounting {
       col_types.push_back(rel_.col_types()[col_idx]);
     }
     auto output_rb =
-        std::make_unique<schema::RowBatch>(schema::RowDescriptor(col_types), batch_size);
+        std::make_unique<schema::RowBatch<arrow::Array>>(schema::RowDescriptor(col_types), batch_size);
     PX_RETURN_IF_ERROR(
         AddBatchSliceToRowBatch(batch, row_offset, batch_size, cols, output_rb.get()));
 
@@ -384,9 +384,10 @@ class StoreWithRowTimeAccounting {
     }
   }
 
+  template<typename T>
   Status AddBatchSliceToRowBatch(const TBatch& batch, size_t row_offset, size_t batch_size,
                                  const std::vector<int64_t>& cols,
-                                 schema::RowBatch* output_rb) const {
+                                 schema::RowBatch<T>* output_rb) const {
     if constexpr (std::is_same_v<TBatch, ColdBatch>) {
       for (auto col_idx : cols) {
         auto arr = batch[col_idx]->Slice(row_offset, batch_size);

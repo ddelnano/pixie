@@ -40,7 +40,9 @@ enum class ExecNodeType : int8_t {
 
 struct ExecNodeStats {
   explicit ExecNodeStats(bool collect_stats) : collect_exec_stats(collect_stats) {}
-  void AddOutputStats(const table_store::schema::RowBatch& rb) {
+
+  template<typename T>
+  void AddOutputStats(const table_store::schema::RowBatch<T>& rb) {
     if (!collect_exec_stats) {
       return;
     }
@@ -49,7 +51,8 @@ struct ExecNodeStats {
     rows_output += rb.num_rows();
   }
 
-  void AddInputStats(const table_store::schema::RowBatch& rb) {
+  template<typename T>
+  void AddInputStats(const table_store::schema::RowBatch<T>& rb) {
     if (!collect_exec_stats) {
       return;
     }
@@ -130,6 +133,7 @@ struct ExecNodeStats {
 /**
  * This is the base class for the execution nodes in Carnot.
  */
+template<typename T>
 class ExecNode {
  public:
   ExecNode() = delete;
@@ -210,7 +214,7 @@ class ExecNode {
    * @param rb The input row batch.
    * @return The Status of consumption.
    */
-  Status ConsumeNext(ExecState* exec_state, const table_store::schema::RowBatch& rb,
+  Status ConsumeNext(ExecState* exec_state, const table_store::schema::RowBatch<T>& rb,
                      size_t parent_index) {
     DCHECK(is_initialized_);
     DCHECK(type() == ExecNodeType::kSinkNode || type() == ExecNodeType::kProcessingNode);
@@ -273,7 +277,7 @@ class ExecNode {
    */
   std::vector<ExecNode*> children() { return children_; }
 
-  ExecNodeStats* stats() const { return stats_.get(); }
+  ExecNodeStats<T>* stats() const { return stats_.get(); }
 
  protected:
   /**
@@ -282,7 +286,7 @@ class ExecNode {
    * @param rb The row batch to send.
    * @return Status of children execution.
    */
-  Status SendRowBatchToChildren(ExecState* exec_state, const table_store::schema::RowBatch& rb) {
+  Status SendRowBatchToChildren(ExecState* exec_state, const table_store::schema::RowBatch<T>& rb) {
     stats_->ResumeChildTimer();
     for (size_t i = 0; i < children_.size(); ++i) {
       PX_RETURN_IF_ERROR(children_[i]->ConsumeNext(exec_state, rb, parent_ids_for_children_[i]));
@@ -310,7 +314,7 @@ class ExecNode {
     return error::Unimplemented("Implement in derived class (if source)");
   }
 
-  virtual Status ConsumeNextImpl(ExecState*, const table_store::schema::RowBatch&, size_t) {
+  virtual Status ConsumeNextImpl(ExecState*, const table_store::schema::RowBatch<T>&, size_t) {
     return error::Unimplemented("Implement in derived class (if sink or processing)");
   }
   bool is_closed() { return is_closed_; }
@@ -362,7 +366,7 @@ class SourceNode : public ExecNode {
   Status SendEndOfStream(ExecState* exec_state) {
     // TODO(philkuz) this part is not tracked w/ the timer. Need to include this in NVI or cut
     // losses.
-    PX_ASSIGN_OR_RETURN(auto rb, table_store::schema::RowBatch::WithZeroRows(
+    PX_ASSIGN_OR_RETURN(auto rb, table_store::schema::RowBatch<arrow::Array>::WithZeroRows(
                                      *output_descriptor_, /*eow*/ true, /*eos*/ true));
     return SendRowBatchToChildren(exec_state, *rb);
   }

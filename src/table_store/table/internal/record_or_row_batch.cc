@@ -32,7 +32,7 @@ size_t RecordOrRowBatch::Length() const {
                           DCHECK(!record_batch.empty());
                           return record_batch[0]->Size() - row_offset_;
                         },
-                        [this](const schema::RowBatch& row_batch) {
+                        [this](const schema::RowBatch<arrow::Array>& row_batch) {
                           return static_cast<size_t>(row_batch.num_rows()) - row_offset_;
                         },
                     },
@@ -51,7 +51,7 @@ int64_t RecordOrRowBatch::FindTimeFirstGreaterThanOrEqual(int64_t time_col_idx, 
             }
             return std::distance(iterable.begin(), it) - row_offset_;
           },
-          [this, time, time_col_idx](const schema::RowBatch& row_batch) {
+          [this, time, time_col_idx](const schema::RowBatch<arrow::Array>& row_batch) {
             auto length = row_batch.num_rows() - row_offset_;
             auto arr = row_batch.ColumnAt(time_col_idx)->Slice(row_offset_, length);
             return types::SearchArrowArrayGreaterThanOrEqual<types::DataType::TIME64NS>(arr.get(),
@@ -73,7 +73,7 @@ int64_t RecordOrRowBatch::FindTimeFirstGreaterThan(int64_t time_col_idx, Time ti
             }
             return std::distance(iterable.begin(), it) - row_offset_;
           },
-          [this, time, time_col_idx](const schema::RowBatch& row_batch) -> int64_t {
+          [this, time, time_col_idx](const schema::RowBatch<arrow::Array>& row_batch) -> int64_t {
             auto length = row_batch.num_rows() - row_offset_;
             auto arr = row_batch.ColumnAt(time_col_idx)->Slice(row_offset_, length);
             if (time >=
@@ -95,7 +95,7 @@ Time RecordOrRowBatch::GetTimeValue(int64_t time_col_idx, int64_t row_idx) const
                           auto col = (*record_batch_w_cache.record_batch)[time_col_idx];
                           return col->template Get<types::Time64NSValue>(row_idx).val;
                         },
-                        [time_col_idx, row_idx](const schema::RowBatch& row_batch) {
+                        [time_col_idx, row_idx](const schema::RowBatch<arrow::Array>& row_batch) {
                           return types::GetValueFromArrowArray<types::DataType::TIME64NS>(
                               row_batch.ColumnAt(time_col_idx).get(), row_idx);
                         },
@@ -107,7 +107,7 @@ void RecordOrRowBatch::RemovePrefix(size_t num_rows) { row_offset_ += num_rows; 
 
 Status RecordOrRowBatch::AddBatchSliceToRowBatch(size_t row_start, size_t batch_size,
                                                  const std::vector<int64_t>& cols,
-                                                 schema::RowBatch* output_rb) const {
+                                                 schema::RowBatch<arrow::Array>* output_rb) const {
   row_start += row_offset_;
   return std::visit(
       overloaded{
@@ -127,7 +127,7 @@ Status RecordOrRowBatch::AddBatchSliceToRowBatch(size_t row_start, size_t batch_
             }
             return Status::OK();
           },
-          [row_start, batch_size, cols, output_rb](const schema::RowBatch& row_batch) {
+          [row_start, batch_size, cols, output_rb](const schema::RowBatch<arrow::Array>& row_batch) {
             for (auto col_idx : cols) {
               auto arr = row_batch.ColumnAt(col_idx)->Slice(row_start, batch_size);
               PX_RETURN_IF_ERROR(output_rb->AddColumn(arr));
@@ -155,7 +155,7 @@ void RecordOrRowBatch::UnsafeAppendColumnToBuilder(types::TypeErasedArrowBuilder
             PX_SWITCH_FOREACH_DATATYPE(data_type, TYPE_CASE);
 #undef TYPE_CASE
           },
-          [builder, data_type, col_idx, start_row, end_row](const schema::RowBatch& row_batch) {
+          [builder, data_type, col_idx, start_row, end_row](const schema::RowBatch<arrow::Array>& row_batch) {
 #define TYPE_CASE(_dt_)                                                               \
   auto iterable = types::ArrowArrayIterator<_dt_>(row_batch.ColumnAt(col_idx).get()); \
   auto typed_builder = types::GetTypedArrowBuilder<_dt_>(builder);                    \
@@ -180,7 +180,7 @@ std::vector<uint64_t> RecordOrRowBatch::GetVariableSizedColumnRowBytes(size_t co
                      rows_bytes.push_back(col_wrapper->GetView(i).size());
                    }
                  },
-                 [this, &rows_bytes, col_idx](const schema::RowBatch& row_batch) {
+                 [this, &rows_bytes, col_idx](const schema::RowBatch<arrow::Array>& row_batch) {
                    auto* arrow_arr = row_batch.ColumnAt(col_idx).get();
                    for (int64_t i = row_offset_; i < arrow_arr->length(); ++i) {
                      rows_bytes.push_back(types::GetStringViewFromArrowArray(arrow_arr, i).size());
