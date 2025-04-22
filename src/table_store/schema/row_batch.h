@@ -75,6 +75,7 @@ class RowBatch {
    * @return StatusOr<std::unique_ptr<RowBatch>>
    */
   StatusOr<std::unique_ptr<RowBatch>> Slice(int64_t offset, int64_t length) const;
+  RowBatch UnsafeSlice(int64_t offset, int64_t length) const;
 
   /**
    * Adds the given column to the row batch, given that it correctly fits the schema.

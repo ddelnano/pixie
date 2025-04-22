@@ -265,6 +265,15 @@ StatusOr<std::unique_ptr<RowBatch>> RowBatch::Slice(int64_t offset, int64_t leng
   return output_rb;
 }
 
+RowBatch RowBatch::UnsafeSlice(int64_t offset, int64_t length) const {
+  auto output_rb = RowBatch(desc(), length);
+  for (int64_t input_col_idx = 0; input_col_idx < num_columns(); ++input_col_idx) {
+    auto col = ColumnAt(input_col_idx);
+    PX_UNUSED(output_rb.AddColumn(col->Slice(offset, length)));
+  }
+  return output_rb;
+}
+
 }  // namespace schema
 }  // namespace table_store
 }  // namespace px

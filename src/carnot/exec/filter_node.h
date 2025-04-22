@@ -32,6 +32,8 @@
 #include "src/common/base/status.h"
 #include "src/table_store/table_store.h"
 
+DECLARE_bool(use_zero_copy_filter);
+
 namespace px {
 namespace carnot {
 namespace exec {
