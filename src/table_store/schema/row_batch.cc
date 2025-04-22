@@ -34,7 +34,7 @@ namespace schema {
 
 using types::DataType;
 
-std::shared_ptr<arrow::Array> RowBatch::ColumnAt(int64_t i) const { return columns_[i]; }
+std::shared_ptr<arrow::ChunkedArray> RowBatch::ColumnAt(int64_t i) const { return columns_[i]; }
 
 Status RowBatch::AddColumn(const std::shared_ptr<arrow::Array>& col) {
   if (columns_.size() >= desc_.size()) {
@@ -43,7 +43,22 @@ Status RowBatch::AddColumn(const std::shared_ptr<arrow::Array>& col) {
   if (col->length() != num_rows_) {
     return error::InvalidArgument("Schema only allows $0 rows, got $1", num_rows_, col->length());
   }
-  if (col->type_id() != types::ToArrowType(desc_.type(columns_.size()))) {
+  if (col->type()->id() != types::ToArrowType(desc_.type(columns_.size()))) {
+    return error::InvalidArgument("Column[$0] was given incorrect type", columns_.size());
+  }
+
+  columns_.emplace_back(col);
+  return Status::OK();
+}
+
+Status RowBatch::AddColumn(const std::shared_ptr<arrow::ChunkedArray>& col) {
+  if (columns_.size() >= desc_.size()) {
+    return error::InvalidArgument("Schema only allows $0 columns", desc_.size());
+  }
+  if (col->length() != num_rows_) {
+    return error::InvalidArgument("Schema only allows $0 rows, got $1", num_rows_, col->length());
+  }
+  if (col->type()->id() != types::ToArrowType(desc_.type(columns_.size()))) {
     return error::InvalidArgument("Column[$0] was given incorrect type", columns_.size());
   }
 
@@ -59,7 +74,9 @@ std::string RowBatch::DebugString() const {
   }
   std::string debug_string = absl::StrFormat("RowBatch(eow=%d, eos=%d):\n", eow_, eos_);
   for (const auto& col : columns_) {
-    debug_string += absl::StrFormat("  %s\n", col->ToString());
+    for (auto& chunk : col->chunks()) {
+      debug_string += absl::StrFormat("  %s\n", chunk->ToString());
+    }
   }
   return debug_string;
 }
@@ -72,7 +89,7 @@ int64_t RowBatch::NumBytes() const {
   int64_t total_bytes = 0;
   for (auto col : columns_) {
 #define TYPE_CASE(_dt_) total_bytes += types::GetArrowArrayBytes<_dt_>(col.get());
-    PX_SWITCH_FOREACH_DATATYPE(types::ArrowToDataType(col->type_id()), TYPE_CASE);
+    PX_SWITCH_FOREACH_DATATYPE(types::ArrowToDataType(col->type()->id()), TYPE_CASE);
 #undef TYPE_CASE
   }
   return total_bytes;
@@ -120,7 +137,7 @@ constexpr const auto& GetPBDataColumn(const table_store::schemapb::Column& data_
 }
 
 template <DataType T>
-void CopyIntoOutputPB(table_store::schemapb::Column* output_column, arrow::Array* input_column) {
+void CopyIntoOutputPB(table_store::schemapb::Column* output_column, arrow::ChunkedArray* input_column) {
   CHECK_NOTNULL(input_column);
   CHECK_NOTNULL(output_column);
 
@@ -139,7 +156,7 @@ void CopyIntoOutputPB(table_store::schemapb::Column* output_column, arrow::Array
 }
 
 template <DataType T>
-Status CopyFromInputPB(std::shared_ptr<arrow::Array>* output_column,
+Status CopyFromInputPB(std::shared_ptr<arrow::ChunkedArray>* output_column,
                        const table_store::schemapb::Column& input_column) {
   CHECK_NOTNULL(output_column);
 

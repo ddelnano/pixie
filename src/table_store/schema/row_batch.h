@@ -19,6 +19,7 @@
 #pragma once
 
 #include <arrow/array.h>
+#include <arrow/table.h>
 #include <arrow/type.h>
 #include <map>
 #include <memory>
@@ -80,13 +81,14 @@ class RowBatch {
    * Adds the given column to the row batch, given that it correctly fits the schema.
    * param col ptr to the arrow array that should be added to the row batch.
    */
+  Status AddColumn(const std::shared_ptr<arrow::ChunkedArray>& col);
   Status AddColumn(const std::shared_ptr<arrow::Array>& col);
 
   /**
    * @ param i the index of the column to be accessed.
    * @ returns the Arrow array for the column at the given index.
    */
-  std::shared_ptr<arrow::Array> ColumnAt(int64_t i) const;
+  std::shared_ptr<arrow::ChunkedArray> ColumnAt(int64_t i) const;
 
   /**
    * @ param i the index of the column to check.
@@ -116,7 +118,7 @@ class RowBatch {
   const RowDescriptor& desc() const { return desc_; }
 
   std::string DebugString() const;
-  std::vector<std::shared_ptr<arrow::Array>> columns() const { return columns_; }
+  std::vector<std::shared_ptr<arrow::ChunkedArray>> columns() const { return columns_; }
 
   int64_t NumBytes() const;
 
@@ -125,7 +127,7 @@ class RowBatch {
   int64_t num_rows_;
   bool eow_ = false;
   bool eos_ = false;
-  std::vector<std::shared_ptr<arrow::Array>> columns_;
+  std::vector<std::shared_ptr<arrow::ChunkedArray>> columns_;
 };
 
 // Append a scalar value to an arrow::Array.

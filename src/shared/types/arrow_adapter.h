@@ -19,6 +19,7 @@
 #pragma once
 
 #include <arrow/array.h>
+#include <arrow/table.h>
 #include <arrow/memory_pool.h>
 
 #include <algorithm>
@@ -141,6 +142,16 @@ constexpr auto GetValueFromArrowArray(const arrow::Array* arg, int64_t idx) {
   return GetValue(static_cast<const arrow_array_type*>(arg), idx);
 }
 
+template <types::DataType TExecArgType>
+constexpr auto GetValueFromArrowArray(const arrow::ChunkedArray* arg, int64_t idx) {
+  // A sample transformation (for TExecArgType = types::DataType::INT64) is:
+  // return GetValue(static_cast<arrow::Int64Array*>(arg), idx);
+  auto arr = arg->Slice(idx, 1).get();
+  DCHECK(arr->num_chunks() == 1);
+  const arrow::Array* arr_ptr = arr->chunks()[0].get();
+  return GetValueFromArrowArray<TExecArgType>(arr_ptr, idx);
+}
+
 inline std::string_view GetStringViewFromArrowArray(const arrow::Array* arr, int64_t idx) {
   DCHECK(arr->type_id() == arrow::Type::STRING);
   auto arrow_string_view = static_cast<const arrow::StringArray*>(arr)->GetView(idx);
@@ -149,6 +160,11 @@ inline std::string_view GetStringViewFromArrowArray(const arrow::Array* arr, int
 
 template <types::DataType TDataType>
 inline int64_t GetArrowArrayBytes(const arrow::Array* arr) {
+  return arr->length() * types::ArrowTypeToBytes(types::ToArrowType(TDataType));
+}
+
+template <types::DataType TDataType>
+inline int64_t GetArrowArrayBytes(const arrow::ChunkedArray* arr) {
   return arr->length() * types::ArrowTypeToBytes(types::ToArrowType(TDataType));
 }
 
@@ -173,9 +189,9 @@ class ArrowArrayIterator
  public:
   ArrowArrayIterator();
 
-  explicit ArrowArrayIterator(arrow::Array* array) : array_(array) {}
+  explicit ArrowArrayIterator(arrow::ChunkedArray* array) : array_(array) {}
 
-  ArrowArrayIterator(arrow::Array* array, int64_t idx) : array_(array), curr_idx_(idx) {}
+  ArrowArrayIterator(arrow::ChunkedArray* array, int64_t idx) : array_(array), curr_idx_(idx) {}
 
   bool operator==(const ArrowArrayIterator<T>& iterator) const {
     return this->array_ == iterator.array_ && this->curr_idx_ == iterator.curr_idx_;
@@ -223,7 +239,7 @@ class ArrowArrayIterator
   }
 
  private:
-  arrow::Array* array_;
+  arrow::ChunkedArray* array_;
   int64_t curr_idx_ = 0;
 };
 

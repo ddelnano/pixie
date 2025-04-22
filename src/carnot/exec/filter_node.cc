@@ -19,7 +19,9 @@
 #include "src/carnot/exec/filter_node.h"
 
 #include <arrow/array.h>
+#include <arrow/api.h>
 #include <arrow/array/builder_binary.h>
+#include <arrow/array/concatenate.h>
 #include <arrow/memory_pool.h>
 #include <arrow/status.h>
 #include <ostream>
@@ -76,56 +78,50 @@ Status FilterNode::CloseImpl(ExecState* exec_state) {
 }
 
 template <types::DataType T>
-Status PredicateCopyValues(const types::BoolValueColumnWrapper& pred, const arrow::Array* input_col,
+Status PredicateCopyValues(const types::BoolValueColumnWrapper& pred, std::shared_ptr<arrow::Array> input_col,
                            RowBatch* output_rb) {
   DCHECK_EQ(pred.Size(), static_cast<size_t>(input_col->length()));
-  size_t num_output_records = output_rb->num_rows();
+  std::vector<std::shared_ptr<arrow::Array>> chunks;
   size_t num_input_records = input_col->length();
-  auto output_col_builder_generic = MakeArrowBuilder(T, arrow::default_memory_pool());
-  auto* output_col_builder = static_cast<typename types::DataTypeTraits<T>::arrow_builder_type*>(
-      output_col_builder_generic.get());
-  PX_RETURN_IF_ERROR(output_col_builder->Reserve(num_output_records));
+  int64_t segment_start = -1;
   for (size_t idx = 0; idx < num_input_records; ++idx) {
-    if (udf::UnWrap(pred[idx])) {
-      output_col_builder->UnsafeAppend(types::GetValueFromArrowArray<T>(input_col, idx));
-    }
-  }
-  std::shared_ptr<arrow::Array> output_array;
-  PX_RETURN_IF_ERROR(output_col_builder->Finish(&output_array));
-  PX_RETURN_IF_ERROR(output_rb->AddColumn(output_array));
-  return Status::OK();
-}
-
-template <>
-Status PredicateCopyValues<types::STRING>(const types::BoolValueColumnWrapper& pred,
-                                          const arrow::Array* input_col, RowBatch* output_rb) {
-  DCHECK_EQ(pred.Size(), static_cast<size_t>(input_col->length()));
-  size_t num_output_records = output_rb->num_rows();
-  size_t num_input_records = input_col->length();
-  size_t reserved =
-      100;  // This can be an arbritrary number, since we do exponential doubling below.
-  size_t total_size = 0;
-
-  auto output_col_builder_generic = MakeArrowBuilder(types::STRING, arrow::default_memory_pool());
-  auto* output_col_builder = static_cast<types::DataTypeTraits<types::STRING>::arrow_builder_type*>(
-      output_col_builder_generic.get());
-
-  PX_RETURN_IF_ERROR(output_col_builder->Reserve(num_output_records));
-  PX_RETURN_IF_ERROR(output_col_builder->ReserveData(reserved));
-  for (size_t idx = 0; idx < num_input_records; ++idx) {
-    if (udf::UnWrap(pred[idx])) {
-      auto res = types::GetValueFromArrowArray<types::STRING>(input_col, idx);
-      total_size += res.size();
-      while (total_size >= reserved) {
-        reserved *= 2;
+    bool passed_pred = udf::UnWrap(pred[idx]);
+    if (passed_pred) {
+      if (segment_start == -1) {
+        segment_start = idx;
       }
-      PX_RETURN_IF_ERROR(output_col_builder->ReserveData(reserved));
-      output_col_builder->UnsafeAppend(std::move(res));
+    } else {
+      if (segment_start != -1) {
+        auto sliced_arr = input_col->Slice(segment_start, idx - segment_start);
+        chunks.push_back(sliced_arr);
+        segment_start = -1;
+      }
     }
   }
-  std::shared_ptr<arrow::Array> output_array;
-  PX_RETURN_IF_ERROR(output_col_builder->Finish(&output_array));
-  PX_RETURN_IF_ERROR(output_rb->AddColumn(output_array));
+  auto mem_pool = arrow::default_memory_pool();
+  auto logging_mem_pool = std::make_unique<arrow::LoggingMemoryPool>(mem_pool);
+  PX_UNUSED(logging_mem_pool);
+  auto starting_bytes = mem_pool->bytes_allocated();
+  if (chunks.empty() && segment_start != -1) {
+    // We have a single segment that doesn't transition to false.
+    auto sliced_arr = input_col->Slice(segment_start, num_input_records - segment_start);
+    chunks.push_back(sliced_arr);
+  } else if (chunks.empty()) {
+    std::shared_ptr<arrow::Array> empty_arr;
+    auto output_col_builder_generic = MakeArrowBuilder(T, mem_pool);
+    PX_RETURN_IF_ERROR(output_col_builder_generic->Reserve(output_rb->num_rows()));
+    PX_RETURN_IF_ERROR(output_col_builder_generic->Finish(&empty_arr));
+    PX_RETURN_IF_ERROR(output_rb->AddColumn(empty_arr));
+    LOG(INFO) << "Allocated " << mem_pool->bytes_allocated() - starting_bytes << " bytes";
+    return Status::OK();
+  }
+  std::shared_ptr<arrow::ChunkedArray> combined_arr;
+  auto status = arrow::Concatenate(chunks, mem_pool, &combined_arr);
+  LOG(INFO) << "Allocated " << mem_pool->bytes_allocated() - starting_bytes << " bytes";
+  if (!status.ok()) {
+    return error::Internal("Failed to concatenate arrays: $0", status.message());
+  }
+  PX_RETURN_IF_ERROR(output_rb->AddColumn(combined_arr));
   return Status::OK();
 }
 
@@ -159,7 +155,7 @@ Status FilterNode::ConsumeNextImpl(ExecState* exec_state, const RowBatch& rb, si
     auto input_col = rb.ColumnAt(input_col_idx);
     auto col_type = output_descriptor_->type(output_col_idx);
 #define TYPE_CASE(_dt_) \
-  PX_RETURN_IF_ERROR(PredicateCopyValues<_dt_>(pred_col_wrapper, input_col.get(), &output_rb));
+  PX_RETURN_IF_ERROR(PredicateCopyValues<_dt_>(pred_col_wrapper, input_col, &output_rb));
     PX_SWITCH_FOREACH_DATATYPE(col_type, TYPE_CASE);
 #undef TYPE_CASE
   }
