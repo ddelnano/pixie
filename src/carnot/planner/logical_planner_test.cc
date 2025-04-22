@@ -404,206 +404,6 @@ TEST_F(LogicalPlannerTest, PlanWithExecFuncs) {
   EXPECT_OK(plan->ToProto());
 }
 
-constexpr char kBPFTraceProgramMaxKernel[] = R"bpftrace(
-kprobe:tcp_drop
-{
-  ...
-}
-)bpftrace";
-
-constexpr char kBPFTraceProgramMinKernel[] = R"bpftrace(
-tracepoint:skb:kfree_skb
-{
-  ...
-}
-)bpftrace";
-
-constexpr char kTwoTraceProgramsPxl[] = R"pxl(
-import pxtrace
-import px
-
-before_518_trace_program = pxtrace.TraceProgram(
-  program="""$0""",
-  max_kernel='5.18',
-)
-
-after_519_trace_program = pxtrace.TraceProgram(
-  program="""$1""",
-  min_kernel='5.19',
-)
-
-table_name = 'tcp_drop_table'
-pxtrace.UpsertTracepoint('tcp_drop_tracer',
-                          table_name,
-                          [before_518_trace_program, after_519_trace_program],
-                          pxtrace.kprobe(),
-                          '10m')
-)pxl";
-
-constexpr char kBPFTwoTraceProgramsPb[] = R"proto(
-name: "tcp_drop_tracer"
-ttl {
-  seconds: 600
-}
-programs {
-  table_name: "tcp_drop_table"
-  bpftrace {
-    program: "\nkprobe:tcp_drop\n{\n  ...\n}\n"
-  }
-  selectors {
-    selector_type: MAX_KERNEL
-    value: "5.18"
-  }
-}
-programs {
-  table_name: "tcp_drop_table"
-  bpftrace {
-    program: "\ntracepoint:skb:kfree_skb\n{\n  ...\n}\n"
-  }
-  selectors {
-    selector_type: MIN_KERNEL
-    value: "5.19"
-  }
-}
-)proto";
-
-TEST_F(LogicalPlannerTest, CompileTwoTracePrograms) {
-  auto planner = LogicalPlanner::Create(info_).ConsumeValueOrDie();
-  plannerpb::CompileMutationsRequest req;
-  req.set_query_str(
-      absl::Substitute(kTwoTraceProgramsPxl, kBPFTraceProgramMaxKernel, kBPFTraceProgramMinKernel));
-  *req.mutable_logical_planner_state() =
-      testutils::CreateTwoPEMsOneKelvinPlannerState(testutils::kHttpEventsSchema);
-  auto trace_ir_or_s = planner->CompileTrace(req);
-  ASSERT_OK(trace_ir_or_s);
-  auto trace_ir = trace_ir_or_s.ConsumeValueOrDie();
-  plannerpb::CompileMutationsResponse resp;
-  ASSERT_OK(trace_ir->ToProto(&resp));
-  ASSERT_EQ(resp.mutations_size(), 1);
-  EXPECT_THAT(resp.mutations()[0].trace(), EqualsProto(kBPFTwoTraceProgramsPb));
-}
-
-constexpr char kSingleProbePxl[] = R"pxl(
-import pxtrace
-import px
-
-@pxtrace.probe("MyFunc")
-def probe_func():
-    id = pxtrace.ArgExpr('id')
-    return [{'id': id},
-            {'err': pxtrace.RetExpr('$0.a')},
-            {'latency': pxtrace.FunctionLatency()}]
-
-pxtrace.UpsertTracepoint('http_return',
-                         'http_return_table',
-                         probe_func,
-                         px.uint128("123e4567-e89b-12d3-a456-426655440000"),
-                         "5m")
-)pxl";
-
-constexpr char kSingleProbeProgramPb[] = R"proto(
-name: "http_return"
-ttl {
-  seconds: 300
-}
-deployment_spec {
-  upid {
-    asid: 306070887 pid: 3902477011 ts_ns: 11841725277501915136
-  }
-}
-programs {
-  table_name: "http_return_table"
-  spec {
-    outputs {
-      name: "http_return_table"
-      fields: "id"
-      fields: "err"
-      fields: "latency"
-    }
-    probe {
-      name: "http_return"
-      tracepoint {
-        symbol: "MyFunc"
-      }
-      args {
-        id: "arg0"
-        expr: "id"
-      }
-      ret_vals {
-        id: "ret0"
-        expr: "$0.a"
-      }
-      function_latency {
-        id: "lat0"
-      }
-      output_actions {
-        output_name: "http_return_table"
-        variable_names: "arg0"
-        variable_names: "ret0"
-        variable_names: "lat0"
-      }
-    }
-  }
-}
-)proto";
-
-TEST_F(LogicalPlannerTest, CompileTrace) {
-  auto planner = LogicalPlanner::Create(info_).ConsumeValueOrDie();
-  plannerpb::CompileMutationsRequest req;
-  req.set_query_str(kSingleProbePxl);
-  *req.mutable_logical_planner_state() =
-      testutils::CreateTwoPEMsOneKelvinPlannerState(testutils::kHttpEventsSchema);
-  auto trace_ir_or_s = planner->CompileTrace(req);
-  ASSERT_OK(trace_ir_or_s);
-  auto trace_ir = trace_ir_or_s.ConsumeValueOrDie();
-  plannerpb::CompileMutationsResponse resp;
-  ASSERT_OK(trace_ir->ToProto(&resp));
-  ASSERT_EQ(resp.mutations_size(), 1);
-  EXPECT_THAT(resp.mutations()[0].trace(), EqualsProto(kSingleProbeProgramPb));
-}
-
-constexpr char kSingleProbeInFuncPxl[] = R"pxl(
-import pxtrace
-import px
-
-@pxtrace.probe("MyFunc")
-def probe_func():
-    id = pxtrace.ArgExpr('id')
-    return [{'id': id},
-            {'err': pxtrace.RetExpr('$0.a')},
-            {'latency': pxtrace.FunctionLatency()}]
-
-def probe_table(upid: str):
-  pxtrace.UpsertTracepoint('http_return',
-                           'http_return_table',
-                           probe_func,
-                           px.uint128(upid),
-                           '5m')
-  return px.DataFrame('http_return_table')
-
-)pxl";
-
-TEST_F(LogicalPlannerTest, CompileTraceWithExecFuncs) {
-  auto planner = LogicalPlanner::Create(info_).ConsumeValueOrDie();
-  plannerpb::CompileMutationsRequest req;
-  req.set_query_str(kSingleProbeInFuncPxl);
-  auto func_to_execute = req.add_exec_funcs();
-  func_to_execute->set_func_name("probe_table");
-  func_to_execute->set_output_table_prefix("output");
-  auto duration = func_to_execute->add_arg_values();
-  duration->set_name("upid");
-  duration->set_value("123e4567-e89b-12d3-a456-426655440000");
-  *req.mutable_logical_planner_state() =
-      testutils::CreateTwoPEMsOneKelvinPlannerState(testutils::kHttpEventsSchema);
-
-  auto trace_ir_or_s = planner->CompileTrace(req);
-  ASSERT_OK(trace_ir_or_s);
-  auto trace_ir = trace_ir_or_s.ConsumeValueOrDie();
-  plannerpb::CompileMutationsResponse resp;
-  ASSERT_OK(trace_ir->ToProto(&resp));
-  ASSERT_EQ(resp.mutations_size(), 1);
-  EXPECT_THAT(resp.mutations()[0].trace(), EqualsProto(kSingleProbeProgramPb));
-}
 constexpr char kBrokenFunc1234[] = R"pxl(
 ''' HTTP Data Tracer
 This script traces all HTTP/HTTP2 data on the cluster for a specified amount of time.
@@ -653,53 +453,53 @@ TEST_F(LogicalPlannerTest, pem_only_limit) {
   EXPECT_OK(plan->ToProto());
 }
 
-constexpr char kLimitFailing[] = R"pxl(
-import pxtrace
-import px
+/* constexpr char kLimitFailing[] = R"pxl( */
+/* import pxtrace */
+/* import px */
 
 
-# func Sum(l, r pb.Money) (pb.Money, error)
-@pxtrace.probe('github.com/GoogleCloudPlatform/microservices-demo/src/checkoutservice/money.Sum')
-def probe_func():
-    return [{'l': pxtrace.ArgExpr('l')},
-            {'r': pxtrace.ArgExpr('r')},
-            {'result': pxtrace.RetExpr('$0')},
-            {'error': pxtrace.RetExpr('$1')},
-            {'latency': pxtrace.FunctionLatency()}]
+/* # func Sum(l, r pb.Money) (pb.Money, error) */
+/* @pxtrace.probe('github.com/GoogleCloudPlatform/microservices-demo/src/checkoutservice/money.Sum') */
+/* def probe_func(): */
+/*     return [{'l': pxtrace.ArgExpr('l')}, */
+/*             {'r': pxtrace.ArgExpr('r')}, */
+/*             {'result': pxtrace.RetExpr('$0')}, */
+/*             {'error': pxtrace.RetExpr('$1')}, */
+/*             {'latency': pxtrace.FunctionLatency()}] */
 
 
-table_name = 'checkout_table1'
-trace_name = 'checkout_probe1'
+/* table_name = 'checkout_table1' */
+/* trace_name = 'checkout_probe1' */
 
-# Change to the Pod you want to trace.
-pod_name = 'online-boutique/checkoutservice'
+/* # Change to the Pod you want to trace. */
+/* pod_name = 'online-boutique/checkoutservice' */
 
-pxtrace.UpsertTracepoint(trace_name, table_name,
-                         probe_func,
-                         pxtrace.PodProcess(pod_name),
-                         ttl='10m')
+/* pxtrace.UpsertTracepoint(trace_name, table_name, */
+/*                          probe_func, */
+/*                          pxtrace.PodProcess(pod_name), */
+/*                          ttl='10m') */
 
-df = px.DataFrame(table_name)
-# nil interface have both 'tab' and 'data' being 0, which means the function finishes successfully.
-df_success = df[px.pluck(df.error, 'data') == '0']
-df_success.error = 'nil'
-px.display(df_success)
+/* df = px.DataFrame(table_name) */
+/* # nil interface have both 'tab' and 'data' being 0, which means the function finishes successfully. */
+/* df_success = df[px.pluck(df.error, 'data') == '0'] */
+/* df_success.error = 'nil' */
+/* px.display(df_success) */
 
-df_failed = df[px.pluck(df.error, 'data') != '0']
-df_failed.error = px.pluck_int64(df.error, 'code')
+/* df_failed = df[px.pluck(df.error, 'data') != '0'] */
+/* df_failed.error = px.pluck_int64(df.error, 'code') */
 
-# Error code 13 means invalid value.
-df_failed_13 = df_failed[df_failed.error == 13]
-df_failed_13.error = "Invalid value"
+/* # Error code 13 means invalid value. */
+/* df_failed_13 = df_failed[df_failed.error == 13] */
+/* df_failed_13.error = "Invalid value" */
 
-df_failed_other = df_failed[df_failed.error != 13]
-df_failed_other.error = "Other"
+/* df_failed_other = df_failed[df_failed.error != 13] */
+/* df_failed_other.error = "Other" */
 
-df_failed_13
-# Concatenate 2 parts to form the full list.
-px.display(df_failed_13.append(df_failed_other))
+/* df_failed_13 */
+/* # Concatenate 2 parts to form the full list. */
+/* px.display(df_failed_13.append(df_failed_other)) */
 
-)pxl";
+/* )pxl"; */
 
 constexpr char kCheckoutProbeTableSchema[] = R"proto(
 relation_map {
@@ -748,18 +548,18 @@ relation_map {
   }
 }
 )proto";
-TEST_F(LogicalPlannerTest, limit_pushdown_failing) {
-  auto planner = LogicalPlanner::Create(info_).ConsumeValueOrDie();
-  auto state = testutils::CreateTwoPEMsOneKelvinPlannerState(kCheckoutProbeTableSchema);
-  // Replicate what happens in the main environment.
-  state.mutable_plan_options()->set_max_output_rows_per_table(10000);
+/* TEST_F(LogicalPlannerTest, limit_pushdown_failing) { */
+/*   auto planner = LogicalPlanner::Create(info_).ConsumeValueOrDie(); */
+/*   auto state = testutils::CreateTwoPEMsOneKelvinPlannerState(kCheckoutProbeTableSchema); */
+/*   // Replicate what happens in the main environment. */
+/*   state.mutable_plan_options()->set_max_output_rows_per_table(10000); */
 
-  auto plan_or_s = planner->Plan(MakeQueryRequest(state, kLimitFailing));
-  EXPECT_OK(plan_or_s);
-  auto plan = plan_or_s.ConsumeValueOrDie();
-  auto proto_or_s = plan->ToProto();
-  ASSERT_OK(proto_or_s.status());
-}
+/*   auto plan_or_s = planner->Plan(MakeQueryRequest(state, kLimitFailing)); */
+/*   EXPECT_OK(plan_or_s); */
+/*   auto plan = plan_or_s.ConsumeValueOrDie(); */
+/*   auto proto_or_s = plan->ToProto(); */
+/*   ASSERT_OK(proto_or_s.status()); */
+/* } */
 
 const char kFilterPushDownBugQuery[] = R"pxl(
 import px

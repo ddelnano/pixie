@@ -39,7 +39,6 @@
 #include "src/carnot/planner/metadata/metadata_handler.h"
 #include "src/carnot/planner/parser/parser.h"
 #include "src/carnot/planner/parser/string_reader.h"
-#include "src/carnot/planner/probes/tracing_module.h"
 #include "src/carnot/planner/rules/rules.h"
 #include "src/carnot/planpb/plan.pb.h"
 #include "src/carnot/udf_exporter/udf_exporter.h"

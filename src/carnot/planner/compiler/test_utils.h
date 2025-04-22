@@ -38,7 +38,6 @@
 #include "src/carnot/planner/metadata/metadata_handler.h"
 #include "src/carnot/planner/parser/parser.h"
 #include "src/carnot/planner/parser/string_reader.h"
-#include "src/carnot/planner/probes/tracing_module.h"
 #include "src/carnot/planner/rules/rules.h"
 #include "src/carnot/udf_exporter/udf_exporter.h"
 #include "src/common/testing/testing.h"
@@ -316,9 +315,8 @@ StatusOr<std::shared_ptr<IR>> ParseQuery(const std::string& query) {
       /* max_output_rows_per_table */ 0, "result_addr", "result_ssl_targetname",
       /* redaction_options */ RedactionOptions{}, nullptr, nullptr, planner::DebugInfo{});
   compiler::ModuleHandler module_handler;
-  compiler::MutationsIR dynamic_trace;
   PX_ASSIGN_OR_RETURN(auto ast_walker,
-                      compiler::ASTVisitorImpl::Create(ir.get(), &dynamic_trace,
+                      compiler::ASTVisitorImpl::Create(ir.get(),
                                                        compiler_state.get(), &module_handler));
 
   pypa::AstModulePtr ast;
@@ -1157,9 +1155,8 @@ class ASTVisitorTest : public OperatorTests {
     bool func_based_exec = false;
     absl::flat_hash_set<std::string> reserved_names;
     compiler::ModuleHandler module_handler;
-    compiler::MutationsIR mutations_ir;
     PX_ASSIGN_OR_RETURN(auto ast_walker,
-                        compiler::ASTVisitorImpl::Create(graph.get(), var_table, &mutations_ir,
+                        compiler::ASTVisitorImpl::Create(graph.get(), var_table,
                                                          compiler_state_.get(), &module_handler,
                                                          func_based_exec, reserved_names));
 
@@ -1180,9 +1177,8 @@ class ASTVisitorTest : public OperatorTests {
     }
 
     compiler::ModuleHandler module_handler;
-    compiler::MutationsIR probe_ir;
     PX_ASSIGN_OR_RETURN(auto ast_walker,
-                        compiler::ASTVisitorImpl::Create(ir.get(), &probe_ir, compiler_state_.get(),
+                        compiler::ASTVisitorImpl::Create(ir.get(), compiler_state_.get(),
                                                          &module_handler, func_based_exec,
                                                          reserved_names, module_name_to_pxl));
 
@@ -1198,10 +1194,8 @@ class ASTVisitorTest : public OperatorTests {
     PX_ASSIGN_OR_RETURN(auto ast, parser.Parse(query));
     std::shared_ptr<IR> ir = std::make_shared<IR>();
     compiler::ModuleHandler module_handler;
-    compiler::MutationsIR dynamic_trace;
     PX_ASSIGN_OR_RETURN(auto ast_walker,
-                        compiler::ASTVisitorImpl::Create(ir.get(), &dynamic_trace,
-                                                         compiler_state_.get(), &module_handler));
+                        compiler::ASTVisitorImpl::Create(ir.get(), compiler_state_.get(), &module_handler));
     PX_RETURN_IF_ERROR(ast_walker->ProcessModuleNode(ast));
     return ast_walker;
   }
