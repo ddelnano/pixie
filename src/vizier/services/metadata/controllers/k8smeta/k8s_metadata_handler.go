@@ -241,12 +241,12 @@ func (m *Handler) processUpdates() {
 				continue
 			}
 
-			if msg.ObjectType == "pods" {
-				err := UpdatePodLabelStore(update, m.pls)
-				if err != nil {
-					log.WithError(err).Error("Failed to update pod labels state")
-				}
-			}
+			// if msg.ObjectType == "pods" {
+			// 	err := UpdatePodLabelStore(update, m.pls)
+			// 	if err != nil {
+			// 		log.WithError(err).Error("Failed to update pod labels state")
+			// 	}
+			// }
 
 			// Persist the update in the data store.
 			updates := processor.GetStoredProtos(update)
@@ -748,26 +748,26 @@ func (p *PodUpdateProcessor) GetUpdatesToSend(storedUpdates []*StoredUpdate, sta
 
 // UpdatePodLabelStore reads the pod resource update. If the pod is running, we update the store with new labels. If the pod has finished, we delete its labels in the store.
 func UpdatePodLabelStore(update *storepb.K8SResource, pls PodLabelStore) error {
-	p := update.GetPod()
-	namespace := p.GetMetadata().GetNamespace()
-	if namespace == "" {
-		namespace = "default"
-	}
-	podName := p.GetMetadata().GetName()
+	// p := update.GetPod()
+	// namespace := p.GetMetadata().GetNamespace()
+	// if namespace == "" {
+	// 	namespace = "default"
+	// }
+	// // podName := p.GetMetadata().GetName()
 
-	switch phase := p.GetStatus().GetPhase(); phase {
-	case metadatapb.RUNNING:
-		labels := p.GetMetadata().GetLabels()
-		err := pls.SetPodLabels(namespace, podName, labels)
-		if err != nil {
-			return err
-		}
-	case metadatapb.PHASE_UNKNOWN, metadatapb.SUCCEEDED, metadatapb.FAILED, metadatapb.TERMINATED:
-		err := pls.DeletePodLabels(namespace, podName)
-		if err != nil {
-			return err
-		}
-	}
+	// switch phase := p.GetStatus().GetPhase(); phase {
+	// // case metadatapb.RUNNING:
+	// // 	labels := p.GetMetadata().GetLabels()
+	// // 	err := pls.SetPodLabels(namespace, podName, labels)
+	// // 	if err != nil {
+	// // 		return err
+	// // 	}
+	// // case metadatapb.PHASE_UNKNOWN, metadatapb.SUCCEEDED, metadatapb.FAILED, metadatapb.TERMINATED:
+	// // 	err := pls.DeletePodLabels(namespace, podName)
+	// // 	if err != nil {
+	// // 		return err
+	// // 	}
+	// }
 	return nil
 }
 

@@ -29,7 +29,7 @@ import (
 
 const (
 	// resourceUpdateTTL is how long the k8s update live in the DataStore.
-	resourceUpdateTTL = 24 * time.Hour
+	resourceUpdateTTL = 1 * time.Hour
 )
 
 // Controller listens to any metadata updates from the K8s API and forwards them
