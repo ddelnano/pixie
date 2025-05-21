@@ -24,9 +24,47 @@
 namespace px {
 namespace event {
 
-Status NATSConnectorBase::ConnectBase(Dispatcher* base_dispatcher) {
+namespace {
+
+std::unique_ptr<NATSPromMetrics> g_nats_metrics = std::make_unique<NATSPromMetrics>();
+
+void ErrorHandler(natsConnection *nc, natsSubscription *sub, natsStatus err, void *closure) {
+  PX_UNUSED(nc);
+  PX_UNUSED(sub);
+  if (err == NATS_SLOW_CONSUMER) {
+    char *subj = static_cast<char *>(closure);
+    LOG(ERROR) << absl::Substitute("Slow consumer subscription topic: $0", subj);
+    g_nats_metrics->error_counts_.Add({{"name", "nats_error_count"}, {"natsStatus", natsStatus_GetText(err)}, {"subject", subj}});
+  } else {
+    LOG(ERROR) << absl::Substitute("Asynchronous error: $0 - $1", err, natsStatus_GetText(err));
+    g_nats_metrics->error_counts_.Add({{"name", "nats_error_count"}, {"natsStatus", natsStatus_GetText(err)}});
+  }
+}
+
+} // namespace
+
+NATSPromMetrics::NATSPromMetrics()
+    : disconnects_(prometheus::BuildCounter()
+               .Name("nats_disconnects")
+               .Help("")
+               .Register(GetMetricsRegistry())
+               .Add({{"name", "nats_disconnects"}})),
+      reconnects_(prometheus::BuildCounter()
+               .Name("nats_reconnects")
+               .Help("")
+               .Register(GetMetricsRegistry())
+               .Add({{"name", "nats_reconnects"}})),
+      error_counts_(
+          prometheus::BuildCounter()
+              .Name("nats_error_counts")
+              .Help("")
+              .Register(GetMetricsRegistry())) {}
+
+Status NATSConnectorBase::ConnectBase(Dispatcher* base_dispatcher, std::string& sub_topic, std::string& /*pub_topic*/) {
   natsOptions* nats_opts = nullptr;
   natsOptions_Create(&nats_opts);
+  char* sub_topic_cstr = const_cast<char*>(sub_topic.c_str());
+  natsOptions_SetErrorHandler(nats_opts, ErrorHandler, static_cast<void*>(sub_topic_cstr));
 
   LibuvDispatcher* dispatcher = dynamic_cast<LibuvDispatcher*>(base_dispatcher);
   if (dispatcher == nullptr) {
@@ -74,12 +112,14 @@ void NATSConnectorBase::DisconnectedCB(natsConnection* nc, void* closure) {
   PX_UNUSED(nc);
   auto* connector = static_cast<NATSConnectorBase*>(closure);
   LOG(WARNING) << "nats disconnected " << ++connector->disconnect_count_;
+  g_nats_metrics->disconnects_.Increment();
 }
 
 void NATSConnectorBase::ReconnectedCB(natsConnection* nc, void* closure) {
   PX_UNUSED(nc);
   auto* connector = static_cast<NATSConnectorBase*>(closure);
   LOG(INFO) << "nats reconnected " << ++connector->reconnect_count_;
+  g_nats_metrics->reconnects_.Increment();
 }
 
 }  // namespace event

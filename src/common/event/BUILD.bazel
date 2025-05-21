@@ -30,6 +30,7 @@ pl_cc_library(
     deps = [
         "//third_party:libuv",
         "//third_party:natsc",
+        "//src/common/metrics:cc_library",
     ],
 )
 

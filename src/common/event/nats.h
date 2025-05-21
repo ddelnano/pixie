@@ -23,6 +23,10 @@
 
 #include <memory>
 #include <string>
+#include <prometheus/counter.h>
+#include <prometheus/registry.h>
+
+#include "src/common/metrics/metrics.h"
 
 namespace px {
 namespace event {
@@ -38,7 +42,7 @@ class NATSConnectorBase {
   NATSConnectorBase(std::string_view nats_server, std::unique_ptr<NATSTLSConfig> tls_config)
       : nats_server_(std::string(nats_server)), tls_config_(std::move(tls_config)) {}
 
-  Status ConnectBase(Dispatcher* base_dispatcher);
+  Status ConnectBase(Dispatcher* base_dispatcher, std::string& sub_topic, std::string& pub_topic);
 
   natsConnection* nats_connection_ = nullptr;
 
@@ -50,6 +54,16 @@ class NATSConnectorBase {
  private:
   size_t disconnect_count_ = 0;
   size_t reconnect_count_ = 0;
+};
+
+class NATSPromMetrics {
+
+ public:
+  NATSPromMetrics();
+
+  prometheus::Counter& disconnects_;
+  prometheus::Counter& reconnects_;
+  prometheus::Family<prometheus::Counter>& error_counts_;
 };
 
 /**
@@ -83,7 +97,7 @@ class NATSConnector : public NATSConnectorBase {
    * @return Status of the connection.
    */
   virtual Status Connect(Dispatcher* base_dispatcher) {
-    PX_RETURN_IF_ERROR(ConnectBase(base_dispatcher));
+    PX_RETURN_IF_ERROR(ConnectBase(base_dispatcher, sub_topic_, pub_topic_));
     // Attach the message reader.
     natsConnection_Subscribe(&nats_subscription_, nats_connection_, sub_topic_.c_str(),
                              NATSMessageCallbackHandler, this);
