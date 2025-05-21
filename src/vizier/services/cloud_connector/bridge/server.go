@@ -65,6 +65,8 @@ const (
 	operatorMessage           = "You are running the non-operator version of Pixie. The operator version of Pixie has additional features that help you manage Pixie and keep it up-to-date. To update to the operator-controlled version of Pixie, follow instructions on docs.px.dev to redeploy Pixie with the CLI or Helm Chart. Using the operator version of Pixie is optional and will not affect functionality or data. Note that the operator version of Pixie is not available for air gapped systems."
 )
 
+var natsErrorCounter *messagebus.NatsErrorCounter
+
 // UpdaterJobYAML is the YAML that should be applied for the updater job.
 const UpdaterJobYAML string = `---
 apiVersion: batch/v1
@@ -214,6 +216,10 @@ type Bridge struct {
 	metricsCh     <-chan *messagespb.MetricsMessage // Channel is used to pass metrics from the scraper to the bridge.
 }
 
+func init() {
+	natsErrorCounter = messagebus.NewNatsErrorCounter()
+}
+
 // New creates a cloud connector to cloud bridge.
 func New(vizierID uuid.UUID, assignedClusterName string, jwtSigningKey string, deployKey string, sessionID int64, vzClient vzconnpb.VZConnServiceClient, vzInfo VizierInfo, vzOperator VizierOperatorInfo, nc *nats.Conn, checker VizierHealthChecker, metricsCh <-chan *messagespb.MetricsMessage) *Bridge {
 	return &Bridge{
@@ -359,11 +365,7 @@ func (s *Bridge) RunStream() {
 		s.nc = nc
 	}
 
-	s.nc.SetErrorHandler(func(conn *nats.Conn, subscription *nats.Subscription, err error) {
-		log.WithField("Sub", subscription.Subject).
-			WithError(err).
-			Error("Error with NATS handler")
-	})
+	s.nc.SetErrorHandler(natsErrorCounter.HandleNatsError)
 
 	natsTopic := messagebus.V2CTopic("*")
 	log.WithField("topic", natsTopic).Trace("Subscribing to NATS")

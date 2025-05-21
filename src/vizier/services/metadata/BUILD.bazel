@@ -40,6 +40,7 @@ go_library(
         "//src/vizier/utils/datastore",
         "//src/vizier/utils/datastore/etcd",
         "//src/vizier/utils/datastore/pebbledb",
+        "//src/vizier/utils/messagebus",
         "@com_github_cockroachdb_pebble//:pebble",
         "@com_github_nats_io_nats_go//:nats_go",
         "@com_github_sirupsen_logrus//:logrus",

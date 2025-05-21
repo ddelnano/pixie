@@ -56,6 +56,7 @@ import (
 	"px.dev/pixie/src/vizier/utils/datastore"
 	"px.dev/pixie/src/vizier/utils/datastore/etcd"
 	"px.dev/pixie/src/vizier/utils/datastore/pebbledb"
+	"px.dev/pixie/src/vizier/utils/messagebus"
 )
 
 const (
@@ -67,6 +68,8 @@ const (
 	metadataBaseMount = "/metadata"
 )
 
+var natsErrorCounter *messagebus.NatsErrorCounter
+
 func init() {
 	pflag.String("md_etcd_server", "https://pl-etcd-client.pl.svc:2379", "The address to metadata etcd server.")
 	pflag.String("cluster_id", "", "The Cluster ID to use for Pixie Cloud")
@@ -76,6 +79,8 @@ func init() {
 	pflag.String("nats_url", "pl-nats", "The URL of NATS")
 	pflag.Bool("use_etcd_operator", false, "Whether the etcd operator should be used instead of the persistent version.")
 	pflag.StringSlice("metadata_namespaces", []string{v1.NamespaceAll}, "The list of namespaces to watch for metadata.")
+
+	natsErrorCounter = messagebus.NewNatsErrorCounter()
 
 	// Metadata flags are set using the env vars in pl-cluster-config.
 	// We historically set PL_ETCD_OPERATOR_ENABLED but not PL_USE_ETCD_OPERATOR in the configmap.
@@ -186,11 +191,7 @@ func main() {
 		log.WithError(err).Fatal("Could not connect to NATS. Please check for the `pl-nats` pods in the namespace to confirm they are healthy and running.")
 	}
 
-	nc.SetErrorHandler(func(conn *nats.Conn, subscription *nats.Subscription, err error) {
-		log.WithError(err).
-			WithField("sub", subscription.Subject).
-			Error("Got nats error")
-	})
+	nc.SetErrorHandler(natsErrorCounter.HandleNatsError)
 
 	// Set up leader election.
 	isLeader := false

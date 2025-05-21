@@ -47,11 +47,14 @@ import (
 	"px.dev/pixie/src/vizier/services/query_broker/querybrokerenv"
 	scriptrunner "px.dev/pixie/src/vizier/services/query_broker/script_runner"
 	"px.dev/pixie/src/vizier/services/query_broker/tracker"
+	"px.dev/pixie/src/vizier/utils/messagebus"
 )
 
 const (
 	querybrokerHostname = "vizier-query-broker-svc"
 )
+
+var natsErrorCounter *messagebus.NatsErrorCounter
 
 func init() {
 	pflag.String("cluster_id", "", "The Cluster ID to use for Pixie Cloud")
@@ -61,6 +64,8 @@ func init() {
 	pflag.String("mds_port", "50400", "The querybroker service port")
 	pflag.String("pod_namespace", "pl", "The namespace this pod runs in.")
 	pflag.StringArray("cron_script_sources", scriptrunner.DefaultSources, "Where to find cron scripts (cloud, configmaps)")
+
+	natsErrorCounter = messagebus.NewNatsErrorCounter()
 }
 
 // NewVizierServiceClient creates a new vz RPC client stub.
@@ -159,11 +164,7 @@ func main() {
 	if err != nil {
 		log.WithError(err).Fatal("Failed to connect to NATS.")
 	}
-	natsConn.SetErrorHandler(func(conn *nats.Conn, subscription *nats.Subscription, err error) {
-		log.WithError(err).
-			WithField("sub", subscription.Subject).
-			Error("Got nats error")
-	})
+	natsConn.SetErrorHandler(natsErrorCounter.HandleNatsError)
 
 	dataPrivacy, err := controllers.CreateDataPrivacyManager(viper.GetString("pod_namespace"))
 	if err != nil {
