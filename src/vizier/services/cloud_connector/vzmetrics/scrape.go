@@ -111,6 +111,10 @@ func (s *scraperImpl) getEndpointsToScrape() ([]endpoint, error) {
 		return []endpoint{}, err
 	}
 	endpoints := make([]endpoint, 0)
+	endpoints = append(endpoints, endpoint{
+		reqPath: "http://localhost:8888/metrics",
+		podName: "nats",
+	})
 	for _, p := range pods.Items {
 		if p.ObjectMeta.Annotations[scrapeAnnotationName] != "true" {
 			continue
