@@ -127,6 +127,8 @@ def _cc_deps():
     _bazel_repo("boringssl", patches = ["//bazel/external:boringssl.patch"], patch_args = ["-p0"])
     _bazel_repo("com_google_benchmark")
     _bazel_repo("com_google_googletest")
+    _bazel_repo("rules_proto")
+    _bazel_repo("bazel_features")
     _bazel_repo("com_github_gflags_gflags")
     _bazel_repo("com_github_google_glog")
     _bazel_repo("com_google_absl")

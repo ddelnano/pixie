@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/gofrs/uuid"
+	"github.com/nats-io/prometheus-nats-exporter/exporter"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -157,6 +158,19 @@ func main() {
 	}
 	checker := vizhealth.NewChecker(viper.GetString("jwt_signing_key"), qbVzClient)
 	defer checker.Stop()
+
+	opts := exporter.GetDefaultExporterOptions()
+	opts.ListenAddress = "localhost"
+	opts.ListenPort = 8888
+	opts.GetVarz = true
+	opts.NATSServerURL = "http://pl-nats-mgmt:8222"
+	exp := exporter.NewExporter(opts)
+
+	// start collecting data
+	exp.Start()
+
+	// when done, simply call Stop()
+	defer exp.Stop()
 
 	// Periodically clean up any completed jobs.
 	quitCh := make(chan bool)

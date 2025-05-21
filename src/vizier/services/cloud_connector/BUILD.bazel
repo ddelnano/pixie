@@ -36,6 +36,7 @@ go_library(
         "//src/vizier/services/cloud_connector/vizhealth",
         "//src/vizier/services/cloud_connector/vzmetrics",
         "@com_github_gofrs_uuid//:uuid",
+        "@com_github_nats_io_prometheus_nats_exporter//exporter",
         "@com_github_sirupsen_logrus//:logrus",
         "@com_github_spf13_pflag//:pflag",
         "@com_github_spf13_viper//:viper",
