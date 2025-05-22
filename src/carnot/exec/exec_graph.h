@@ -48,8 +48,9 @@ struct ExecutionStats {
   int64_t rows_processed;
 };
 
+DECLARE_uint32(exec_graph_upstream_result_connection_timeout_ms);
+
 constexpr std::chrono::milliseconds kDefaultYieldTimeoutMS{1000};
-constexpr std::chrono::milliseconds kDefaultUpstreamResultConnectionTimeout{5000};
 constexpr int32_t kDefaultConsecutiveGenerateCallsPerSource = 10;
 using SystemTimePoint = std::chrono::time_point<std::chrono::system_clock>;
 
@@ -67,12 +68,14 @@ class ExecutionGraph {
    * @return The execution graph.
    */
   ExecutionGraph(const std::chrono::milliseconds& yield_duration,
+                 const uint32_t upstream_result_connection_timeout)
+      : ExecutionGraph(yield_duration,
+                       std::chrono::milliseconds(upstream_result_connection_timeout)) {}
+
+  ExecutionGraph(const std::chrono::milliseconds& yield_duration,
                  const std::chrono::milliseconds& upstream_result_connection_timeout)
       : upstream_result_connection_timeout_ms_(upstream_result_connection_timeout),
         yield_timeout_ms_(yield_duration) {}
-
-  ExecutionGraph()
-      : ExecutionGraph(kDefaultYieldTimeoutMS, kDefaultUpstreamResultConnectionTimeout) {}
 
   /**
    * Initializes the Execution Graph by initializing the execution nodes and their children.

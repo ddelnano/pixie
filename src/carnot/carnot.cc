@@ -38,6 +38,8 @@
 namespace px {
 namespace carnot {
 
+DEFINE_uint32(exec_graph_upstream_result_connection_timeout_ms, 1500, "How long to wait for a GRPC source to establish a connection before proceeding with the rest of the query.");
+
 using types::DataType;
 
 class CarnotImpl final : public Carnot {
@@ -355,7 +357,7 @@ Status CarnotImpl::ExecutePlan(const planpb::Plan& logical_plan, const sole::uui
   auto s =
       plan::PlanWalker()
           .OnPlanFragment([&](auto* pf) {
-            auto exec_graph = exec::ExecutionGraph();
+            auto exec_graph = exec::ExecutionGraph(exec::kDefaultYieldTimeoutMS, FLAGS_exec_graph_upstream_result_connection_timeout_ms);
             PX_RETURN_IF_ERROR(exec_graph.Init(schema.get(), plan_state.get(), exec_state.get(), pf,
                                                /* collect_exec_node_stats */ analyze));
             PX_RETURN_IF_ERROR(exec_graph.Execute());
