@@ -53,7 +53,7 @@ cc_toolchain_config(
     name = "toolchain_config",
     abi_libc_version = "{libc_version}",
     abi_version = "clang",
-    builtin_sysroot = "{sysroot_path}",
+    # builtin_sysroot = "{sysroot_path}",
     compile_flags = [
         "-target",
         "{target_arch}-linux-gnu",
