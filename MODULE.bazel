@@ -1,0 +1,8 @@
+module(
+    name = "px",
+    version = "0.1.0",
+    compatibility_level = 1,
+    repo_name = "px",
+)
+
+bazel_dep(name = "platforms", version = "0.0.6")
