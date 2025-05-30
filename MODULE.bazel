@@ -1,0 +1,29 @@
+module(
+    name = "px",
+    version = "0.1.0",
+    compatibility_level = 1,
+    repo_name = "px",
+)
+
+bazel_dep(name = "platforms", version = "0.0.6")
+bazel_dep(name = "bazel_skylib", version = "1.6.1")
+
+cc_cfg = use_extension(
+    "@bazel_tools//tools/cpp:cc_configure.bzl",
+    "cc_configure_extension",
+)
+use_repo(cc_cfg, "local_config_cc")
+
+# register_toolchains("@local_config_cc//:all")
+
+cc = use_extension(
+    "//bazel/cc_toolchains:cc_toolchain_ext.bzl",
+    "cc_toolchain_ext",
+)
+
+use_repo(cc,
+    "clang-15.0-x86_64",
+    "clang-15.0-x86_64-glibc2.36-sysroot",
+    "clang-15.0-aarch64-glibc2.36-sysroot",
+    "clang-15.0-exec",
+)

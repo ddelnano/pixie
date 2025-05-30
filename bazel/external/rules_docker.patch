@@ -1,7 +1,8 @@
-index ceeea01..f2762d4 100644
+diff --git a/container/image.bzl b/container/image.bzl
+index bb27848..9a29158 100644
 --- a/container/image.bzl
 +++ b/container/image.bzl
-@@ -769,11 +769,7 @@ _outputs["build_script"] = "%{name}.executable"
+@@ -794,11 +794,7 @@ _outputs["build_script"] = "%{name}.executable"
  def _image_transition_impl(settings, attr):
      if not settings["@io_bazel_rules_docker//transitions:enable"]:
          # Once bazel < 5.0 is not supported we can return an empty dict here
@@ -14,3 +15,26 @@ index ceeea01..f2762d4 100644
  
      return {
          "//command_line_option:platforms": "@io_bazel_rules_docker//platforms:image_transition",
+diff --git a/repositories/py_repositories.bzl b/repositories/py_repositories.bzl
+index 8b511e9..4bd2caf 100644
+--- a/repositories/py_repositories.bzl
++++ b/repositories/py_repositories.bzl
+@@ -19,7 +19,7 @@ Provides functions to pull all Python external package dependencies of this
+ repository.
+ """
+ 
+-load("@rules_python//python:pip.bzl", "pip_install")
++load("@rules_python//python:pip.bzl", "pip_parse")
+ 
+ def py_deps():
+     """Pull in external Python packages needed by py binaries in this repo.
+@@ -31,7 +31,7 @@ def py_deps():
+     """
+     excludes = native.existing_rules().keys()
+     if "io_bazel_rules_docker_pip_deps" not in excludes:
+-        pip_install(
++        pip_parse(
+             name = "io_bazel_rules_docker_pip_deps",
+-            requirements = "@io_bazel_rules_docker//repositories:requirements-pip.txt",
++            requirements_lock = "@io_bazel_rules_docker//repositories:requirements-pip.txt",
+         )

@@ -1,3 +1,5 @@
+# build:exec --extra_toolchains=@local_config_cc//:all
+common --enable_bzlmod
 # Global bazelrc file, see https://docs.bazel.build/versions/master/guide.html#bazelrc.
 
 # Use strict action env to prevent leaks of env vars.
