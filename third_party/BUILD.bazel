@@ -83,6 +83,9 @@ cmake(
         "//conditions:default": "libnats_static",
     }),
     lib_source = "@com_github_nats_io_natsc//:all",
+    # Used to force a failure in the bazel 6.2.0 case to preserve sandbox.
+    # Since bazel 7.0.0 fails, its not needed for that case.
+    # postfix_script = "touch $$BUILD_TMPDIR$$/KEEP_ME && false",
     targets = [
         "nats_static",
     ],
