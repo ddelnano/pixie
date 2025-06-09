@@ -296,7 +296,7 @@ def stirling_test_images():
     )
     container_pull(
         name = "go_1_23_grpc_server_with_mod_info",
-        digest = "sha256:a06b8f280a37e671f64a93d534ca35d0ac495f5f3b8adb6e623a765fc6e9a1f5",
+        digest = "sha256:48bbaedd82c13a4dd7e34ae39273fd2b6352ac078718494dc8a7b91e97c5e18e",
         registry = "docker.io",
         repository = "ddelnano/go_1_23_grpc_server_with_mod_info",
     )
