@@ -94,6 +94,26 @@ GolangRegABIModel::GolangRegABIModel() : reg_size_(RegisterSize()) {
                           RegisterName::kXMM12, RegisterName::kXMM13, RegisterName::kXMM14};
 }
 
+StatusOr<int64_t> GolangRegABIModel::GetRegisterOffset(RegisterName reg_name,
+                                                       TypeClass type_class) {
+  if (type_class == TypeClass::kInteger) {
+    auto it = std::find(int_arg_registers_.begin(), int_arg_registers_.end(), reg_name);
+    if (it != int_arg_registers_.end()) {
+      int index = std::distance(int_arg_registers_.begin(), it);
+      return index * reg_size_;
+    }
+  } else if (type_class == TypeClass::kFloat) {
+    auto it = std::find(fp_arg_registers_.begin(), fp_arg_registers_.end(), reg_name);
+    if (it != fp_arg_registers_.end()) {
+      int index = std::distance(fp_arg_registers_.begin(), it);
+      return index * reg_size_;
+    }
+  }
+  return error::NotFound(absl::Substitute("Register not found for type class $0: $1",
+                                          magic_enum::enum_name(type_class),
+                                          magic_enum::enum_name(reg_name)));
+}
+
 StatusOr<VarLocation> GolangRegABIModel::PopLocation(TypeClass type_class, uint64_t type_size,
                                                      uint64_t alignment_size, int num_vars,
                                                      bool is_ret_arg) {

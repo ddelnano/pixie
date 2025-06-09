@@ -155,6 +155,10 @@ class ABICallingConventionModel {
   virtual StatusOr<VarLocation> PopLocation(TypeClass type_class, uint64_t type_size,
                                             uint64_t alignment_size, int num_vars,
                                             bool is_ret_arg) = 0;
+
+  virtual StatusOr<int64_t> GetRegisterOffset(RegisterName /*reg_name*/, TypeClass /*type_class*/) {
+    return error::Internal("Not implemented");
+  }
 };
 
 /**
@@ -185,6 +189,8 @@ class GolangRegABIModel : public ABICallingConventionModel {
   StatusOr<VarLocation> PopLocation(TypeClass type_class, uint64_t type_size,
                                     uint64_t alignment_size, int num_vars,
                                     bool is_ret_arg) override;
+
+  StatusOr<int64_t> GetRegisterOffset(RegisterName reg_name, TypeClass type_class) override;
 
  private:
   const uint64_t reg_size_;

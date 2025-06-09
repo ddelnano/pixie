@@ -19,7 +19,11 @@
 #include <llvm/BinaryFormat/Dwarf.h>
 #include <llvm/Config/llvm-config.h>
 #include <llvm/DebugInfo/DWARF/DWARFExpression.h>
+#include <llvm/MC/MCRegisterInfo.h>
+#include <llvm/MC/TargetRegistry.h>
+#include <llvm/Support/Host.h>
 #include <llvm/Support/ScopedPrinter.h>
+#include <llvm/Support/TargetSelect.h>
 
 #include "src/stirling/obj_tools/dwarf_reader.h"
 
@@ -335,6 +339,29 @@ StatusOr<SimpleBlock> DecodeSimpleBlock(const llvm::ArrayRef<uint8_t>& block) {
                               magic_enum::enum_name(decoded_block.code), decoded_block.operand);
 
   return decoded_block;
+}
+
+StatusOr<std::vector<SimpleBlock>> DecodeSimpleBlocks(const llvm::ArrayRef<uint8_t>& block) {
+  std::vector<SimpleBlock> decoded_blocks;
+  // Don't ask me why address size is 0. Just copied it from LLVM examples.
+  llvm::DataExtractor data(
+      llvm::StringRef(reinterpret_cast<const char*>(block.data()), block.size()),
+      /* isLittleEndian */ true, /* AddressSize */ 0);
+  llvm::DWARFExpression expr(data, kAddressSize, llvm::dwarf::DwarfFormat::DWARF64);
+
+  for (auto iter = expr.begin(); iter != expr.end(); ++iter) {
+    auto& operation = *iter;
+    SimpleBlock decoded_block;
+
+    decoded_block.code = static_cast<llvm::dwarf::LocationAtom>(operation.getCode());
+    decoded_block.operand = operation.getRawOperand(0);
+
+    VLOG(1) << absl::Substitute("Decoded block: code=$0 operand=$1",
+                                magic_enum::enum_name(decoded_block.code), decoded_block.operand);
+    decoded_blocks.push_back(decoded_block);
+  }
+
+  return decoded_blocks;
 }
 
 StatusOr<uint64_t> GetMemberOffset(const DWARFDie& die) {
@@ -780,6 +807,31 @@ StatusOr<uint64_t> DwarfReader::GetArgumentTypeByteSize(std::string_view functio
 
 namespace {
 
+ABI LanguageToABI(llvm::dwarf::SourceLanguage lang, const std::string& compiler) {
+  switch (lang) {
+    case llvm::dwarf::DW_LANG_Go:
+      // Go has different ABIs, so check the compiler to choose the right one.
+      // Sample output: "Go cmd/compile go1.17; regabi"
+      // The regabi means the register-based ABI was used (empirically verified only).
+      if (absl::StrContains(compiler, "regabi")) {
+        return ABI::kGolangRegister;
+      }
+      return ABI::kGolangStack;
+    case llvm::dwarf::DW_LANG_C:
+    case llvm::dwarf::DW_LANG_C89:
+    case llvm::dwarf::DW_LANG_C99:
+    case llvm::dwarf::DW_LANG_C11:
+    case llvm::dwarf::DW_LANG_C_plus_plus:
+    case llvm::dwarf::DW_LANG_C_plus_plus_03:
+    case llvm::dwarf::DW_LANG_C_plus_plus_11:
+    case llvm::dwarf::DW_LANG_C_plus_plus_14:
+      // TODO(oazizi): We assume AMD64 for now, but need to support other architectures.
+      return ABI::kSystemVAMD64;
+    default:
+      return ABI::kUnknown;
+  }
+}
+
 // Get the DW_AT_location of a DIE as raw bytes.
 // For DW_AT_location expressions that have different values for different address ranges,
 // this function currently returns the value for the first address range (which should
@@ -841,11 +893,18 @@ StatusOr<llvm::DWARFLocationExpressionsVector> GetDieLocationAttrBytes(const DWA
 //                    ...
 //                    DW_AT_location [DW_FORM_block1] (DW_OP_call_frame_cfa)
 // This example should return the location on the stack.
-StatusOr<VarLocation> GetDieLocationAttr(const DWARFDie& die) {
+StatusOr<VarLocation> GetDieLocationAttr(const DWARFDie& die, llvm::MCRegisterInfo* mri,
+                                         llvm::dwarf::SourceLanguage source_language,
+                                         const std::string& compiler) {
   PX_ASSIGN_OR_RETURN(llvm::DWARFLocationExpressionsVector loc, GetDieLocationAttrBytes(die));
-  PX_ASSIGN_OR_RETURN(SimpleBlock loc_block,
-                      DecodeSimpleBlock(llvm::ArrayRef<uint8_t>(loc.front().Expr)));
 
+  // Decode the first DWARF location expression. Later ones show how the variable's location
+  // changes over time (i.e. if the var later spills onto the stack), which isn't important
+  // for our use case.
+  PX_ASSIGN_OR_RETURN(std::vector<SimpleBlock> loc_blocks,
+                      DecodeSimpleBlocks(llvm::ArrayRef<uint8_t>(loc.front().Expr)));
+
+  auto loc_block = loc_blocks.front();
   if (loc_block.code == llvm::dwarf::LocationAtom::DW_OP_fbreg) {
     if (loc_block.operand >= 0) {
       return VarLocation{.loc_type = LocationType::kStack, .offset = loc_block.operand};
@@ -865,8 +924,40 @@ StatusOr<VarLocation> GetDieLocationAttr(const DWARFDie& die) {
 
   if (loc_block.code >= llvm::dwarf::LocationAtom::DW_OP_reg0 &&
       loc_block.code <= llvm::dwarf::LocationAtom::DW_OP_reg31) {
-    int reg_num = loc_block.code - llvm::dwarf::LocationAtom::DW_OP_reg0;
-    return VarLocation{.loc_type = LocationType::kRegister, .offset = reg_num};
+    std::vector<RegisterName> regs;
+    for (auto& block : loc_blocks) {
+      if (block.code == llvm::dwarf::LocationAtom::DW_OP_piece) {
+        continue;
+      }
+      VLOG(1) << absl::Substitute("Location block: code=$0 operand=$1",
+                                  magic_enum::enum_name(block.code), block.operand);
+
+      auto dwarf_reg = block.code - llvm::dwarf::LocationAtom::DW_OP_reg0;
+      auto reg_num = mri->getLLVMRegNum(dwarf_reg, /*isEH=*/false);
+      if (!reg_num) {
+        return error::Internal(absl::Substitute("Could not get LLVM reg number for $0",
+                                                magic_enum::enum_name(block.code)));
+      }
+      auto mri_reg_name = mri->getName(*reg_num);
+      auto reg_name =
+          magic_enum::enum_cast<RegisterName>(absl::StrCat("k", mri->getName(*reg_num)));
+      if (!reg_name.has_value()) {
+        return error::Internal(absl::Substitute(
+            "Could not convert register name $0 to RegisterName enum", mri_reg_name));
+      }
+      regs.push_back(*reg_name);
+    }
+
+    PX_ASSIGN_OR_RETURN(const DWARFDie type_die, GetTypeDie(die));
+    PX_ASSIGN_OR_RETURN(const TypeClass type_class, GetTypeClass(type_die));
+    ABI abi = LanguageToABI(source_language, compiler);
+    if (abi == ABI::kUnknown) {
+      return error::Unimplemented("Unable to determine ABI from language: $0",
+                                  magic_enum::enum_name(source_language));
+    }
+    std::unique_ptr<ABICallingConventionModel> abi_model = ABICallingConventionModel::Create(abi);
+    PX_ASSIGN_OR_RETURN(auto offset, abi_model->GetRegisterOffset(regs[0], type_class));
+    return VarLocation{.loc_type = LocationType::kRegister, .offset = offset, .registers = regs};
   }
 
   return error::Unimplemented("Unsupported code (location atom): $0", loc_block.code);
@@ -879,41 +970,24 @@ StatusOr<VarLocation> DwarfReader::GetArgumentLocation(std::string_view function
   PX_ASSIGN_OR_RETURN(const DWARFDie& function_die,
                       GetMatchingDIE(function_symbol_name, llvm::dwarf::DW_TAG_subprogram));
 
+  std::string TripleStr = llvm::sys::getDefaultTargetTriple();
+  std::string Err;
+  const llvm::Target* target = llvm::TargetRegistry::lookupTarget(TripleStr, Err);
+  if (!target) {
+    return error::Internal("Could not lookup target: $0", Err);
+  }
+  auto mri = std::unique_ptr<llvm::MCRegisterInfo>(target->createMCRegInfo(TripleStr));
+  if (!mri) {
+    return error::Internal("Could not create MCRegisterInfo");
+  }
+
   for (const auto& die : GetParamDIEs(function_die)) {
     if (die.getShortName() == arg_name) {
-      return GetDieLocationAttr(die);
+      return GetDieLocationAttr(die, mri.get(), source_language_, compiler_);
     }
   }
   return error::Internal("Could not find argument.");
 }
-
-namespace {
-
-ABI LanguageToABI(llvm::dwarf::SourceLanguage lang, const std::string& compiler) {
-  switch (lang) {
-    case llvm::dwarf::DW_LANG_Go:
-      // Go has different ABIs, so check the compiler to choose the right one.
-      // Sample output: "Go cmd/compile go1.17; regabi"
-      // The regabi means the register-based ABI was used (empirically verified only).
-      if (absl::StrContains(compiler, "regabi")) {
-        return ABI::kGolangRegister;
-      }
-      return ABI::kGolangStack;
-    case llvm::dwarf::DW_LANG_C:
-    case llvm::dwarf::DW_LANG_C89:
-    case llvm::dwarf::DW_LANG_C99:
-    case llvm::dwarf::DW_LANG_C11:
-    case llvm::dwarf::DW_LANG_C_plus_plus:
-    case llvm::dwarf::DW_LANG_C_plus_plus_03:
-    case llvm::dwarf::DW_LANG_C_plus_plus_11:
-    case llvm::dwarf::DW_LANG_C_plus_plus_14:
-      // TODO(oazizi): We assume AMD64 for now, but need to support other architectures.
-      return ABI::kSystemVAMD64;
-    default:
-      return ABI::kUnknown;
-  }
-}
-}  // namespace
 
 StatusOr<std::map<std::string, ArgInfo>> DwarfReader::GetFunctionArgInfo(
     std::string_view function_symbol_name) {

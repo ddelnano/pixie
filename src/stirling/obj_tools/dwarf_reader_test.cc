@@ -317,26 +317,34 @@ TEST_P(GolangDwarfReaderTest, ArgumentLocation) {
   ASSERT_OK_AND_ASSIGN(bool uses_regabi, UsesRegABI());
   auto location = uses_regabi ? LocationType::kRegister : LocationType::kStack;
 
-  EXPECT_OK_AND_EQ(dwarf_reader->GetArgumentLocation("main.(*Vertex).Scale", "v"),
-                   (VarLocation{.loc_type = location, .offset = 0}));
-  EXPECT_OK_AND_EQ(dwarf_reader->GetArgumentLocation("main.(*Vertex).Scale", "f"),
-                   (VarLocation{.loc_type = location, .offset = uses_regabi ? 17 : 8}));
-  EXPECT_OK_AND_EQ(dwarf_reader->GetArgumentLocation("main.(*Vertex).CrossScale", "v"),
-                   (VarLocation{.loc_type = location, .offset = 0}));
+  EXPECT_OK_AND_EQ(
+      dwarf_reader->GetArgumentLocation("main.(*Vertex).Scale", "v"),
+      (VarLocation{.loc_type = location, .offset = 0, .registers = {RegisterName::kRAX}}));
+  EXPECT_OK_AND_EQ(
+      dwarf_reader->GetArgumentLocation("main.(*Vertex).Scale", "f"),
+      (VarLocation{.loc_type = location, .offset = 0, .registers = {RegisterName::kXMM0}}));
+  EXPECT_OK_AND_EQ(
+      dwarf_reader->GetArgumentLocation("main.(*Vertex).CrossScale", "v"),
+      (VarLocation{.loc_type = location, .offset = 0, .registers = {RegisterName::kRAX}}));
   if (uses_regabi) {
-    // TODO(oazizi): Support multi-piece arguments that span multiple registers.
-    EXPECT_NOT_OK(dwarf_reader->GetArgumentLocation("main.(*Vertex).CrossScale", "v2"));
+    EXPECT_OK_AND_EQ(dwarf_reader->GetArgumentLocation("main.(*Vertex).CrossScale", "v2"),
+                     (VarLocation{.loc_type = location,
+                                  .offset = 0,
+                                  .registers = {RegisterName::kXMM0, RegisterName::kXMM1}}));
   } else {
     EXPECT_OK_AND_EQ(dwarf_reader->GetArgumentLocation("main.(*Vertex).CrossScale", "v2"),
                      (VarLocation{.loc_type = location, .offset = 8}));
   }
 
-  EXPECT_OK_AND_EQ(dwarf_reader->GetArgumentLocation("main.(*Vertex).CrossScale", "f"),
-                   (VarLocation{.loc_type = location, .offset = uses_regabi ? 19 : 24}));
+  EXPECT_OK_AND_EQ(
+      dwarf_reader->GetArgumentLocation("main.(*Vertex).CrossScale", "f"),
+      (VarLocation{.loc_type = location, .offset = 16, .registers = {RegisterName::kXMM2}}));
 
   if (uses_regabi) {
-    // TODO(oazizi): Support multi-piece arguments that span multiple registers.
-    EXPECT_NOT_OK(dwarf_reader->GetArgumentLocation("main.Vertex.Abs", "v"));
+    EXPECT_OK_AND_EQ(dwarf_reader->GetArgumentLocation("main.Vertex.Abs", "v"),
+                     (VarLocation{.loc_type = location,
+                                  .offset = 0,
+                                  .registers = {RegisterName::kXMM0, RegisterName::kXMM1}}));
   } else {
     EXPECT_OK_AND_EQ(dwarf_reader->GetArgumentLocation("main.Vertex.Abs", "v"),
                      (VarLocation{.loc_type = location, .offset = 0}));
@@ -505,9 +513,7 @@ TEST_P(GolangDwarfReaderTest, FunctionArgInfo) {
   }
 }
 
-// TODO(oazizi): This seems to work only on go1.16.
-// If this is expected to work on go 1.17+, fix and re-enable. Else remove the test.
-TEST_P(GolangDwarfReaderTest, DISABLED_FunctionVarLocationConsistency) {
+TEST_P(GolangDwarfReaderTest, FunctionVarLocationConsistency) {
   // First run GetFunctionArgInfo to automatically get all arguments.
   ASSERT_OK_AND_ASSIGN(auto function_arg_locations,
                        dwarf_reader->GetFunctionArgInfo("main.MixedArgTypes"));
@@ -517,6 +523,10 @@ TEST_P(GolangDwarfReaderTest, DISABLED_FunctionVarLocationConsistency) {
 
   // Finally, run a consistency check between the two methods.
   for (auto& [arg_name, arg_info] : function_arg_locations) {
+    if (absl::StartsWith(arg_name, "~r")) {
+      // Return values can't be checked with GetArgumentLocation.
+      continue;
+    }
     ASSERT_OK_AND_ASSIGN(VarLocation location,
                          dwarf_reader->GetArgumentLocation("main.MixedArgTypes", arg_name));
     EXPECT_EQ(location, arg_info.location)
