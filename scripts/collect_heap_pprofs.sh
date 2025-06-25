@@ -22,6 +22,7 @@ usage() {
   echo "Usage: $0 <heap_profile_dir> <vizier_cluster_id> [--gcloud-common-args] [--gcloud-ssh-args...]"
   echo "<heap_profile_dir> : the directory where the heap profile and memory mapped files will be stored. It will be created if it does not exist."
   echo "<vizier_cluster_id> : the ID of the Vizier cluster to connect to."
+  echo "[--px-run-args] : additional arguments to pass the px run px/collect_agent_heaps command, such as --asid <asid_value>. This must come before any gcloud arguments."
   echo "[--gcloud-common-args] : common arguments to pass to gcloud commands, such as --project."
   echo "[--gcloud-ssh-args] : additional arguments to pass to gcloud compute ssh commands, such as --internal-ip."
   exit 1
@@ -37,6 +38,24 @@ parse_args() {
 
   cluster_id="$1"
   shift
+
+  ARGS_PROCESSED=3
+
+  case "$1" in
+    --px-run-args=*)
+      PX_RUN_ARGS="${1#*=}"
+      read -ra PX_RUN_ARGS_ARR <<< "$PX_RUN_ARGS"
+      shift
+      ARGS_PROCESSED=$((ARGS_PROCESSED + 1))
+      ;;
+    --px-run-args)
+      PX_RUN_ARGS="$2"
+      read -ra PX_RUN_ARGS_ARR <<< "$PX_RUN_ARGS"
+      shift
+      shift
+      ARGS_PROCESSED=$((ARGS_PROCESSED + 2))
+      ;;
+  esac
 }
 
 check_args() {
@@ -55,7 +74,7 @@ mkdir -p "$heap_profile_dir"
 
 pxl_heap_output_file="${heap_profile_dir}/heap_dump_raw_output.json"
 
-px run -o json -c "$cluster_id" -f "${repo_root}/src/pxl_scripts/px/collect_heap_dumps.pxl"  > "$pxl_heap_output_file"
+px run -o json -c "$cluster_id" -f "${repo_root}/src/pxl_scripts/px/collect_agent_heaps" -- "${PX_RUN_ARGS_ARR[@]}" > "$pxl_heap_output_file"
 
 while IFS= read -r line; do
     asid=$(echo "$line" | jq -r '.asid')
@@ -82,5 +101,5 @@ for agent in "${!agents[@]}"; do
   asid="${agent}"
   hostname="${agents[$agent]}"
   filename="${heap_profile_dir}/${hostname}-${asid}.txt"
-  "${script_dir}/download_heap_prof_mapped_files.sh" "$filename" "$hostname" "${@:3}"
+  "${script_dir}/download_heap_prof_mapped_files.sh" "$filename" "$hostname" "${@:${ARGS_PROCESSED}}"
 done

@@ -93,6 +93,20 @@ class HeapSampleUDTF final : public carnot::udf::UDTF<HeapSampleUDTF> {
   }
 };
 
+/* template <typename TUDTF> */
+/* class UDTFWithMDFactory : public carnot::udf::UDTFFactory { */
+/*  public: */
+/*   UDTFWithMDFactory() = delete; */
+/*   explicit UDTFWithMDFactory(const VizierFuncFactoryContext& ctx) : ctx_(ctx) {} */
+
+/*   std::unique_ptr<carnot::udf::AnyUDTF> Make() override { */
+/*     return std::make_unique<TUDTF>(ctx_); */
+/*   } */
+
+/*  private: */
+/*   const VizierFuncFactoryContext& ctx_; */
+/* }; */
+
 class HeapGrowthStacksUDTF final : public carnot::udf::UDTF<HeapGrowthStacksUDTF> {
  public:
   static constexpr auto Executor() { return carnot::udfspb::UDTFSourceExecutor::UDTF_ALL_AGENTS; }
@@ -105,6 +119,10 @@ class HeapGrowthStacksUDTF final : public carnot::udf::UDTF<HeapGrowthStacksUDTF
   }
 
   bool NextRecord(FunctionContext* ctx, RecordWriter* rw) {
+    auto asid = ctx->metadata_state()->asid();
+    if (asid_ != -1 && asid != asid_) {
+      return false;
+    }
 #ifdef TCMALLOC
     std::string buf;
     MallocExtension::instance()->GetHeapGrowthStacks(&buf);
@@ -118,6 +136,19 @@ class HeapGrowthStacksUDTF final : public carnot::udf::UDTF<HeapGrowthStacksUDTF
 
     return false;
   }
+
+  Status Init(FunctionContext* /*ctx*/, types::Int64Value asid) {
+    asid_ = asid.val;
+    return Status::OK();
+  }
+
+  static constexpr auto InitArgs() {
+    return MakeArray(UDTFArg::Make<types::INT64>(
+        "asid", "Whether to filter the result set for a specific asid", -1));
+  }
+
+ private:
+  int64_t asid_;
 };
 
 class AgentProcStatusUDTF final : public carnot::udf::UDTF<AgentProcStatusUDTF> {
