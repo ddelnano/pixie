@@ -33,6 +33,27 @@ data:
       timeout: 3
       verify: true
     }
+
+    server_name: $POD_NAME
+    jetstream {
+      store_dir: /data/jetstream
+    }
+
+    cluster {
+      name: pl-nats
+      port: 6222
+
+      tls {
+        ca_file: "/etc/nats-server-tls-certs/ca.crt",
+        cert_file: "/etc/nats-server-tls-certs/server.crt",
+        key_file: "/etc/nats-server-tls-certs/server.key",
+        timeout: 3
+        insecure: true
+      }
+
+      advertise: $CLUSTER_ADVERTISE
+      connect_retries: 30
+    }
 ---
 apiVersion: v1
 kind: Service
@@ -46,6 +67,7 @@ spec:
   ports:
   - name: client
     port: 4222
+  publishNotReadyAddresses: true
 ---
 apiVersion: v1
 kind: Service
@@ -58,6 +80,8 @@ spec:
     name: pl-nats
   clusterIP: None
   ports:
+  - name: client
+    port: 4222
   - name: cluster
     port: 6222
   - name: monitor
@@ -68,6 +92,17 @@ spec:
     port: 7422
   - name: gateways
     port: 7522
+  publishNotReadyAddresses: true
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: pl-nats-pdb
+spec:
+  minAvailable: 51%
+  selector:
+    matchLabels:
+      name: pl-nats
 ---
 apiVersion: apps/v1
 kind: StatefulSet
@@ -79,14 +114,37 @@ spec:
   selector:
     matchLabels:
       name: pl-nats
-  replicas: 1
-  serviceName: pl-nats
+  replicas: 5
+  podManagementPolicy: Parallel
+  serviceName: pl-nats-mgmt
+  volumeClaimTemplates:
+  - metadata:
+      name: nats-sts-vol
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      storageClassName: premium-rwo
+      resources:
+        requests:
+          storage: 25Gi
   template:
     metadata:
       labels:
         name: pl-nats
         plane: control
     spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 1
+            podAffinityTerm:
+              topologyKey: "kubernetes.io/hostname"
+              labelSelector:
+                matchExpressions:
+                - key: name
+                  operator: In
+                  values:
+                  - pl-nats
       # Common volumes for the containers
       volumes:
       - name: nats-server-tls-volume
@@ -125,8 +183,14 @@ spec:
           name: metrics
         command:
         - "nats-server"
+        args:
         - "--config"
         - "/etc/nats-config/nats.conf"
+        - "-js"
+        - "--cluster"
+        - "nats://0.0.0.0:6222"
+        - "--routes"
+        - "nats://pl-nats-0.pl-nats-mgmt.$(POD_NAMESPACE).svc:6222,nats://pl-nats-1.pl-nats-mgmt.$(POD_NAMESPACE).svc:6222,nats://pl-nats-2.pl-nats-mgmt.$(POD_NAMESPACE).svc:6222,nats://pl-nats-3.pl-nats-mgmt.$(POD_NAMESPACE).svc:6222,nats://pl-nats-4.pl-nats-mgmt.$(POD_NAMESPACE).svc:6222"
 
         # Required to be able to define an environment variable
         # that refers to other environment variables.  This env var
@@ -141,7 +205,7 @@ spec:
             fieldRef:
               fieldPath: metadata.namespace
         - name: CLUSTER_ADVERTISE
-          value: $(POD_NAME).pl-nats.$(POD_NAMESPACE).svc
+          value: $(POD_NAME).pl-nats-mgmt.$(POD_NAMESPACE).svc
         volumeMounts:
         - name: config-volume
           mountPath: /etc/nats-config
@@ -149,21 +213,36 @@ spec:
           mountPath: /etc/nats-server-tls-certs
         - name: pid
           mountPath: /var/run/nats
+        - name: nats-sts-vol
+          mountPath: /data/jetstream
 
         # Liveness/Readiness probes against the monitoring
         #
         livenessProbe:
           httpGet:
-            path: /
+            path: /healthz?js-enabled-only=true
             port: 8222
-          initialDelaySeconds: 10
-          timeoutSeconds: 5
+          periodSeconds: 30
+          successThreshold: 1
+          failureThreshold: 3
         readinessProbe:
           httpGet:
-            path: /
+            path: /healthz?js-server-only=true
             port: 8222
           initialDelaySeconds: 10
           timeoutSeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /healthz
+            port: 8222
+          initialDelaySeconds: 10
+          timeoutSeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 90
 
         # Gracefully stop NATS Server on pod deletion or image upgrade.
         #
