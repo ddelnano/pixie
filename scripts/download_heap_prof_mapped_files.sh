@@ -87,8 +87,8 @@ mkdir -p "$output_dir"
 mappings=$(awk 'BEGIN{m=0} /MAPPED_LIBRARIES/{m=1} { if(m) { print $6 }}' "$heap_profile" | grep "^/" | sort | uniq)
 
 err_file="$output_dir/gcloud_error.log"
-zone=$(gcloud compute instances list "${GCLOUD_COMMON_ARGS}" --filter="$node_name" --format="table(name, zone)"| tail -n 1 | awk '{print $2}')
-procs=$(gcloud compute ssh --zone "$zone" --command='ps ax' "$node_name" "${GCLOUD_COMMON_ARGS}" "${GCLOUD_SSH_ARGS}" 2> "$err_file") || cat "$err_file" && rm "$err_file"
+# zone=$(gcloud compute instances list "${GCLOUD_COMMON_ARGS}" --filter="$node_name" --format="table(name, zone)"| tail -n 1 | awk '{print $2}')
+procs=$(ssh "$node_name" ps ax 2> "$err_file") || cat "$err_file" && rm "$err_file"
 
 # Find the mapping that corresponds to a process on the node.
 # We assume that the process was started by running one of the files in the mappings
@@ -110,26 +110,32 @@ file_paths=$(echo "$mappings" | xargs -I{} echo "$file_root{}")
 
 # Create a tar archive on the remote node with each of the files from the mappings found above.
 tar_file="output.tar.gz"
-create_tar_cmd=$(cat << EOF
- mkdir -p output;
- echo "$file_paths" | xargs -I{} sudo cp {} output;
- tar -czf "$tar_file" output/*;
- rm -rf output;
-EOF
-)
 
 output_on_err() {
   output=$("$@" 2>&1) || echo "$output"
 }
 
+# Encode file paths for transmission
+encoded_paths=$(echo "$file_paths" | base64 -w 0)
+
 # Create tar archive on node.
-output_on_err gcloud compute ssh  --zone "$zone" --command="$create_tar_cmd" "$node_name" "${GCLOUD_COMMON_ARGS}" "${GCLOUD_SSH_ARGS}"
+output_on_err ssh "$node_name" 'bash -s' <<EOF
+set -e
+mkdir -p output
+
+echo "$encoded_paths" | base64 --decode | while read -r file; do
+  sudo cp "\$file" output/
+done
+
+tar -czf "$tar_file" output/*
+rm -rf output
+EOF
 
 # Copy archive to local machine.
-output_on_err gcloud compute scp --zone "$zone" "${GCLOUD_COMMON_ARGS}" "${GCLOUD_SSH_ARGS}" "$USER@$node_name:~/$tar_file" "${output_dir}/$tar_file"
+output_on_err scp "$node_name:~/$tar_file" "${output_dir}/$tar_file"
 
 # Cleanup tar archive on node.
-output_on_err gcloud compute ssh --zone "$zone" --command="rm ~/$tar_file" "$node_name" "${GCLOUD_COMMON_ARGS}" "${GCLOUD_SSH_ARGS}"
+output_on_err ssh "$node_name" rm "~/$tar_file"
 
 tar --strip-components=1 -C "$output_dir" -xzf "${output_dir}/$tar_file"
 
