@@ -320,6 +320,75 @@ INSTANTIATE_TEST_SUITE_P(AutoTraceExpansionTestSuite, AutoTraceExpansionTest,
                          ::testing::Values(ProbeGenTestParam{kProgramWithSymbol,
                                                              kAutoTraceExpansionOutput}));
 
+//-------------------------------------
+// ValidateTracepointLanguageConsistency Tests
+//-------------------------------------
+
+class ValidateTracepointLanguageConsistencyTest : public ProbeGenTest {};
+
+TEST_F(ValidateTracepointLanguageConsistencyTest, SingleTracepointConsistency) {
+  constexpr std::string_view kSingleTracepoint = R"(
+deployment_spec {
+  path_list: {
+    paths: "$0"
+  }
+}
+tracepoints {
+  program {
+    language: GOLANG
+    probes {
+      name: "probe0"
+      tracepoint {
+        symbol: "main.MixedArgTypes"
+        type: LOGICAL
+      }
+    }
+  }
+}
+)";
+
+  ir::logical::TracepointDeployment program;
+  ASSERT_NO_FATAL_FAILURE(PrepareInput(kSingleTracepoint, &program));
+
+  // This should succeed because there's only one tracepoint
+  ASSERT_OK(ValidateTracepointLanguageConsistency(dwarf_reader_.get(), &program));
+}
+
+TEST_F(ValidateTracepointLanguageConsistencyTest, MultipleConsistentTracepoints) {
+  constexpr std::string_view kMultipleConsistentTracepoints = R"(
+deployment_spec {
+  path_list: {
+    paths: "$0"
+  }
+}
+tracepoints {
+  program {
+    language: GOLANG
+    probes {
+      name: "probe0"
+      tracepoint {
+        symbol: "main.MixedArgTypes"
+        type: LOGICAL
+      }
+    }
+    probes {
+      name: "probe1"
+      tracepoint {
+        symbol: "main.(*Vertex).Scale"
+        type: LOGICAL
+      }
+    }
+  }
+}
+)";
+
+  ir::logical::TracepointDeployment program;
+  ASSERT_NO_FATAL_FAILURE(PrepareInput(kMultipleConsistentTracepoints, &program));
+
+  // This should succeed because both functions should be from the same Go compile unit
+  ASSERT_OK(ValidateTracepointLanguageConsistency(dwarf_reader_.get(), &program));
+}
+
 }  // namespace dynamic_tracing
 }  // namespace stirling
 }  // namespace px

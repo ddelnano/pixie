@@ -45,6 +45,14 @@ Status ResolveProbeSymbol(obj_tools::ElfReader* elf_reader,
                           ir::logical::TracepointDeployment* input_program);
 
 /**
+ * Validates that all tracepoints in a binary have consistent DW_AT_language attributes.
+ * Returns an error if tracepoints have different languages, as Pixie only supports
+ * single-language binaries for tracing.
+ */
+Status ValidateTracepointLanguageConsistency(obj_tools::DwarfReader* dwarf_reader,
+                                             ir::logical::TracepointDeployment* input_program);
+
+/**
  * If any tracepoint in input_program contains no fields to trace, this function uses DWARF info
  * to automatically add (1) all arguments, (2) all response values, and (3) function latency
  * to the tracepoint specifications in input_program.

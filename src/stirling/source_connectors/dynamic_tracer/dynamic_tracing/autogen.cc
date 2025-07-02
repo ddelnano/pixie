@@ -21,6 +21,7 @@
 #include <absl/strings/str_replace.h>
 
 #include <map>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -176,8 +177,50 @@ Status ResolveProbeSymbol(obj_tools::ElfReader* elf_reader,
   return Status::OK();
 }
 
+Status ValidateTracepointLanguageConsistency(obj_tools::DwarfReader* dwarf_reader,
+                                             ir::logical::TracepointDeployment* input_program) {
+  std::optional<llvm::dwarf::SourceLanguage> expected_language;
+  std::string first_symbol;
+
+  for (const auto& t : input_program->tracepoints()) {
+    for (const auto& probe : t.program().probes()) {
+      const std::string& symbol_name = probe.tracepoint().symbol();
+
+      // Get the function DIE for this tracepoint
+      PX_ASSIGN_OR_RETURN(
+          const llvm::DWARFDie& function_die,
+          dwarf_reader->GetMatchingDIE(symbol_name, llvm::dwarf::DW_TAG_subprogram));
+
+      // Get the compile unit for this function
+      llvm::DWARFUnit* cu = function_die.getDwarfUnit();
+      llvm::DWARFDie unit_die = cu->getUnitDIE();
+
+      // Extract the language from this compile unit
+      PX_ASSIGN_OR_RETURN(auto lang_pair, dwarf_reader->DetectSourceLanguageFromCUDIE(unit_die));
+      llvm::dwarf::SourceLanguage current_language = lang_pair.first;
+
+      if (!expected_language.has_value()) {
+        expected_language = current_language;
+        first_symbol = symbol_name;
+      } else if (expected_language.value() != current_language) {
+        return error::Internal(
+            "Tracepoint language inconsistency detected. Function '$0' has language $1, "
+            "but function '$2' has language $3. All tracepoints in a binary must have the same "
+            "language.",
+            first_symbol, magic_enum::enum_name(expected_language.value()), symbol_name,
+            magic_enum::enum_name(current_language));
+      }
+    }
+  }
+
+  return Status::OK();
+}
+
 Status AutoTraceExpansion(obj_tools::DwarfReader* dwarf_reader,
                           ir::logical::TracepointDeployment* input_program) {
+  // Validate that all tracepoints have consistent DW_AT_language attributes
+  PX_RETURN_IF_ERROR(ValidateTracepointLanguageConsistency(dwarf_reader, input_program));
+
   for (auto& t : *input_program->mutable_tracepoints()) {
     for (auto& probe : *t.mutable_program()->mutable_probes()) {
       if ((probe.args_size() != 0) || (probe.ret_vals_size() != 0) ||
