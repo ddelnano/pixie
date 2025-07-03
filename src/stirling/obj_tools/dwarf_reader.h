@@ -297,25 +297,9 @@ class DwarfReader {
 
   bool IsValid() const { return dwarf_context_->getNumCompileUnits() != 0; }
 
-  StatusOr<llvm::dwarf::SourceLanguage> source_language() const {
-    if (!is_multi_lang_.has_value()) {
-      return error::Internal(
-          "source_language() called before the source language was detected. "
-          "Call DetectSourceLanguage() first.");
-    } else if (is_multi_lang_.value()) {
-      return error::Internal(
-          "source_language() called on a multi-language DWARF file. "
-          "Use GetMatchingDIEs() to find the source language for a specific DIE.");
-    }
-    return source_language_;
-  }
-
  private:
   DwarfReader(std::unique_ptr<llvm::MemoryBuffer> buffer,
               std::unique_ptr<llvm::DWARFContext> dwarf_context);
-
-  // Detects the source language of the dwarf content being read.
-  Status DetectSourceLanguage();
 
   // Builds an index for certain commonly used DIE types (e.g. structs and functions).
   // When making multiple DwarfReader calls, this speeds up the process at the cost of some memory.
@@ -332,11 +316,6 @@ class DwarfReader {
 
   void InsertToDIEMap(std::string name, llvm::dwarf::Tag tag, llvm::DWARFDie die);
   std::optional<llvm::DWARFDie> FindInDIEMap(const std::string& name, llvm::dwarf::Tag tag) const;
-
-  // Records the source language of the DWARF information.
-  llvm::dwarf::SourceLanguage source_language_;
-
-  std::optional<bool> is_multi_lang_;
 
   std::unique_ptr<llvm::MemoryBuffer> memory_buffer_;
   std::unique_ptr<llvm::DWARFContext> dwarf_context_;

@@ -61,25 +61,43 @@ void DetectSourceLanguage(obj_tools::ElfReader* elf_reader, obj_tools::DwarfRead
   ir::shared::Language detected_language = ir::shared::Language::LANG_UNKNOWN;
 
   // Primary detection mechanism is DWARF info, when available.
-  if (dwarf_reader != nullptr) {
-    // It's possible for DWARF to have DW_TAG_compile_unit's from multiple languages.
-    // We currently only support binaries with a single language, so we
-    // assert that this is the case.
-    auto source_lang_s = dwarf_reader->source_language();
-    if (source_lang_s.ok()) {
-      auto source_lang = source_lang_s.ValueOrDie();
-      detected_language =
-          TransformSourceLanguage(source_lang).ConsumeValueOr(ir::shared::Language::LANG_UNKNOWN);
-      LOG(INFO) << absl::Substitute("Using language $0 for object $1 and others",
-                                    magic_enum::enum_name(source_lang),
-                                    input_program->deployment_spec().path_list().paths(0));
+  if (dwarf_reader != nullptr && !input_program->tracepoints().empty()) {
+    // Use the first tracepoint to determine the language for the entire program.
+    // The ValidateTracepointLanguageConsistency function will ensure all tracepoints
+    // have the same language.
+    const auto& first_tracepoint = input_program->tracepoints(0);
+    if (!first_tracepoint.program().probes().empty()) {
+      const std::string& symbol_name = first_tracepoint.program().probes(0).tracepoint().symbol();
 
-    } else {
-      LOG(WARNING) << absl::Substitute(
-          "Unable to detect TracepointDeployment's source language error=$0", source_lang_s.msg());
-      detected_language = ir::shared::Language::LANG_UNKNOWN;
+      auto function_die_s =
+          dwarf_reader->GetMatchingDIE(symbol_name, llvm::dwarf::DW_TAG_subprogram);
+      if (function_die_s.ok()) {
+        const llvm::DWARFDie& function_die = function_die_s.ValueOrDie();
+        llvm::DWARFUnit* cu = function_die.getDwarfUnit();
+        llvm::DWARFDie unit_die = cu->getUnitDIE();
+
+        auto lang_pair_s = dwarf_reader->DetectSourceLanguageFromCUDIE(unit_die);
+        if (lang_pair_s.ok()) {
+          auto lang_pair = lang_pair_s.ValueOrDie();
+          llvm::dwarf::SourceLanguage source_lang = lang_pair.first;
+          detected_language = TransformSourceLanguage(source_lang)
+                                  .ConsumeValueOr(ir::shared::Language::LANG_UNKNOWN);
+          LOG(INFO) << absl::Substitute("Using language $0 for object $1 and others",
+                                        magic_enum::enum_name(source_lang),
+                                        input_program->deployment_spec().path_list().paths(0));
+        } else {
+          LOG(WARNING) << absl::Substitute(
+              "Unable to detect language from DWARF for symbol '$0': $1", symbol_name,
+              lang_pair_s.msg());
+        }
+      } else {
+        LOG(WARNING) << absl::Substitute("Unable to find function DIE for symbol '$0': $1",
+                                         symbol_name, function_die_s.msg());
+      }
     }
-  } else {
+  }
+
+  if (detected_language == ir::shared::Language::LANG_UNKNOWN) {
     // Back-up detection policy looks for certain language-specific symbols
     if (IsGoExecutable(elf_reader)) {
       detected_language = ir::shared::Language::GOLANG;

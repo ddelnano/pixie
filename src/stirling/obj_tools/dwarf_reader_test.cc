@@ -129,21 +129,13 @@ TEST_P(CppDwarfReaderTest, NonExistentPath) {
 
 TEST_P(CppDwarfReaderTest, SourceLanguage) {
   {
-    // Indexed DwarfReader's have source_language() populated, while non-indexed ones do not.
-    auto source_lang_s = dwarf_reader->source_language();
-    if (indexed) {
-      // We use C++17, but the dwarf shows 14.
-      EXPECT_EQ(source_lang_s.ValueOrDie(), llvm::dwarf::DW_LANG_C_plus_plus_14);
-    } else {
-      EXPECT_TRUE(!source_lang_s.ok());
-    }
-
     // Check that source language detect for individual DIEs works.
     ASSERT_OK_AND_ASSIGN(
         auto die, dwarf_reader->GetMatchingDIE("CanYouFindThis", llvm::dwarf::DW_TAG_subprogram));
     llvm::DWARFUnit* cu = die.getDwarfUnit();
     llvm::DWARFDie unit_die = cu->getUnitDIE();
     ASSERT_OK_AND_ASSIGN(auto p, dwarf_reader->DetectSourceLanguageFromCUDIE(unit_die));
+    // We use C++17, but the dwarf shows 14.
     EXPECT_EQ(p.first, llvm::dwarf::DW_LANG_C_plus_plus_14);
     EXPECT_THAT(p.second, ::testing::HasSubstr("clang"));
   }
@@ -151,19 +143,6 @@ TEST_P(CppDwarfReaderTest, SourceLanguage) {
 
 TEST_P(GolangDwarfReaderTest, SourceLanguage) {
   {
-    auto source_lang_s = dwarf_reader->source_language();
-    // Indexed DwarfReader's have source_language() populated, while non-indexed ones do not.
-    if (indexed) {
-      if (source_lang_s.ok()) {
-        EXPECT_EQ(source_lang_s.ValueOrDie(), llvm::dwarf::DW_LANG_Go);
-      } else {
-        ASSERT_THAT(std::string(source_lang_s.msg()),
-                    ::testing::HasSubstr("multi-language DWARF file"));
-      }
-    } else {
-      EXPECT_TRUE(!source_lang_s.ok());
-    }
-
     // Check that source language detect for individual DIEs works.
     ASSERT_OK_AND_ASSIGN(const bool uses_regabi, UsesRegABI());
     ASSERT_OK_AND_ASSIGN(auto die, dwarf_reader->GetMatchingDIE("main.(*Vertex).Scale",
@@ -171,11 +150,10 @@ TEST_P(GolangDwarfReaderTest, SourceLanguage) {
     llvm::DWARFUnit* cu = die.getDwarfUnit();
     llvm::DWARFDie unit_die = cu->getUnitDIE();
     ASSERT_OK_AND_ASSIGN(auto p, dwarf_reader->DetectSourceLanguageFromCUDIE(unit_die));
+    EXPECT_EQ(p.first, llvm::dwarf::DW_LANG_Go);
     if (uses_regabi) {
-      EXPECT_EQ(p.first, llvm::dwarf::DW_LANG_Go);
       EXPECT_THAT(p.second, ::testing::HasSubstr("regabi"));
     } else {
-      EXPECT_EQ(p.first, llvm::dwarf::DW_LANG_Go);
       EXPECT_THAT(p.second, ::testing::Not(::testing::HasSubstr("regabi")));
     }
   }

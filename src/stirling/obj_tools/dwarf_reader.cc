@@ -99,7 +99,6 @@ StatusOr<std::unique_ptr<DwarfReader>> DwarfReader::CreateIndexingAll(
     const std::filesystem::path& path) {
   PX_ASSIGN_OR_RETURN(auto dwarf_reader, CreateWithoutIndexing(path));
   dwarf_reader->IndexDIEs(std::nullopt);
-  PX_RETURN_IF_ERROR(dwarf_reader->DetectSourceLanguage());
   return dwarf_reader;
 }
 
@@ -107,15 +106,12 @@ StatusOr<std::unique_ptr<DwarfReader>> DwarfReader::CreateWithSelectiveIndexing(
     const std::filesystem::path& path, const std::vector<SymbolSearchPattern>& symbol_patterns) {
   PX_ASSIGN_OR_RETURN(auto dwarf_reader, CreateWithoutIndexing(path));
   dwarf_reader->IndexDIEs(symbol_patterns);
-  PX_RETURN_IF_ERROR(dwarf_reader->DetectSourceLanguage());
   return dwarf_reader;
 }
 
 DwarfReader::DwarfReader(std::unique_ptr<llvm::MemoryBuffer> buffer,
                          std::unique_ptr<llvm::DWARFContext> dwarf_context)
-    : is_multi_lang_(std::nullopt),
-      memory_buffer_(std::move(buffer)),
-      dwarf_context_(std::move(dwarf_context)) {
+    : memory_buffer_(std::move(buffer)), dwarf_context_(std::move(dwarf_context)) {
   // Only very first call will actually perform initialization.
   InitLLVMOnce();
 }
@@ -179,34 +175,6 @@ DwarfReader::DetectSourceLanguageFromCUDIE(const llvm::DWARFDie& unit_die) {
   auto source_language =
       static_cast<llvm::dwarf::SourceLanguage>(lang_attr.getAsUnsignedConstant().getValue());
   return std::make_pair(source_language, compiler);
-}
-
-Status DwarfReader::DetectSourceLanguage() {
-  is_multi_lang_ = false;
-  std::optional<llvm::dwarf::SourceLanguage> prev_source_language;
-  for (size_t i = 0; i < dwarf_context_->getNumCompileUnits(); ++i) {
-    const auto& unit_die = dwarf_context_->getUnitAtIndex(i)->getUnitDIE();
-    auto lang_s = DetectSourceLanguageFromCUDIE(unit_die);
-    if (!lang_s.ok()) {
-      continue;
-    }
-    auto p = lang_s.ValueOrDie();
-    auto source_language = p.first;
-
-    if (!prev_source_language.has_value()) {
-      prev_source_language = source_language;
-    } else if (prev_source_language.has_value() &&
-               prev_source_language.value() != source_language) {
-      is_multi_lang_ = true;
-    }
-  }
-  if (prev_source_language.has_value()) {
-    source_language_ = prev_source_language.value();
-    return Status::OK();
-  }
-  return error::Internal(
-      "Could not determine the source language of the DWARF info. DW_AT_language not found on "
-      "any compilation unit.");
 }
 
 void DwarfReader::IndexDIEs(
@@ -956,7 +924,7 @@ StatusOr<std::map<std::string, ArgInfo>> DwarfReader::GetFunctionArgInfo(
   ABI abi = LanguageToABI(p.first, p.second);
   if (abi == ABI::kUnknown) {
     return error::Unimplemented("Unable to determine ABI from language: $0",
-                                magic_enum::enum_name(source_language_));
+                                magic_enum::enum_name(p.first));
   }
   std::unique_ptr<ABICallingConventionModel> arg_tracker = ABICallingConventionModel::Create(abi);
 
