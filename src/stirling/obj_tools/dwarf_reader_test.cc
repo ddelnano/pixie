@@ -87,10 +87,8 @@ class CppDwarfReaderTest : public ::testing::TestWithParam<DwarfReaderTestParam>
   void SetUp() override {
     DwarfReaderTestParam p = GetParam();
     ASSERT_OK_AND_ASSIGN(dwarf_reader, CreateDwarfReader(p.binary_path, p.index));
-    indexed = p.index;
   }
   std::unique_ptr<DwarfReader> dwarf_reader;
-  bool indexed;
 };
 
 class GolangDwarfReaderTest : public ::testing::TestWithParam<DwarfReaderTestParam> {
@@ -98,7 +96,6 @@ class GolangDwarfReaderTest : public ::testing::TestWithParam<DwarfReaderTestPar
   void SetUp() override {
     DwarfReaderTestParam p = GetParam();
     ASSERT_OK_AND_ASSIGN(dwarf_reader, CreateDwarfReader(p.binary_path, p.index));
-    indexed = p.index;
   }
 
   StatusOr<SemVer> GetGoVersion() const {
@@ -115,7 +112,6 @@ class GolangDwarfReaderTest : public ::testing::TestWithParam<DwarfReaderTestPar
   }
 
   std::unique_ptr<DwarfReader> dwarf_reader;
-  bool indexed;
 };
 
 class GolangDwarfReaderIndexTest : public ::testing::TestWithParam<bool> {
