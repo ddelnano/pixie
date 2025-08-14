@@ -19,6 +19,11 @@ pl_register_cc_toolchains()
 # Install Pixie Labs Dependencies.
 pl_deps()
 
+# Load protobuf_deps early to set up compatibility_proxy
+load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
+
+protobuf_deps()
+
 # Order is important. Try to go from most basic/primitive to higher level packages.
 # - go_rules_dependencies
 # - protobuf_deps
@@ -33,7 +38,7 @@ pl_go_overrides()
 
 go_download_sdk(
     name = "go_sdk",
-    version = "1.24.6",
+    version = "1.25.0",
 )
 
 go_rules_dependencies()
@@ -45,13 +50,17 @@ go_register_toolchains()
 # gazelle:repository_macro go_deps.bzl%pl_go_dependencies
 pl_go_dependencies()
 
-load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
-
-protobuf_deps()
-
 load("@com_github_grpc_grpc//bazel:grpc_deps.bzl", "grpc_deps")
 
 grpc_deps()
+
+load("@rules_jvm_external//:repositories.bzl", "rules_jvm_external_deps")
+
+rules_jvm_external_deps()
+
+load("@rules_jvm_external//:setup.bzl", "rules_jvm_external_setup")
+
+rules_jvm_external_setup()
 
 load("@io_bazel_rules_scala//:scala_config.bzl", "scala_config")
 
@@ -59,13 +68,19 @@ scala_version = "2.13.6"
 
 scala_config(scala_version = scala_version)
 
-load("@io_bazel_rules_scala//scala:scala.bzl", "scala_repositories")
+load("@rules_scala//scala:deps.bzl", "rules_scala_dependencies")
 
-scala_repositories()
+rules_scala_dependencies()
 
 load("@io_bazel_rules_scala//scala:toolchains.bzl", "scala_register_toolchains")
 
 scala_register_toolchains()
+
+# Setup rules_java early to avoid cycles
+load("@rules_java//java:repositories.bzl", "rules_java_dependencies", "rules_java_toolchains")
+
+rules_java_dependencies()
+rules_java_toolchains()
 
 # These dependencies are needed by GRPC.
 load("@build_bazel_rules_apple//apple:repositories.bzl", "apple_rules_dependencies")
@@ -215,6 +230,11 @@ go_download_sdk(
     version = "1.23.12",
 )
 
+go_download_sdk(
+    name = "go_sdk_1_24",
+    version = "1.24.6",
+)
+
 # The go_sdk_boringcrypto SDK is used for testing boringcrypto specific functionality (TLS tracing).
 # This SDK is used for specific test cases and is not meant to be used wholesale for a particular go
 # version.
@@ -225,7 +245,7 @@ go_download_sdk(
 go_download_sdk(
     name = "go_sdk_boringcrypto",
     experiments = ["boringcrypto"],
-    version = "1.23.11",
+    version = "1.24.5",
 )
 
 pip_parse(

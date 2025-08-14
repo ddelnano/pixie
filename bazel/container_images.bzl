@@ -330,6 +330,15 @@ def stirling_test_images():
 
     # Tag: 1.0
     # Arch: linux/amd64
+    # TODO: Uncomment once golang_1_23 images are built
+    # _container_image(
+    #     name = "golang_1_23_https_server_with_buildinfo",
+    #     repository = "golang_1_23_https_server_with_buildinfo",
+    #     digest = "sha256:0f14818a1046dfdb7d5ac27e173d99e071219897a1d9969c8d7604acbd0d9541",
+    # )
+
+    # Tag: 1.0
+    # Arch: linux/amd64
     _container_image(
         name = "golang_1_18_grpc_server_with_buildinfo",
         repository = "golang_1_18_grpc_server_with_buildinfo",
@@ -367,3 +376,12 @@ def stirling_test_images():
         repository = "golang_1_22_grpc_server_with_buildinfo",
         digest = "sha256:67adba5e8513670fa37bd042862e7844f26239e8d2997ed8c3b0aa527bc04cc3",
     )
+
+    # Tag: 1.0
+    # Arch: linux/amd64
+    # TODO: Uncomment once golang_1_23 images are built
+    # _container_image(
+    #     name = "golang_1_23_grpc_server_with_buildinfo",
+    #     repository = "golang_1_23_grpc_server_with_buildinfo",
+    #     digest = "sha256:67adba5e8513670fa37bd042862e7844f26239e8d2997ed8c3b0aa527bc04cc3",
+    # )

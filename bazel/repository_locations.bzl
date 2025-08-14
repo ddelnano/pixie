@@ -262,11 +262,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/googletest/archive/refs/tags/release-1.12.1.tar.gz"],
     ),
     com_google_protobuf = dict(
-        sha256 = "63c5539a8506dc6bccd352a857cea106e0a389ce047a3ff0a78fe3f8fede410d",
-        strip_prefix = "protobuf-24487dd1045c7f3d64a21f38a3f0c06cc4cf2edb",
+        sha256 = "d0e3a75876a81e1536028bb9cf9181382b198da4cc6fa6aef86879ef629ac807",
+        strip_prefix = "protobuf-74211c0dfc2777318ab53c2cd2c317a2ef9012de",
         urls = [
-            "https://storage.googleapis.com/grpc-bazel-mirror/github.com/protocolbuffers/protobuf/archive/24487dd1045c7f3d64a21f38a3f0c06cc4cf2edb.tar.gz",
-            "https://github.com/protocolbuffers/protobuf/archive/24487dd1045c7f3d64a21f38a3f0c06cc4cf2edb.tar.gz",
+            "https://github.com/protocolbuffers/protobuf/archive/74211c0dfc2777318ab53c2cd2c317a2ef9012de.tar.gz",
         ],
     ),
     com_google_protobuf_javascript = dict(
@@ -410,6 +409,14 @@ REPOSITORY_LOCATIONS = dict(
         ],
         manual_license_name = "oracle/openjdk",
     ),
+    io_bazel_rules_proto = dict(
+	name = "rules_proto",
+	sha256 = "14a225870ab4e91869652cfd69ef2028277fc1dc4910d65d353b62d6e0ae21f4",
+	strip_prefix = "rules_proto-7.1.0",
+	urls = [
+            "https://github.com/bazelbuild/rules_proto/releases/download/7.1.0/rules_proto-7.1.0.tar.gz",
+        ],
+    ),
     io_bazel_rules_closure = dict(
         sha256 = "5b00383d08dd71f28503736db0500b6fb4dda47489ff5fc6bed42557c07c6ba9",
         strip_prefix = "rules_closure-308b05b2419edb5c8ee0471b67a40403df940149",
@@ -420,10 +427,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/bazelbuild/rules_docker/releases/download/v0.25.0/rules_docker-v0.25.0.tar.gz"],
     ),
     io_bazel_rules_go = dict(
-        sha256 = "f74c98d6df55217a36859c74b460e774abc0410a47cc100d822be34d5f990f16",
+        sha256 = "89d2050410602142c9acafd01c95baf48b65f8dd16f4771d37c89f82f5e147f2",
         urls = [
-            "https://mirror.bazel.build/github.com/bazelbuild/rules_go/releases/download/v0.47.1/rules_go-v0.47.1.zip",
-            "https://github.com/bazelbuild/rules_go/releases/download/v0.47.1/rules_go-v0.47.1.zip",
+            "https://mirror.bazel.build/github.com/bazelbuild/rules_go/releases/download/v0.56.1/rules_go-v0.56.1.zip",
+            "https://github.com/bazelbuild/rules_go/releases/download/v0.56.1/rules_go-v0.56.1.zip",
         ],
     ),
     io_bazel_rules_k8s = dict(
@@ -434,11 +441,11 @@ REPOSITORY_LOCATIONS = dict(
         ],
     ),
     io_bazel_rules_scala = dict(
-        sha256 = "6e9191363357d30b144e7306fec74deea2c7f1de63f3ed32028838116c239e8a",
+        sha256 = "6a900a39bf643c5c9308c8200f9a61e27588dc54a67aa08fcfc798f25add4f7b",
         urls = [
-            "https://github.com/bazelbuild/rules_scala/archive/4ba3780fcba8d26980daff4639abc6f18517308b.tar.gz",
+            "https://github.com/bazelbuild/rules_scala/releases/download/v7.1.0/rules_scala-v7.1.0.tar.gz",
         ],
-        strip_prefix = "rules_scala-4ba3780fcba8d26980daff4639abc6f18517308b",
+        strip_prefix = "rules_scala-7.1.0",
     ),
     org_tensorflow = dict(
         sha256 = "99c732b92b1b37fc243a559e02f9aef5671771e272758aa4aec7f34dc92dac48",
@@ -461,10 +468,16 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "rules_python-0.26.0",
         urls = ["https://github.com/bazelbuild/rules_python/archive/refs/tags/0.26.0.tar.gz"],
     ),
+    rules_java = dict(
+        sha256 = "c0ee60f8757f140c157fc2c7af703d819514de6e025ebf70386d38bdd85fce83",
+        urls = [
+            "https://github.com/bazelbuild/rules_java/releases/download/7.12.3/rules_java-7.12.3.tar.gz",
+        ],
+    ),
     rules_jvm_external = dict(
-        urls = ["https://github.com/bazelbuild/rules_jvm_external/archive/refs/tags/5.2.tar.gz"],
-        sha256 = "c9ae901381ae7f7eca08aed96caeb542f96c5449052db9c9d27274a8dc154cdf",
-        strip_prefix = "rules_jvm_external-5.2",
+        urls = ["https://github.com/bazel-contrib/rules_jvm_external/releases/download/6.8/rules_jvm_external-6.8.tar.gz"],
+        sha256 = "704a0197e4e966f96993260418f2542568198490456c21814f647ae7091f56f2",
+        strip_prefix = "rules_jvm_external-6.8",
     ),
     rules_pkg = dict(
         sha256 = "eea0f59c28a9241156a47d7a8e32db9122f3d50b505fae0f33de6ce4d9b61834",

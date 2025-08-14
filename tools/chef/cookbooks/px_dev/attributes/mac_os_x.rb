@@ -34,9 +34,9 @@ default['codecov']['sha256'] =
   '8d3709d957c7115610e764621569728be102d213fee15bc1d1aa9d465eb2c258'
 
 default['golang']['download_path'] =
-  'https://go.dev/dl/go1.24.6.darwin-amd64.tar.gz'
+  'https://go.dev/dl/go1.25.0.darwin-amd64.tar.gz'
 default['golang']['sha256'] =
-  '4a8d7a32052f223e71faab424a69430455b27b3fff5f4e651f9d97c3e51a8746'
+  '5bd60e823037062c2307c71e8111809865116714d6f6b410597cf5075dfd80ef'
 
 default['golangci-lint']['download_path'] =
   'https://github.com/golangci/golangci-lint/releases/download/v2.3.1/golangci-lint-2.3.1-darwin-amd64.tar.gz'
