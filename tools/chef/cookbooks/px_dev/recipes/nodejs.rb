@@ -41,8 +41,10 @@ ENV['PATH'] = "/opt/px_dev/tools/node/bin:#{ENV['PATH']}"
 
 execute 'install node packages' do
   command 'npm install -g yarn@1.22.4 protobufjs@6.11.2 && npm cache clean --force'
+  not_if 'npm list -g yarn@1.22.4 && npm list -g protobufjs@6.11.2'
 end
 
 execute 'install pbjs/pbts deps' do
   command 'pbjs || true'
+  only_if { ::File.exist?('/opt/px_dev/tools/node/bin/pbjs') }
 end

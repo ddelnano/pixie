@@ -19,14 +19,18 @@ execute 'install go linters' do
             go install golang.org/x/tools/cmd/goimports@v0.1.2 && \
             go clean -modcache && \
             go clean -cache)
+  not_if { ::File.exist?('/opt/px_dev/gopath/bin/golint') &&
+           ::File.exist?('/opt/px_dev/gopath/bin/goimports') }
 end
 
 execute 'install js linters' do
   command 'npm install -g jshint@2.11.0 && npm cache clean --force'
+  not_if 'npm list -g jshint@2.11.0'
 end
 
 execute 'install py linters' do
   command 'python3 -m pip install --break-system-packages flake8 mypy yamllint --no-cache-dir && python3 -m pip cache purge'
+  not_if 'python3 -c "import flake8, mypy, yamllint" 2>/dev/null'
 end
 
 common_remote_bin 'prototool'

@@ -27,7 +27,12 @@ end
 
 include_recipe 'px_dev::golang'
 include_recipe 'px_dev::nodejs'
-include_recipe 'px_dev::php'
 include_recipe 'px_dev::python'
 
-include_recipe 'px_dev::arcanist'
+if node['optional_components'] && node['optional_components']['php']
+  include_recipe 'px_dev::php'
+end
+
+if node['optional_components'] && node['optional_components']['arcanist']
+  include_recipe 'px_dev::arcanist'
+end

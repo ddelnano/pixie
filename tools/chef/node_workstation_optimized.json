@@ -1,0 +1,17 @@
+{
+   "run_list": [ "role[px_workstation]" ],
+   "env": "base",
+   "optional_components": {
+      "gcloud": false,
+      "gcloud_update": false,
+      "gcloud_components": false,
+      "php": false,
+      "arcanist": false,
+      "k8s_tools": false,
+      "packer": false,
+      "trivy": false,
+      "lego": false,
+      "gperftools": false,
+      "docker_buildx": false
+   }
+}

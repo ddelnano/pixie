@@ -52,10 +52,10 @@ apt_pkg_list = [
   'libltdl-dev',
   'libunwind-dev',
 
-  'qemu-system-arm',
-  'qemu-system-x86',
-  'qemu-user-static',
-  'qemu-utils',
+#   'qemu-system-arm',
+#   'qemu-system-x86',
+#   'qemu-user-static',
+#   'qemu-utils',
 ]
 
 apt_package apt_pkg_list do

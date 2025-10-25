@@ -52,4 +52,14 @@ execute 'install go binaries' do
             go install github.com/regclient/regclient/cmd/regbot@v0.4.8 && \
             go clean -modcache && \
             go clean -cache)
+  # Only run if the binaries don't exist yet
+  not_if { ::File.exist?('/opt/px_dev/gopath/bin/mockgen') &&
+           ::File.exist?('/opt/px_dev/gopath/bin/controller-gen') &&
+           ::File.exist?('/opt/px_dev/gopath/bin/client-gen') &&
+           ::File.exist?('/opt/px_dev/gopath/bin/go-bindata') &&
+           ::File.exist?('/opt/px_dev/gopath/bin/crane') &&
+           ::File.exist?('/opt/px_dev/gopath/bin/cosign') &&
+           ::File.exist?('/opt/px_dev/gopath/bin/regctl') &&
+           ::File.exist?('/opt/px_dev/gopath/bin/regsync') &&
+           ::File.exist?('/opt/px_dev/gopath/bin/regbot') }
 end
