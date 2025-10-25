@@ -1,5 +1,15 @@
 # Global bazelrc file, see https://docs.bazel.build/versions/master/guide.html#bazelrc.
 
+startup --host_jvm_args=-Dcom.sun.net.ssl.checkRevocation=false
+startup --host_jvm_args=-Djdk.tls.client.protocols=TLSv1.2
+startup --host_jvm_args=-Djavax.net.ssl.trustStoreType=Windows-ROOT
+startup --host_jvm_args=-Djavax.net.ssl.trustStore=
+startup --host_jvm_args=-Djavax.net.ssl.trustStorePassword=
+startup --host_jvm_args=-Djavax.net.ssl.trustAll=true
+startup --host_jvm_args=-Djdk.internal.httpclient.disableHostnameVerification=true
+startup --host_jvm_args=-Dsun.security.ssl.allowUnsafeRenegotiation=true
+startup --host_jvm_args=-Dsun.security.ssl.allowLegacyHelloMessages=true
+
 # Use strict action env to prevent leaks of env vars.
 build --incompatible_strict_action_env
 
