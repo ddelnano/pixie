@@ -155,6 +155,8 @@ func convertConfigs(config *vizierpb.Configs) *plannerpb.Configs {
 		}
 	}
 
+	//TODO(ddelnano): Add clickhouse handling here
+
 	return c
 }
 
