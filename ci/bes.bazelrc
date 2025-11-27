@@ -1,4 +1,3 @@
 build --bes_results_url=https://app.buildbuddy.io/invocation/
 build --bes_backend=grpcs://remote.buildbuddy.io
-# For now, our CI isn't using remote caching
-# build --remote_cache=grpcs://remote.buildbuddy.io
+build --remote_cache=grpcs://remote.buildbuddy.io
