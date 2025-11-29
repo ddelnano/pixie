@@ -22,8 +22,8 @@ def _gcc_x86_64_gnu():
         "ar": "/usr/bin/ar",
         "cpp": "/usr/bin/cpp",
         "dwp": "/usr/bin/dwp",
-        "gcc": "/usr/bin/gcc-12",
-        "gcov": "/usr/bin/gcov-12",
+        "gcc": "/usr/bin/gcc-13",
+        "gcov": "/usr/bin/gcov-13",
         "ld": "/usr/bin/ld.gold",
         # TODO(zasgar): Fix this or remove this.
         "llvm-cov": "/opt/clang-15.0/bin/llvm-cov",
@@ -44,13 +44,13 @@ def _gcc_x86_64_gnu():
         abi_version = "gcc",
         abi_libc_version = "glibc_unknown",
         cxx_builtin_include_directories = [
-            "/usr/lib/gcc/x86_64-linux-gnu/12/include",
+            "/usr/lib/gcc/x86_64-linux-gnu/13/include",
             "/usr/local/include",
             "/usr/include/x86_64-linux-gnu",
             "/usr/include",
-            "/usr/include/c++/12",
-            "/usr/include/x86_64-linux-gnu/c++/12",
-            "/usr/include/c++/12/backward",
+            "/usr/include/c++/13",
+            "/usr/include/x86_64-linux-gnu/c++/13",
+            "/usr/include/c++/13/backward",
         ],
         tool_paths = tool_paths,
         compile_flags = [

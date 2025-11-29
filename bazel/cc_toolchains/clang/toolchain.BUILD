@@ -43,9 +43,9 @@ includes = [
     "{sysroot_include_prefix}/usr/local/include",
     "{sysroot_include_prefix}/usr/include/x86_64-linux-gnu",
     "{sysroot_include_prefix}/usr/include",
-    "{sysroot_include_prefix}/usr/include/c++/12",
-    "{sysroot_include_prefix}/usr/include/x86_64-linux-gnu/c++/12",
-    "{sysroot_include_prefix}/usr/include/c++/12/backward",
+    "{sysroot_include_prefix}/usr/include/c++/13",
+    "{sysroot_include_prefix}/usr/include/x86_64-linux-gnu/c++/13",
+    "{sysroot_include_prefix}/usr/include/c++/13/backward",
     "{libcxx_path}/include/c++/v1",
 ]
 
@@ -63,7 +63,7 @@ cc_toolchain_config(
         "-Wself-assign",
         "-Wunused-but-set-parameter",
         "-fcolor-diagnostics",
-        "-fno-omit-frame-pointer",
+        "-fno-omit-frame-pointer",{host_system_includes}
     ],
     compiler = "clang",
     coverage_compile_flags = ["--coverage"],
@@ -87,7 +87,7 @@ cc_toolchain_config(
         "-Wl,-no-as-needed",
         "-Wl,-z,relro,-z,now",
         "-Bexternal/{this_repo}/{toolchain_path}/bin",
-        "-lm",
+        "-lm",{host_system_lib_dirs}
     ] + (["-no-pie"] if {use_for_host_tools} else []),
     opt_compile_flags = [
         "-g0",

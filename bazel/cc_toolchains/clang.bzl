@@ -46,9 +46,28 @@ def _clang_toolchain_impl(rctx):
     sysroot_repo = sysroot_repo_name(rctx.attr.target_arch, rctx.attr.libc_version, "build")
     sysroot_path = ""
     sysroot_include_prefix = ""
+    # When not using a sysroot, we need to explicitly tell clang where to find
+    # the host system's C++ headers since the downloaded clang toolchain doesn't
+    # have them in its default search paths.
+    host_system_includes = ""
+    host_system_lib_dirs = ""
     if sysroot_repo:
         sysroot_path = "external/{repo}".format(repo = sysroot_repo)
         sysroot_include_prefix = "%sysroot%"
+    else:
+        # Add explicit -isystem flags for host C++ headers when not using a sysroot.
+        # These match the paths in the includes list but need to be passed explicitly
+        # to clang since there's no sysroot to provide them.
+        host_system_includes = """
+        "-isystem", "/usr/include/c++/13",
+        "-isystem", "/usr/include/x86_64-linux-gnu/c++/13",
+        "-isystem", "/usr/include/c++/13/backward",
+        "-isystem", "/usr/local/include",
+        "-isystem", "/usr/include/x86_64-linux-gnu",
+        "-isystem", "/usr/include","""
+        # Add library search path for libstdc++.a when not using a sysroot.
+        host_system_lib_dirs = """
+        "-L/usr/lib/gcc/x86_64-linux-gnu/13","""
 
     # First combine all of the build file templates into one file.
     rctx.template(
@@ -75,6 +94,8 @@ def _clang_toolchain_impl(rctx):
             "{clang_version}": rctx.attr.clang_version,
             "{host_abi}": abi(rctx.attr.host_arch, rctx.attr.host_libc_version),
             "{host_arch}": rctx.attr.host_arch,
+            "{host_system_includes}": host_system_includes,
+            "{host_system_lib_dirs}": host_system_lib_dirs,
             "{libc_version}": rctx.attr.libc_version,
             "{libcxx_path}": libcxx_path,
             "{name}": rctx.attr.name,
