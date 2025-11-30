@@ -63,7 +63,7 @@ func SetupElastic() (*elastic.Client, func(), error) {
 			"ES_HEAP_SIZE=128m",
 		},
 	}, func(config *docker.HostConfig) {
-		config.AutoRemove = true
+		config.AutoRemove = false
 		config.RestartPolicy = docker.RestartPolicy{Name: "no"}
 		// Tmpfs is much faster than the default docker mounts.
 		config.Mounts = []docker.HostMount{
@@ -103,17 +103,29 @@ func SetupElastic() (*elastic.Client, func(), error) {
 		return nil, cleanup, err
 	}
 
-	// Increase retry timeout to 3 minutes (default is 1 minute)
-	pool.MaxWait = 3 * time.Minute
+	// Increase retry timeout (default is 1 minute)
+	pool.MaxWait = 1 * time.Minute
+
+	// Log network debugging info
+	log.Infof("Container ID: %s", resource.Container.ID)
+	log.Infof("Container IPAddress: %s", resource.Container.NetworkSettings.IPAddress)
+	log.Infof("Container Gateway: %s", resource.Container.NetworkSettings.Gateway)
+	log.Infof("Mapped port 9200/tcp: %s", resource.GetPort("9200/tcp"))
+	for netName, netSettings := range resource.Container.NetworkSettings.Networks {
+		log.Infof("Network %s: Gateway=%s, IPAddress=%s", netName, netSettings.Gateway, netSettings.IPAddress)
+	}
 
 	clientPort := "9200"
+	esHost := resource.Container.NetworkSettings.IPAddress
+	esURL := fmt.Sprintf("http://%s:%s", esHost, clientPort)
+	log.Infof("Will attempt to connect to Elasticsearch at: %s", esURL)
+
 	var client *elastic.Client
 	err = pool.Retry(func() error {
 		var err error
-		client, err = connectElastic(fmt.Sprintf("http://%s:%s",
-			resource.Container.NetworkSettings.IPAddress, clientPort), "elastic", esPass)
+		client, err = connectElastic(esURL, "elastic", esPass)
 		if err != nil {
-			log.WithError(err).Errorf("Failed to connect to elasticsearch.")
+			log.WithError(err).Errorf("Failed to connect to elasticsearch at %s", esURL)
 		}
 		return err
 	})
