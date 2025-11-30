@@ -79,6 +79,8 @@ func SetupElastic() (*elastic.Client, func(), error) {
 
 	// Increase retry timeout (default is 1 minute)
 	pool.MaxWait = 1 * time.Minute
+	clientPort := resource.GetPort("9200/tcp")
+	var esHost string
 
 	// Log network debugging info
 	log.Infof("Container ID: %s", resource.Container.ID)
@@ -86,11 +88,11 @@ func SetupElastic() (*elastic.Client, func(), error) {
 	log.Infof("Container Gateway: %s", resource.Container.NetworkSettings.Gateway)
 	log.Infof("Mapped port 9200/tcp: %s", resource.GetPort("9200/tcp"))
 	for netName, netSettings := range resource.Container.NetworkSettings.Networks {
-		log.Infof("Network %s: Gateway=%s, IPAddress=%s", netName, netSettings.Gateway, netSettings.IPAddress)
+		esHost = netSettings.Gateway
+		log.Infof("Setting ES host to gateway %s for network %s", esHost, netName)
+		break
 	}
 
-	clientPort := "9200"
-	esHost := resource.Container.NetworkSettings.IPAddress
 	esURL := fmt.Sprintf("http://%s:%s", esHost, clientPort)
 	log.Infof("Will attempt to connect to Elasticsearch at: %s", esURL)
 
