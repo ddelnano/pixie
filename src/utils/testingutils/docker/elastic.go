@@ -19,7 +19,9 @@
 package docker
 
 import (
+	"bytes"
 	"fmt"
+	"time"
 
 	"github.com/olivere/elastic/v7"
 	"github.com/ory/dockertest/v3"
@@ -101,6 +103,9 @@ func SetupElastic() (*elastic.Client, func(), error) {
 		return nil, cleanup, err
 	}
 
+	// Increase retry timeout to 3 minutes (default is 1 minute)
+	pool.MaxWait = 3 * time.Minute
+
 	clientPort := "9200"
 	var client *elastic.Client
 	err = pool.Retry(func() error {
@@ -113,6 +118,23 @@ func SetupElastic() (*elastic.Client, func(), error) {
 		return err
 	})
 	if err != nil {
+		// Dump container logs on failure for debugging
+		var stdout, stderr bytes.Buffer
+		logsErr := pool.Client.Logs(docker.LogsOptions{
+			Container:    resource.Container.ID,
+			OutputStream: &stdout,
+			ErrorStream:  &stderr,
+			Stdout:       true,
+			Stderr:       true,
+			Tail:         "100",
+		})
+		if logsErr != nil {
+			log.WithError(logsErr).Error("Failed to get container logs")
+		} else {
+			log.Errorf("Elasticsearch container stdout:\n%s", stdout.String())
+			log.Errorf("Elasticsearch container stderr:\n%s", stderr.String())
+		}
+
 		purgeErr := pool.Purge(resource)
 		if purgeErr != nil {
 			log.WithError(err).Error("Failed to purge pool")
