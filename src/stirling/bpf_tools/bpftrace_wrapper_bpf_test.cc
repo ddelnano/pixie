@@ -117,17 +117,17 @@ TEST(BPFTracerWrapperTest, OutputFields) {
 
   ASSERT_EQ(fields.size(), 4);
 
-  EXPECT_EQ(fields[0].type.type, bpftrace::Type::integer);
-  EXPECT_EQ(fields[0].type.size(), 8);
+  EXPECT_EQ(fields[0].type.GetTy(), bpftrace::Type::integer);
+  EXPECT_EQ(fields[0].type.GetSize(), 8);
 
-  EXPECT_EQ(fields[1].type.type, bpftrace::Type::integer);
-  EXPECT_EQ(fields[1].type.size(), 8);
+  EXPECT_EQ(fields[1].type.GetTy(), bpftrace::Type::integer);
+  EXPECT_EQ(fields[1].type.GetSize(), 8);
 
-  EXPECT_EQ(fields[2].type.type, bpftrace::Type::string);
-  EXPECT_EQ(fields[2].type.size(), 16);
+  EXPECT_EQ(fields[2].type.GetTy(), bpftrace::Type::string);
+  EXPECT_EQ(fields[2].type.GetSize(), 16);
 
-  EXPECT_EQ(fields[3].type.type, bpftrace::Type::inet);
-  EXPECT_EQ(fields[3].type.size(), 24);
+  EXPECT_EQ(fields[3].type.GetTy(), bpftrace::Type::inet);
+  EXPECT_EQ(fields[3].type.GetSize(), 24);
 }
 
 TEST(BPFTracerWrapperTest, MultiplePrintfs) {
@@ -144,17 +144,17 @@ TEST(BPFTracerWrapperTest, MultiplePrintfs) {
 
   ASSERT_EQ(fields.size(), 4);
 
-  EXPECT_EQ(fields[0].type.type, bpftrace::Type::integer);
-  EXPECT_EQ(fields[0].type.size(), 8);
+  EXPECT_EQ(fields[0].type.GetTy(), bpftrace::Type::integer);
+  EXPECT_EQ(fields[0].type.GetSize(), 8);
 
-  EXPECT_EQ(fields[1].type.type, bpftrace::Type::integer);
-  EXPECT_EQ(fields[1].type.size(), 8);
+  EXPECT_EQ(fields[1].type.GetTy(), bpftrace::Type::integer);
+  EXPECT_EQ(fields[1].type.GetSize(), 8);
 
-  EXPECT_EQ(fields[2].type.type, bpftrace::Type::string);
-  EXPECT_EQ(fields[2].type.size(), 16);
+  EXPECT_EQ(fields[2].type.GetTy(), bpftrace::Type::string);
+  EXPECT_EQ(fields[2].type.GetSize(), 16);
 
-  EXPECT_EQ(fields[3].type.type, bpftrace::Type::inet);
-  EXPECT_EQ(fields[3].type.size(), 24);
+  EXPECT_EQ(fields[3].type.GetTy(), bpftrace::Type::inet);
+  EXPECT_EQ(fields[3].type.GetSize(), 24);
 }
 
 TEST(BPFTracerWrapperTest, InconsistentPrintfs) {

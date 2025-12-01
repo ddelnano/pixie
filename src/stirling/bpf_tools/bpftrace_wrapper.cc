@@ -50,7 +50,7 @@ std::string DumpDriver(const Driver& driver) {
   std::ostringstream oss;
 
   Printer p(oss);
-  driver.root->accept(p);
+  driver.ctx.root->accept(p);
   return oss.str();
 }
 
@@ -79,7 +79,7 @@ struct timespec GetBootTime() {
 }
 
 BPFTraceWrapper::BPFTraceWrapper() {
-  bpftrace_.ast_max_nodes_ = std::numeric_limits<uint64_t>::max();
+  bpftrace_.max_ast_nodes_ = std::numeric_limits<uint64_t>::max();
   bpftrace_.boottime_ = GetBootTime();
 
   // Change these values for debug
@@ -104,19 +104,16 @@ Status BPFTraceWrapper::CompileForMapOutput(std::string_view script,
   return Status::OK();
 }
 
-std::vector<std::string> ClangCompileFlags(bool has_btf, std::vector<std::string> include_dirs = {},
+std::vector<std::string> ClangCompileFlags(const bpftrace::KConfig& kconfig,
+                                           std::vector<std::string> include_dirs = {},
                                            std::vector<std::string> include_files = {}) {
   std::vector<std::string> extra_flags;
   {
     struct utsname utsname;
     uname(&utsname);
     std::string ksrc, kobj;
-    auto kdirs = bpftrace::get_kernel_dirs(utsname, !has_btf);
-    ksrc = std::get<0>(kdirs);
-    kobj = std::get<1>(kdirs);
-
-    if (ksrc != "") {
-      extra_flags = bpftrace::get_kernel_cflags(utsname.machine, ksrc, kobj);
+    if (bpftrace::get_kernel_dirs(utsname, ksrc, kobj) && ksrc != "") {
+      extra_flags = bpftrace::get_kernel_cflags(utsname.machine, ksrc, kobj, kconfig);
     }
   }
   extra_flags.push_back("-include");
@@ -192,7 +189,7 @@ Status BPFTraceWrapper::Compile(std::string_view script, const std::vector<std::
 
   // This collects the error messages emitted during the FieldAnalyser's analysis.
   std::ostringstream field_analyser_oss;
-  bpftrace::ast::FieldAnalyser fields(driver.root.get(), bpftrace_, field_analyser_oss);
+  bpftrace::ast::FieldAnalyser fields(driver.ctx.root, bpftrace_, field_analyser_oss);
   err = fields.analyse();
   if (err != 0) {
     return error::Internal(ERR_MSG "invalid field: $0", field_analyser_oss.str());
@@ -202,42 +199,37 @@ Status BPFTraceWrapper::Compile(std::string_view script, const std::vector<std::
     CerrRedirect cerr_redirect;
     // TracepointFormatParser does not provide internal error recording, and the error is directly
     // logged to std::cerr.
-    success = bpftrace::TracepointFormatParser::parse(driver.root.get(), bpftrace_);
+    success = bpftrace::TracepointFormatParser::parse(driver.ctx.root, bpftrace_);
     err_msg = cerr_redirect.GetString();
   }
   if (!success) {
     return error::Internal(ERR_MSG "invalid tracepoint: $0", err_msg);
   }
 
-  std::vector<std::string> clang_compile_flags = ClangCompileFlags(bpftrace_.feature_->has_btf());
+  std::vector<std::string> clang_compile_flags = ClangCompileFlags(bpftrace_.kconfig);
 
   bpftrace::ClangParser clang;
-  // TODO(yzhao): Return error messages from ClangParserHandler::get_error_messages().
-  // Needs to update bpftrace source code.
-  std::vector<std::string> clang_parser_err_msgs;
-  success = clang.parse(driver.root.get(), bpftrace_, clang_compile_flags, &clang_parser_err_msgs);
+  success = clang.parse(driver.ctx.root, bpftrace_, clang_compile_flags);
   if (!success) {
-    return error::Internal(ERR_MSG "Clang parse failed: $0",
-                           absl::StrJoin(clang_parser_err_msgs, "\n"));
+    return error::Internal(ERR_MSG "Clang parse failed");
   }
 
-  bpftrace::ast::PassContext ctx(bpftrace_);
+  bpftrace::ast::PassContext ctx(bpftrace_, driver.ctx);
   bpftrace::ast::PassManager pm;
   pm.AddPass(bpftrace::ast::CreateSemanticPass());
   pm.AddPass(bpftrace::ast::CreateCounterPass());
   pm.AddPass(bpftrace::ast::CreateResourcePass());
-  auto result = pm.Run(std::move(driver.root), ctx);
+  auto result = pm.Run(driver.ctx.root, ctx);
   if (!result.Ok()) {
     return error::Internal(ERR_MSG "$0 pass failed: $1",
                            result.GetErrorPass().value_or("Unknown pass"),
                            result.GetErrorMsg().value_or("-"));
   }
-  std::unique_ptr<bpftrace::ast::Node> ast_root(result.Root());
 
-  bpftrace::ast::CodegenLLVM llvm(ast_root.get(), bpftrace_);
+  bpftrace::ast::CodegenLLVM llvm(driver.ctx.root, bpftrace_);
   llvm.generate_ir();
   llvm.optimize();
-  bytecode_ = llvm.emit();
+  bytecode_ = llvm.emit(false);
 
   compiled_ = true;
 
@@ -262,7 +254,7 @@ Status BPFTraceWrapper::Deploy(const PrintfCallback& printf_callback) {
     bpftrace_.printf_callback_ = printf_callback;
   }
 
-  int err = bpftrace_.deploy(bytecode_);
+  int err = bpftrace_.deploy(std::move(bytecode_));
   if (err != 0) {
     return error::Internal("Failed to run BPF code.");
   }
@@ -270,7 +262,7 @@ Status BPFTraceWrapper::Deploy(const PrintfCallback& printf_callback) {
 }
 
 void BPFTraceWrapper::PollPerfBuffers(int timeout_ms) {
-  bpftrace_.poll_perf_events(/* drain */ false, timeout_ms);
+  bpftrace_.poll_output(/* drain */ false, timeout_ms);
 }
 
 void BPFTraceWrapper::Stop() {

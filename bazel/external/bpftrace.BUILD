@@ -55,6 +55,9 @@ cmake(
         "LIBBPF_INCLUDE_DIRS": "$EXT_BUILD_DEPS/libbpf/include",
         "LIBBPF_LIBRARIES": "$EXT_BUILD_DEPS/libbpf/lib64/libbpf.a",
         "LIBCEREAL_INCLUDE_DIRS": "$EXT_BUILD_DEPS/include",
+
+        # Disable libstdc++ concepts to work around GCC 14 std::ranges compatibility issues
+        # "CMAKE_CXX_FLAGS": "-U__cpp_lib_concepts -U__cpp_concepts -D__cpp_lib_ranges=0 -D_GLIBCXX_CONCEPT_CHECKS=0",
     }),
     lib_source = ":bpftrace_source",
     linkopts = [
@@ -65,6 +68,7 @@ cmake(
         "libbpftrace.a",
         "libaot.a",
         "libast.a",
+        "librequired_resources.a",
         "libruntime.a",
         "libast_defs.a",
         "libparser.a",

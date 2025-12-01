@@ -41,12 +41,12 @@ StatusOr<types::DataType> BPFTraceTypeToDataType(const bpftrace::Type& bpftrace_
       return types::DataType::INT64;
     case bpftrace::Type::string:
     case bpftrace::Type::inet:
-    case bpftrace::Type::usym:
-    case bpftrace::Type::ksym:
+    case bpftrace::Type::usym_t:
+    case bpftrace::Type::ksym_t:
     case bpftrace::Type::username:
     case bpftrace::Type::probe:
-    case bpftrace::Type::kstack:
-    case bpftrace::Type::ustack:
+    case bpftrace::Type::kstack_t:
+    case bpftrace::Type::ustack_t:
     case bpftrace::Type::timestamp:
       return types::DataType::STRING;
     default:
@@ -96,11 +96,11 @@ StatusOr<BackedDataElements> ConvertFields(const std::vector<bpftrace::Field> fi
   }
 
   for (size_t i = 0; i < fields.size(); ++i) {
-    bpftrace::Type bpftrace_type = fields[i].type.type;
+    bpftrace::Type bpftrace_type = fields[i].type.GetTy();
 
     // Check: Any integers must be an expected size.
     if (bpftrace_type == bpftrace::Type::integer) {
-      size_t bpftrace_type_size = fields[i].type.size();
+      size_t bpftrace_type_size = fields[i].type.GetSize();
 
       switch (bpftrace_type_size) {
         case 8:
@@ -178,7 +178,7 @@ Status CheckOutputFields(const std::vector<bpftrace::Field>& fields,
   }
 
   for (size_t i = 0; i < fields.size(); ++i) {
-    bpftrace::Type bpftrace_type = fields[i].type.type;
+    bpftrace::Type bpftrace_type = fields[i].type.GetTy();
     types::DataType table_type = table_schema_elements[i].type();
 
     PX_ASSIGN_OR_RETURN(types::DataType expected_type, BPFTraceTypeToDataType(bpftrace_type));
@@ -197,7 +197,7 @@ Status CheckOutputFields(const std::vector<bpftrace::Field>& fields,
 
     // Check #2: Any integers must be an expected size.
     if (bpftrace_type == bpftrace::Type::integer) {
-      size_t bpftrace_type_size = fields[i].type.size();
+      size_t bpftrace_type_size = fields[i].type.GetSize();
 
       switch (bpftrace_type_size) {
         case 8:
@@ -274,7 +274,7 @@ void DynamicBPFTraceConnector::HandleEvent(uint8_t* data) {
     const auto& field = output_fields_[i];
     const auto& column = columns[i];
 
-    switch (field.type.type) {
+    switch (field.type.GetTy()) {
       case bpftrace::Type::integer:
 
 #define APPEND_INTEGER(int_type, expr)                             \
@@ -287,7 +287,7 @@ void DynamicBPFTraceConnector::HandleEvent(uint8_t* data) {
     }                                                              \
   }
 
-        switch (field.type.size()) {
+        switch (field.type.GetSize()) {
           case 8:
             APPEND_INTEGER(uint64_t, data + field.offset);
             break;
@@ -304,14 +304,14 @@ void DynamicBPFTraceConnector::HandleEvent(uint8_t* data) {
             LOG(DFATAL) << absl::Substitute(
                 "[DataTable: $0, col: $1] Invalid integer size: $2. Table is now inconsistent. "
                 "This is a critical error.",
-                name_, col, field.type.size());
+                name_, col, field.type.GetSize());
             break;
         }
         break;
 #undef APPEND_INTEGER
       case bpftrace::Type::string: {
         auto p = reinterpret_cast<char*>(data + field.offset);
-        r.Append(col, types::StringValue(std::string(p, strnlen(p, field.type.size()))));
+        r.Append(col, types::StringValue(std::string(p, strnlen(p, field.type.GetSize()))));
         break;
       }
       case bpftrace::Type::inet: {
@@ -320,13 +320,14 @@ void DynamicBPFTraceConnector::HandleEvent(uint8_t* data) {
         r.Append(col, types::StringValue(ResolveInet(af, inet)));
         break;
       }
-      case bpftrace::Type::usym: {
+      case bpftrace::Type::usym_t: {
         uint64_t addr = *reinterpret_cast<uint64_t*>(data + field.offset);
         uint64_t pid = *reinterpret_cast<uint64_t*>(data + field.offset + 8);
-        r.Append(col, types::StringValue(bpftrace_->mutable_bpftrace()->resolve_usym(addr, pid)));
+        // resolve_usym requires (addr, pid, probe_id), use 0 for probe_id
+        r.Append(col, types::StringValue(bpftrace_->mutable_bpftrace()->resolve_usym(addr, pid, 0)));
         break;
       }
-      case bpftrace::Type::ksym: {
+      case bpftrace::Type::ksym_t: {
         uint64_t addr = *reinterpret_cast<uint64_t*>(data + field.offset);
         r.Append(col, types::StringValue(bpftrace_->mutable_bpftrace()->resolve_ksym(addr)));
         break;
@@ -341,26 +342,29 @@ void DynamicBPFTraceConnector::HandleEvent(uint8_t* data) {
         r.Append(col, types::StringValue(bpftrace_->mutable_bpftrace()->resolve_probe(probe_id)));
         break;
       }
-      case bpftrace::Type::kstack: {
-        uint64_t stackidpid = *reinterpret_cast<uint64_t*>(data + field.offset);
+      case bpftrace::Type::kstack_t: {
+        auto* stack_key = reinterpret_cast<bpftrace::stack_key*>(data + field.offset);
         bool ustack = false;
         auto& stack_type = field.type.stack_type;
+        // get_stack requires (stackid, nr_stack_frames, pid, probe_id, ustack, stack_type)
         r.Append(col, types::StringValue(bpftrace_->mutable_bpftrace()->get_stack(
-                          stackidpid, ustack, stack_type)));
+                          stack_key->stackid, stack_key->nr_stack_frames, 0, 0, ustack, stack_type)));
         break;
       }
-      case bpftrace::Type::ustack: {
-        uint64_t stackidpid = *reinterpret_cast<uint64_t*>(data + field.offset);
+      case bpftrace::Type::ustack_t: {
+        auto* stack_key = reinterpret_cast<bpftrace::stack_key*>(data + field.offset);
         bool ustack = true;
         auto& stack_type = field.type.stack_type;
+        // get_stack requires (stackid, nr_stack_frames, pid, probe_id, ustack, stack_type)
         r.Append(col, types::StringValue(bpftrace_->mutable_bpftrace()->get_stack(
-                          stackidpid, ustack, stack_type)));
+                          stack_key->stackid, stack_key->nr_stack_frames, 0, 0, ustack, stack_type)));
         break;
       }
       case bpftrace::Type::timestamp: {
         auto x = reinterpret_cast<bpftrace::AsyncEvent::Strftime*>(data + field.offset);
+        // resolve_timestamp requires (mode, strftime_id, nsecs)
         r.Append(col, types::StringValue(bpftrace_->mutable_bpftrace()->resolve_timestamp(
-                          x->strftime_id, x->nsecs_since_boot)));
+                          x->mode, x->strftime_id, x->nsecs)));
         break;
       }
       case bpftrace::Type::pointer: {
@@ -372,7 +376,7 @@ void DynamicBPFTraceConnector::HandleEvent(uint8_t* data) {
         LOG(DFATAL) << absl::Substitute(
             "[DataTable: $0, col: $1] Invalid argument type $2. Table is now inconsistent. This is "
             "a critical error.",
-            name_, col, magic_enum::enum_name(field.type.type));
+            name_, col, magic_enum::enum_name(field.type.GetTy()));
     }
 
     ++col;
