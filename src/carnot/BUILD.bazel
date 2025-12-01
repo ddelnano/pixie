@@ -46,7 +46,8 @@ pl_cc_library(
     ),
     deps = [
         "//src/carnot/exec:cc_library",
-        "//src/carnot/exec/ml:cc_library",
+        # NOTE: Commented out due to TensorFlow/Eigen dependencies causing build issues with bzlmod
+        # "//src/carnot/exec/ml:cc_library",
         "//src/carnot/funcs:cc_library",
         "//src/carnot/plan:cc_library",
         "//src/carnot/planner/compiler:cc_library",

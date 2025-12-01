@@ -22,7 +22,8 @@
 #include "src/carnot/funcs/builtins/json_ops.h"
 #include "src/carnot/funcs/builtins/math_ops.h"
 #include "src/carnot/funcs/builtins/math_sketches.h"
-#include "src/carnot/funcs/builtins/ml_ops.h"
+// NOTE: ml_ops.h removed due to TensorFlow/ML dependencies
+// #include "src/carnot/funcs/builtins/ml_ops.h"
 #include "src/carnot/funcs/builtins/pii_ops.h"
 #include "src/carnot/funcs/builtins/pprof_ops.h"
 #include "src/carnot/funcs/builtins/regex_ops.h"
@@ -45,7 +46,8 @@ void RegisterBuiltinsOrDie(udf::Registry* registry) {
   RegisterMathSketchesOrDie(registry);
   RegisterJSONOpsOrDie(registry);
   RegisterStringOpsOrDie(registry);
-  RegisterMLOpsOrDie(registry);
+  // NOTE: RegisterMLOpsOrDie removed due to TensorFlow/ML dependencies
+  // RegisterMLOpsOrDie(registry);
   RegisterRequestPathOpsOrDie(registry);
   RegisterSQLOpsOrDie(registry);
   RegisterRegexOpsOrDie(registry);

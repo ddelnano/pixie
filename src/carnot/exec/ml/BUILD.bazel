@@ -18,76 +18,79 @@ load("//bazel:pl_build_system.bzl", "pl_cc_binary", "pl_cc_library", "pl_cc_test
 
 package(default_visibility = ["//src/carnot:__subpackages__"])
 
-pl_cc_library(
-    name = "cc_library",
-    srcs = glob(
-        [
-            "*.cc",
-            "*.h",
-        ],
-        exclude = [
-            "**/*_test.cc",
-            "**/*_benchmark.cc",
-            "**/*_mock.h",
-            "**/*test_utils.h",
-            "**/*test_utils.cc",
-        ],
-    ),
-    deps = [
-        "//src/carnot/udf:cc_library",
-        "//src/shared/types:cc_library",
-        "@com_github_google_sentencepiece//:libsentencepiece",
-        "@com_github_tencent_rapidjson//:rapidjson",
-        "@org_tensorflow//tensorflow/lite:framework",
-        "@org_tensorflow//tensorflow/lite/kernels:builtin_ops",
-        "@org_tensorflow//third_party/eigen3",
-    ],
-)
+# NOTE: Commented out due to TensorFlow/Eigen dependencies causing build issues with bzlmod
+# pl_cc_library(
+#     name = "cc_library",
+#     srcs = glob(
+#         [
+#             "*.cc",
+#             "*.h",
+#         ],
+#         exclude = [
+#             "**/*_test.cc",
+#             "**/*_benchmark.cc",
+#             "**/*_mock.h",
+#             "**/*test_utils.h",
+#             "**/*test_utils.cc",
+#         ],
+#     ),
+#     deps = [
+#         "//src/carnot/udf:cc_library",
+#         "//src/shared/types:cc_library",
+#         "@com_github_google_sentencepiece//:libsentencepiece",
+#         "@com_github_tencent_rapidjson//:rapidjson",
+#         "@org_tensorflow//tensorflow/lite:framework",
+#         "@org_tensorflow//tensorflow/lite/kernels:builtin_ops",
+#         "@org_tensorflow//third_party/eigen3",
+#     ],
+# )
 
-pl_cc_test_library(
-    name = "eigen_testutils",
-    srcs = [
-        "eigen_test_utils.cc",
-        "eigen_test_utils.h",
-    ],
-    deps = [
-        "@org_tensorflow//third_party/eigen3",
-    ],
-)
+# NOTE: Commented out due to TensorFlow/Eigen dependencies causing build issues with bzlmod
+# pl_cc_test_library(
+#     name = "eigen_testutils",
+#     srcs = [
+#         "eigen_test_utils.cc",
+#         "eigen_test_utils.h",
+#     ],
+#     deps = [
+#         "@org_tensorflow//third_party/eigen3",
+#     ],
+# )
 
-pl_cc_test(
-    name = "coreset_test",
-    srcs = ["coreset_test.cc"],
-    deps = [
-        ":cc_library",
-    ],
-)
+# NOTE: Commented out due to TensorFlow/Eigen dependencies causing build issues with bzlmod
+# pl_cc_test(
+#     name = "coreset_test",
+#     srcs = ["coreset_test.cc"],
+#     deps = [
+#         ":cc_library",
+#     ],
+# )
 
-pl_cc_binary(
-    name = "coreset_benchmark",
-    testonly = 1,
-    srcs = ["coreset_benchmark.cc"],
-    deps = [
-        ":cc_library",
-        "//src/common/benchmark:cc_library",
-    ],
-)
+# pl_cc_binary(
+#     name = "coreset_benchmark",
+#     testonly = 1,
+#     srcs = ["coreset_benchmark.cc"],
+#     deps = [
+#         ":cc_library",
+#         "//src/common/benchmark:cc_library",
+#     ],
+# )
 
-pl_cc_test(
-    name = "kmeans_test",
-    srcs = ["kmeans_test.cc"],
-    deps = [
-        ":cc_library",
-        ":eigen_testutils",
-    ],
-)
+# pl_cc_test(
+#     name = "kmeans_test",
+#     srcs = ["kmeans_test.cc"],
+#     deps = [
+#         ":cc_library",
+#         ":eigen_testutils",
+#     ],
+# )
 
-pl_cc_binary(
-    name = "kmeans_benchmark",
-    testonly = 1,
-    srcs = ["kmeans_benchmark.cc"],
-    deps = [
-        ":cc_library",
-        "//src/common/benchmark:cc_library",
-    ],
-)
+# pl_cc_binary(
+#     name = "kmeans_benchmark",
+#     testonly = 1,
+#     srcs = ["kmeans_benchmark.cc"],
+#     deps = [
+#         ":cc_library",
+#         "//src/common/benchmark:cc_library",
+#     ],
+# )
