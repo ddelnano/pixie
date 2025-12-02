@@ -145,6 +145,7 @@ def _grpc_web_library_impl(ctx):
     # create a list of well known proto files if the argument is non-None
     well_known_proto_files = []
     arguments.append("-Iexternal/com_google_protobuf/src")
+    arguments.append("-Iexternal/protobuf~/src")
     well_known_proto_files = [
         f
         for f in ctx.attr.well_known_protos.files.to_list()
@@ -184,7 +185,7 @@ pl_grpc_web_library = rule(
             default = Label("@com_google_protobuf//:well_known_protos"),
         ),
         "_protoc": attr.label(
-            default = Label("//external:protocol_compiler"),
+            default = Label("@com_google_protobuf//:protoc"),
             executable = True,
             cfg = "host",
         ),
