@@ -65,7 +65,7 @@ def _sysroot_variant_image_factory(variant):
         return _image_from_sysroot_info(ctx, sysroot_toolchain.sysroot)
 
     return rule(
-        name = "sysroot_{variant}_image".format(variant = variant),
+        # name = "sysroot_{variant}_image".format(variant = variant),
         implementation = _impl,
         attrs = dicts.add(_container.image.attrs, {
             "default_image": attr.label(mandatory = True, doc = "Default container_image to use if no sysroot toolchain is found"),

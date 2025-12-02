@@ -45,27 +45,32 @@ go_register_toolchains()
 # gazelle:repository_macro go_deps.bzl%pl_go_dependencies
 pl_go_dependencies()
 
-load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
+# load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
 
-protobuf_deps()
+# protobuf_deps()
 
-load("@com_github_grpc_grpc//bazel:grpc_deps.bzl", "grpc_deps")
+# load("@com_github_grpc_grpc//bazel:grpc_deps.bzl", "grpc_deps")
 
-grpc_deps()
+# grpc_deps()
 
-load("@io_bazel_rules_scala//:scala_config.bzl", "scala_config")
+# NOTE: rules_scala is now managed via bzlmod in MODULE.bazel
+# The following WORKSPACE-based setup has been commented out to avoid conflicts
+# load("@rules_scala//:scala_config.bzl", "scala_config")
+# load("@rules_scala//scala:deps.bzl", "rules_scala_dependencies")
 
-scala_version = "2.13.6"
+# scala_version = "2.13.12"
 
-scala_config(scala_version = scala_version)
+# scala_config(scala_version = scala_version)
 
-load("@io_bazel_rules_scala//scala:scala.bzl", "scala_repositories")
+# rules_scala_dependencies()
 
-scala_repositories()
+# load("@rules_scala//scala:scala.bzl", "scala_repositories")
 
-load("@io_bazel_rules_scala//scala:toolchains.bzl", "scala_register_toolchains")
+# scala_repositories()
 
-scala_register_toolchains()
+# load("@io_bazel_rules_scala//scala:toolchains.bzl", "scala_register_toolchains")
+
+# scala_register_toolchains()
 
 # These dependencies are needed by GRPC.
 load("@build_bazel_rules_apple//apple:repositories.bzl", "apple_rules_dependencies")
@@ -109,9 +114,9 @@ rules_pkg_dependencies()
 # The docker images can't be loaded until all pip_deps are satisfied.
 pl_container_images()
 
-load("@com_github_grpc_grpc//bazel:grpc_extra_deps.bzl", "grpc_extra_deps")
+# load("@com_github_grpc_grpc//bazel:grpc_extra_deps.bzl", "grpc_extra_deps")
 
-grpc_extra_deps()
+# grpc_extra_deps()
 
 load("@rules_foreign_cc//foreign_cc:repositories.bzl", "rules_foreign_cc_dependencies")
 
@@ -122,21 +127,21 @@ load("//bazel:gogo.bzl", "gogo_grpc_proto")
 gogo_grpc_proto(name = "gogo_grpc_proto")
 
 # Setup tensorflow.
-load("@org_tensorflow//tensorflow:workspace3.bzl", "tf_workspace3")
+# load("@org_tensorflow//tensorflow:workspace3.bzl", "tf_workspace3")
 
-tf_workspace3()
+# tf_workspace3()
 
-load("@org_tensorflow//tensorflow:workspace2.bzl", "tf_workspace2")
+# load("@org_tensorflow//tensorflow:workspace2.bzl", "tf_workspace2")
 
-tf_workspace2()
+# tf_workspace2()
 
-load("@org_tensorflow//tensorflow:workspace1.bzl", "tf_workspace1")
+# load("@org_tensorflow//tensorflow:workspace1.bzl", "tf_workspace1")
 
-tf_workspace1(with_rules_cc = False)
+# tf_workspace1(with_rules_cc = False)
 
-load("@org_tensorflow//tensorflow:workspace0.bzl", "tf_workspace0")
+# load("@org_tensorflow//tensorflow:workspace0.bzl", "tf_workspace0")
 
-tf_workspace0()
+# tf_workspace0()
 
 pl_model_files()
 
@@ -148,15 +153,17 @@ python_register_toolchains(
     ignore_root_user_error = True,
     # Available versions are listed in @rules_python//python:versions.bzl.
     # We recommend using the same version your team is already standardized on.
-    python_version = "3.10",
+    python_version = "3.12",
 )
 
-load("@python3_10//:defs.bzl", "interpreter")
+# NOTE: With bzlmod, we use the Python interpreter from the bzlmod toolchain
+# load("@python3_10//:defs.bzl", "interpreter")
 
 # Setup the environment for the open-source python API.
 pip_parse(
     name = "vizier_api_python_deps",
-    python_interpreter_target = interpreter,
+    # NOTE: With bzlmod, pip_parse automatically uses the registered Python toolchain
+    # python_interpreter_target = "@python_3_12//:python",
     requirements_lock = "//src/api/python:requirements.bazel.txt",
 )
 
@@ -166,7 +173,8 @@ vizier_api_install_deps()
 
 pip_parse(
     name = "pxapi_python_doc_deps",
-    python_interpreter_target = interpreter,
+    # NOTE: With bzlmod, pip_parse automatically uses the registered Python toolchain
+    # python_interpreter_target = "@python_3_12//:python",
     requirements_lock = "//src/api/python/doc:requirements.bazel.txt",
 )
 
@@ -175,13 +183,15 @@ load("@pxapi_python_doc_deps//:requirements.bzl", pxapi_py_doc_install_deps = "i
 pxapi_py_doc_install_deps()
 
 # Setup thrift: used for building Stirling tracing targets.
-load("//bazel:thrift.bzl", "thrift_deps")
+# NOTE: Commented out because twitter_scrooge() loads bzlmod rules_scala which creates cycles
+# load("//bazel:thrift.bzl", "thrift_deps")
 
-thrift_deps(scala_version = scala_version)
+# # Use the scala version configured in MODULE.bazel (2.13.16)
+# thrift_deps(scala_version = "2.13.16")
 
-load("@thrift_deps//:defs.bzl", thrift_pinned_maven_install = "pinned_maven_install")
+# load("@thrift_deps//:defs.bzl", thrift_pinned_maven_install = "pinned_maven_install")
 
-thrift_pinned_maven_install()
+# thrift_pinned_maven_install()
 
 # twitter_scrooge will use incompatible versions of @scrooge_jars and @thrift_jars.
 # These bind statements ensure that the correct versions of finagle libthrift, scrooge core
@@ -189,17 +199,17 @@ thrift_pinned_maven_install()
 # See https://github.com/bazelbuild/rules_scala/issues/592 and
 # https://github.com/bazelbuild/rules_scala/pull/847 for more details.
 bind(
-    name = "io_bazel_rules_scala/dependency/thrift/scrooge_core",
+    name = "rules_scala/dependency/thrift/scrooge_core",
     actual = "//src/stirling/source_connectors/socket_tracer/testing/containers/thriftmux:scrooge_jars",
 )
 
 bind(
-    name = "io_bazel_rules_scala/dependency/thrift/scrooge_generator",
+    name = "rules_scala/dependency/thrift/scrooge_generator",
     actual = "//src/stirling/source_connectors/socket_tracer/testing/containers/thriftmux:scrooge_jars",
 )
 
 bind(
-    name = "io_bazel_rules_scala/dependency/thrift/libthrift",
+    name = "rules_scala/dependency/thrift/libthrift",
     actual = "//src/stirling/source_connectors/socket_tracer/testing/containers/thriftmux:thrift_jars",
 )
 
@@ -256,7 +266,8 @@ go_download_sdk(
 
 pip_parse(
     name = "amqp_gen_reqs",
-    python_interpreter_target = interpreter,
+    # NOTE: With bzlmod, pip_parse automatically uses the registered Python toolchain
+    # python_interpreter_target = "@python_3_12//:python",
     requirements_lock = "//src/stirling/source_connectors/socket_tracer/protocols/amqp/amqp_code_generator:requirements.bazel.txt",
 )
 
@@ -266,7 +277,8 @@ amp_gen_install_deps()
 
 pip_parse(
     name = "protocol_inference",
-    python_interpreter_target = interpreter,
+    # NOTE: With bzlmod, pip_parse automatically uses the registered Python toolchain
+    # python_interpreter_target = "@python_3_12//:python",
     requirements_lock = "//src/stirling/protocol_inference:requirements.bazel.txt",
 )
 
@@ -283,7 +295,8 @@ py_image_repos()
 
 pip_parse(
     name = "amqp_bpf_test_requirements",
-    python_interpreter_target = interpreter,
+    # NOTE: With bzlmod, pip_parse automatically uses the registered Python toolchain
+    # python_interpreter_target = "@python_3_12//:python",
     requirements_lock = "//src/stirling/source_connectors/socket_tracer/testing/containers/amqp:requirements.bazel.txt",
 )
 
@@ -309,7 +322,8 @@ px_deps_pinned_maven_install()
 
 pip_parse(
     name = "mongodb_bpf_test_requirements",
-    python_interpreter_target = interpreter,
+    # NOTE: With bzlmod, pip_parse automatically uses the registered Python toolchain
+    # python_interpreter_target = "@python_3_12//:python",
     requirements_lock = "//src/stirling/source_connectors/socket_tracer/testing/containers/mongodb:requirements.bazel.txt",
 )
 

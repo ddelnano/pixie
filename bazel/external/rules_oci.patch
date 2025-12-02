@@ -1,0 +1,13 @@
+diff --git a/oci/private/pull.bzl b/oci/private/pull.bzl
+index 47883aa..530ed6a 100644
+--- a/oci/private/pull.bzl
++++ b/oci/private/pull.bzl
+@@ -170,7 +170,7 @@ _BUILD_FILE_TMPL = """\
+ load("@aspect_bazel_lib//lib:copy_to_directory.bzl", "copy_to_directory")
+ 
+ copy_to_directory(
+-    name = "{target_name}",
++    name = "image",
+     out = "layout",
+     # Always use hardlink to avoid having copies of the blobs from external repository in the output-tree.
+     hardlink = "on",

@@ -1,0 +1,21 @@
+--- a/repositories/py_repositories.bzl
++++ b/repositories/py_repositories.bzl
+@@ -19,7 +19,7 @@ Provides functions to pull all Python external package dependencies of this
+ repository.
+ """
+
+-load("@rules_python//python:pip.bzl", "pip_install")
++load("@rules_python//python:pip.bzl", "pip_parse")
+
+ def py_deps():
+     """Pull in external Python packages needed by py binaries in this repo.
+@@ -31,7 +31,7 @@ def py_deps():
+     """
+     excludes = native.existing_rules().keys()
+     if "io_bazel_rules_docker_pip_deps" not in excludes:
+-        pip_install(
++        pip_parse(
+             name = "io_bazel_rules_docker_pip_deps",
+-            requirements = "@io_bazel_rules_docker//repositories:requirements-pip.txt",
++            requirements_lock = "@io_bazel_rules_docker//repositories:requirements-pip.txt",
+         )

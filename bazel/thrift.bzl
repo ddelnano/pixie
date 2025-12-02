@@ -14,7 +14,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-load("@io_bazel_rules_scala//twitter_scrooge:twitter_scrooge.bzl", "twitter_scrooge")
+load("@rules_scala//twitter_scrooge:twitter_scrooge.bzl", "twitter_scrooge")
 load("@rules_jvm_external//:defs.bzl", "maven_install")
 
 def thrift_deps(scala_version):

@@ -94,7 +94,8 @@ def pl_common_linkopts():
             "-lunwind",
         ],
         # The OSX system library transitively links common libraries (e.g., pthread).
-        "@bazel_tools//tools/osx:darwin": [],
+        "@bazel_tools//tools/osx:darwin_x86_64": [],
+        "@bazel_tools//tools/osx:darwin_arm64": [],
         "//conditions:default": [
             "-pthread",
             "-lunwind",
@@ -270,6 +271,7 @@ def pl_cc_test(
         timeout = "short",
         args = [],
         defines = [],
+        copts = [],
         coverage = True,
         local = False,
         flaky = False,
@@ -285,6 +287,7 @@ def pl_cc_test(
         repository = repository,
         tags = test_lib_tags,
         defines = defines,
+        copts = copts,
     )
     cc_test(
         name = name,
@@ -320,13 +323,14 @@ def pl_cc_test_library(
         visibility = None,
         repository = "",
         tags = [],
-        defines = []):
+        defines = [],
+        copts = []):
     cc_library(
         name = name,
         srcs = srcs,
         hdrs = hdrs,
         data = data,
-        copts = pl_copts(),
+        copts = pl_copts() + copts,
         testonly = 1,
         deps = deps + [
             "@com_google_googletest//:gtest",
