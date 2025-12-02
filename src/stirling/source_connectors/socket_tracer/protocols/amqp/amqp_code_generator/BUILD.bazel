@@ -28,6 +28,9 @@ py_library(
         "gen_templates/decode.h.jinja_template",
         "gen_templates/types_gen.h.jinja_template",
     ],
+    # The imports attribute adds this directory to PYTHONPATH so that
+    # "from amqp_code_gen import ..." works directly.
+    imports = ["."],
     deps = [
         "@rules_python//python/runfiles",
         requirement("Jinja2"),

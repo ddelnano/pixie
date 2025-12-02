@@ -22,7 +22,7 @@ from typing import List
 from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
 import subprocess
-from rules_python.python.runfiles import runfiles
+from python.runfiles import runfiles
 
 
 def to_camel_case(text):

@@ -15,7 +15,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import fire
-from px.src.stirling.source_connectors.socket_tracer.protocols.amqp.amqp_code_generator.amqp_code_gen import (
+from amqp_code_gen import (
     CodeGeneratorWriter
 )
 

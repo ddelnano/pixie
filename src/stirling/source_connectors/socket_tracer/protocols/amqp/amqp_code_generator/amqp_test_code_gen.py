@@ -25,7 +25,7 @@ import fire
 import pyshark
 import dill
 
-from px.src.stirling.source_connectors.socket_tracer.protocols.amqp.amqp_code_generator.amqp_code_gen import (
+from amqp_code_gen import (
     AMQPMethod,
     CodeGeneratorWriter,
     CodeGenerator,
