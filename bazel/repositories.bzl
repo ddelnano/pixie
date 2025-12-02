@@ -244,8 +244,9 @@ def _pl_cc_toolchain_deps():
 def _pl_deps():
     _bazel_repo("bazel_gazelle")
     _bazel_repo("io_bazel_rules_go", patches = ["//bazel/external:rules_go.patch"], patch_args = ["-p1"])
-    # NOTE: rules_scala is now managed via bzlmod in MODULE.bazel
-    # _bazel_repo("rules_scala")
+    # NOTE: rules_scala is loaded via WORKSPACE (not bzlmod) due to compatibility_proxy cycle issues
+    # Using v6.5.0 which requires the repo name io_bazel_rules_scala
+    _bazel_repo("io_bazel_rules_scala")
     _bazel_repo("rules_jvm_external")
     _bazel_repo("rules_foreign_cc")
     _bazel_repo("io_bazel_rules_k8s")

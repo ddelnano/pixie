@@ -445,12 +445,15 @@ REPOSITORY_LOCATIONS = dict(
             "https://github.com/bazelbuild/rules_k8s/archive/refs/tags/v0.7.tar.gz",
         ],
     ),
-    rules_scala = dict(
-        sha256 = "a4700d6e6cdf13cf85e29029ec998e2ec3ba94791606ec83d2c96e3c5b0aebed",
+    # NOTE: Using v6.5.0 for WORKSPACE compatibility. v7.0.0+ requires bzlmod and rules_java 8.x
+    # which uses compatibility_proxy causing cycles when loaded from WORKSPACE.
+    # The repo name must be io_bazel_rules_scala to match what upstream expects.
+    io_bazel_rules_scala = dict(
+        sha256 = "3b00fa0b243b04565abb17d3839a5f4fa6cc2cac571f6db9f83c1982ba1e19e5",
         urls = [
-            "https://github.com/bazelbuild/rules_scala/releases/download/v7.0.0/rules_scala-v7.0.0.tar.gz",
+            "https://github.com/bazelbuild/rules_scala/releases/download/v6.5.0/rules_scala-v6.5.0.tar.gz",
         ],
-        strip_prefix = "rules_scala-7.0.0",
+        strip_prefix = "rules_scala-6.5.0",
     ),
     org_tensorflow = dict(
         sha256 = "c24442c0f5339fa5c5ce981d9d63e983dc4dd5dfaab4b612c7040af70f942700",

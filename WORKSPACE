@@ -53,24 +53,22 @@ pl_go_dependencies()
 
 # grpc_deps()
 
-# NOTE: rules_scala is now managed via bzlmod in MODULE.bazel
-# The following WORKSPACE-based setup has been commented out to avoid conflicts
-# load("@rules_scala//:scala_config.bzl", "scala_config")
-# load("@rules_scala//scala:deps.bzl", "rules_scala_dependencies")
+# NOTE: rules_scala is loaded via WORKSPACE (not bzlmod) due to compatibility_proxy cycle issues
+# Using rules_scala v6.5.0 which is compatible with WORKSPACE-based setup
+load("@io_bazel_rules_scala//:scala_config.bzl", "scala_config")
 
-# scala_version = "2.13.12"
+# NOTE: rules_scala v6.5.0 has hardcoded repository versions for 2.13.12
+scala_config(scala_version = "2.13.12")
 
-# scala_config(scala_version = scala_version)
+load("@io_bazel_rules_scala//scala:scala.bzl", "rules_scala_setup", "rules_scala_toolchain_deps_repositories")
 
-# rules_scala_dependencies()
+rules_scala_setup()
 
-# load("@rules_scala//scala:scala.bzl", "scala_repositories")
+rules_scala_toolchain_deps_repositories(fetch_sources = True)
 
-# scala_repositories()
+load("@io_bazel_rules_scala//scala:toolchains.bzl", "scala_register_toolchains")
 
-# load("@io_bazel_rules_scala//scala:toolchains.bzl", "scala_register_toolchains")
-
-# scala_register_toolchains()
+scala_register_toolchains()
 
 # These dependencies are needed by GRPC.
 load("@build_bazel_rules_apple//apple:repositories.bzl", "apple_rules_dependencies")
@@ -184,32 +182,33 @@ pxapi_py_doc_install_deps()
 
 # Setup thrift: used for building Stirling tracing targets.
 # NOTE: Commented out because twitter_scrooge() loads bzlmod rules_scala which creates cycles
-# load("//bazel:thrift.bzl", "thrift_deps")
+load("//bazel:thrift.bzl", "thrift_deps")
 
-# # Use the scala version configured in MODULE.bazel (2.13.16)
-# thrift_deps(scala_version = "2.13.16")
+# Use the scala version configured in WORKSPACE (2.13.12) to match rules_scala v6.5.0
+thrift_deps(scala_version = "2.13.12")
 
-# load("@thrift_deps//:defs.bzl", thrift_pinned_maven_install = "pinned_maven_install")
+load("@thrift_deps//:defs.bzl", thrift_pinned_maven_install = "pinned_maven_install")
 
-# thrift_pinned_maven_install()
+thrift_pinned_maven_install()
 
 # twitter_scrooge will use incompatible versions of @scrooge_jars and @thrift_jars.
 # These bind statements ensure that the correct versions of finagle libthrift, scrooge core
 # and scrooge generator are used to ensure successful compilation.
 # See https://github.com/bazelbuild/rules_scala/issues/592 and
 # https://github.com/bazelbuild/rules_scala/pull/847 for more details.
+# NOTE: For rules_scala v6.5.0, the bind names use io_bazel_rules_scala prefix
 bind(
-    name = "rules_scala/dependency/thrift/scrooge_core",
+    name = "io_bazel_rules_scala/dependency/thrift/scrooge_core",
     actual = "//src/stirling/source_connectors/socket_tracer/testing/containers/thriftmux:scrooge_jars",
 )
 
 bind(
-    name = "rules_scala/dependency/thrift/scrooge_generator",
+    name = "io_bazel_rules_scala/dependency/thrift/scrooge_generator",
     actual = "//src/stirling/source_connectors/socket_tracer/testing/containers/thriftmux:scrooge_jars",
 )
 
 bind(
-    name = "rules_scala/dependency/thrift/libthrift",
+    name = "io_bazel_rules_scala/dependency/thrift/libthrift",
     actual = "//src/stirling/source_connectors/socket_tracer/testing/containers/thriftmux:thrift_jars",
 )
 
