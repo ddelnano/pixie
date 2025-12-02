@@ -91,9 +91,9 @@ TEST(ParsePB, MultipleGRPCLengthPrefixedMessages) {
 }
 
 TEST(ParsePB, LongStringTruncation) {
-  std::string_view data = CreateStringView<char>(
+  std::string data = std::string(CreateStringView<char>(
       "\x00\x00\x00\x00\x49\x0A\x47This is a long string. It is so long that is expected to get "
-      "truncated.");
+      "truncated."));
   EXPECT_THAT(ParsePB(data, /*is_gzipped*/ false, /*str_field_truncation_len*/ 32),
               StrEq(R"(1: "This is a long string. It is so ...<truncated>...")"));
 }

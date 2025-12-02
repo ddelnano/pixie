@@ -1,0 +1,40 @@
+--- a/src/google/protobuf/text_format.cc
++++ b/src/google/protobuf/text_format.cc
+@@ -91,6 +91,18 @@ inline void TrimTrailingSpace(std::string& debug_string) {
+   // Single line mode currently might have an extra space at the end.
+   if (!debug_string.empty() && debug_string.back() == ' ') {
+     debug_string.pop_back();
+   }
+ }
+
++// Returns true if truncation occurred.
++bool TruncateStringView(int64_t max_length, absl::string_view* s) {
++  if (max_length > 0) {
++    int64_t excess = static_cast<int64_t>(s->size()) - max_length;
++    if (excess > 0) {
++      s->remove_suffix(excess);
++      return true;
++    }
++  }
++  return false;
++}
++
+ }  // namespace
+
+ namespace internal {
+@@ -2935,7 +2947,14 @@ void TextFormat::Printer::PrintUnknownFields(
+             break;
+           }
+           generator->PrintMaybeWithMarker(MarkerToken(), ": ", "\"");
+-          generator->PrintString(absl::CEscape(value));
++          absl::string_view value_to_print = value;
++          bool truncated = TruncateStringView(truncate_string_field_longer_than_, &value_to_print);
++
++          if (truncated) {
++            generator->PrintString(absl::StrCat(absl::CEscape(value_to_print), "...<truncated>..."));
++          } else {
++            generator->PrintString(absl::CEscape(value));
++          }
+           if (single_line_mode_) {
+             generator->PrintLiteral("\" ");
+           } else {

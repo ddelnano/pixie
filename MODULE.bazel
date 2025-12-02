@@ -10,6 +10,20 @@ bazel_dep(name = "with_cfg.bzl", version = "0.11.0")
 bazel_dep(name = "rules_apple", version = "4.1.2", repo_name = "build_bazel_rules_apple")
 bazel_dep(name = "rules_cc", version = "0.2.0")
 bazel_dep(name = "protobuf", version = "31.1", repo_name = "com_google_protobuf")
+
+# Apply custom patch to add string truncation support for unknown fields in TextFormat.
+# This is needed for ParsePB() to truncate long strings when parsing arbitrary protobuf
+# wire data into an Empty message (where all fields become unknown fields).
+single_version_override(
+    module_name = "protobuf",
+    patch_strip = 1,
+    patches = [
+        "//bazel/external:protobuf_text_format_v31_part1.patch",
+        "//bazel/external:protobuf_text_format_v31_part2.patch",
+    ],
+    version = "31.1",
+)
+
 bazel_dep(name = "grpc", version = "1.74.1", repo_name = "com_github_grpc_grpc")
 bazel_dep(name = "abseil-cpp", version = "20250512.1")
 bazel_dep(name = "boringssl", repo_name = "boringssl", version = "0.20250818.0")

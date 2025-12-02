@@ -115,6 +115,7 @@ Status GRPCPBWireToText(std::string_view message, bool is_gzipped, std::string* 
     // Include the most recent status.
     status = PBWireToText(is_compressed ? gunzipped_data : data, &pb_printer, &pb_str);
 
+    LOG(INFO) << "Parsed gRPC message: " << pb_str;
     text->append(pb_str);
   }
   return status;
