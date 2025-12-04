@@ -19,7 +19,9 @@
 package docker
 
 import (
+	"bytes"
 	"fmt"
+	"time"
 
 	"github.com/olivere/elastic/v7"
 	"github.com/ory/dockertest/v3"
@@ -55,38 +57,12 @@ func SetupElastic() (*elastic.Client, func(), error) {
 			"xpack.security.http.ssl.enabled=false",
 			"xpack.security.transport.ssl.enabled=false",
 			"indices.lifecycle.poll_interval=5s",
-			"path.data=/opt/elasticsearch/volatile/data",
-			"path.logs=/opt/elasticsearch/volatile/logs",
 			"ES_JAVA_OPTS=-Xms128m -Xmx128m -server",
 			"ES_HEAP_SIZE=128m",
 		},
 	}, func(config *docker.HostConfig) {
-		config.AutoRemove = true
+		config.AutoRemove = false
 		config.RestartPolicy = docker.RestartPolicy{Name: "no"}
-		// Tmpfs is much faster than the default docker mounts.
-		config.Mounts = []docker.HostMount{
-			{
-				Target: "/opt/elasticsearch/volatile/data",
-				Type:   "tmpfs",
-				TempfsOptions: &docker.TempfsOptions{
-					SizeBytes: 100 * 1024 * 1024,
-				},
-			},
-			{
-				Target: "/opt/elasticsearch/volatile/logs",
-				Type:   "tmpfs",
-				TempfsOptions: &docker.TempfsOptions{
-					SizeBytes: 100 * 1024 * 1024,
-				},
-			},
-			{
-				Target: "/tmp",
-				Type:   "tmpfs",
-				TempfsOptions: &docker.TempfsOptions{
-					SizeBytes: 100 * 1024 * 1024,
-				},
-			},
-		}
 		config.CPUCount = 1
 		config.Memory = 1024 * 1024 * 1024
 		config.MemorySwap = 0
@@ -101,18 +77,52 @@ func SetupElastic() (*elastic.Client, func(), error) {
 		return nil, cleanup, err
 	}
 
+	// Increase retry timeout (default is 1 minute)
+	pool.MaxWait = 1 * time.Minute
 	clientPort := resource.GetPort("9200/tcp")
+	var esHost string
+
+	// Log network debugging info
+	log.Infof("Container ID: %s", resource.Container.ID)
+	log.Infof("Container IPAddress: %s", resource.Container.NetworkSettings.IPAddress)
+	log.Infof("Container Gateway: %s", resource.Container.NetworkSettings.Gateway)
+	log.Infof("Mapped port 9200/tcp: %s", resource.GetPort("9200/tcp"))
+	for netName, netSettings := range resource.Container.NetworkSettings.Networks {
+		esHost = netSettings.Gateway
+		log.Infof("Setting ES host to gateway %s for network %s", esHost, netName)
+		break
+	}
+
+	esURL := fmt.Sprintf("http://%s:%s", esHost, clientPort)
+	log.Infof("Will attempt to connect to Elasticsearch at: %s", esURL)
+
 	var client *elastic.Client
 	err = pool.Retry(func() error {
 		var err error
-		client, err = connectElastic(fmt.Sprintf("http://%s:%s",
-			resource.Container.NetworkSettings.Gateway, clientPort), "elastic", esPass)
+		client, err = connectElastic(esURL, "elastic", esPass)
 		if err != nil {
-			log.WithError(err).Errorf("Failed to connect to elasticsearch.")
+			log.WithError(err).Errorf("Failed to connect to elasticsearch at %s", esURL)
 		}
 		return err
 	})
 	if err != nil {
+		// Dump container logs on failure for debugging
+		var stdout, stderr bytes.Buffer
+		logsErr := pool.Client.Logs(docker.LogsOptions{
+			Container:    resource.Container.ID,
+			OutputStream: &stdout,
+			ErrorStream:  &stderr,
+			Stdout:       true,
+			Stderr:       true,
+			Tail:         "100",
+		})
+		if logsErr != nil {
+			log.WithError(logsErr).Error("Failed to get container logs")
+		} else {
+			log.Errorf("Elasticsearch container stdout:\n%s", stdout.String())
+			log.Errorf("Elasticsearch container stderr:\n%s", stderr.String())
+		}
+
 		purgeErr := pool.Purge(resource)
 		if purgeErr != nil {
 			log.WithError(err).Error("Failed to purge pool")
