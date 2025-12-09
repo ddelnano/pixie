@@ -19,6 +19,10 @@ pl_register_cc_toolchains()
 # Install Pixie Labs Dependencies.
 pl_deps()
 
+load("@bazel_features//:deps.bzl", "bazel_features_deps")
+
+bazel_features_deps()
+
 # Order is important. Try to go from most basic/primitive to higher level packages.
 # - go_rules_dependencies
 # - protobuf_deps
@@ -44,6 +48,10 @@ go_register_toolchains()
 # to make sure we get the correct version.
 # gazelle:repository_macro go_deps.bzl%pl_go_dependencies
 pl_go_dependencies()
+
+load("@rules_java//java:rules_java_deps.bzl", "rules_java_dependencies")
+
+rules_java_dependencies()
 
 load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
 

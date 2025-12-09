@@ -15,6 +15,13 @@
 # SPDX-License-Identifier: Apache-2.0
 
 REPOSITORY_LOCATIONS = dict(
+    bazel_features = dict(
+	sha256 = "07271d0f6b12633777b69020c4cb1eb67b1939c0cf84bb3944dc85cc250c0c01",
+	strip_prefix = "bazel_features-1.38.0",
+	urls = [
+	    "https://github.com/bazel-contrib/bazel_features/releases/download/v1.38.0/bazel_features-v1.38.0.tar.gz",
+	],
+    ),
     bazel_gazelle = dict(
         sha256 = "d76bf7a60fd8b050444090dfa2837a4eaf9829e1165618ee35dceca5cbdf58d5",
         urls = [
@@ -81,13 +88,6 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "tdigest-85e0f70092460e60236821db4c25143768d3da12",
         urls = ["https://github.com/pixie-io/tdigest/archive/85e0f70092460e60236821db4c25143768d3da12.tar.gz"],
     ),
-    com_github_fmeum_rules_meta = dict(
-        sha256 = "ed3ed909e6e3f34a11d7c2adcc461535975a875fe434719540a4e6f63434a866",
-        strip_prefix = "rules_meta-0.0.4",
-        urls = [
-            "https://github.com/fmeum/rules_meta/archive/refs/tags/v0.0.4.tar.gz",
-        ],
-    ),
     com_github_gflags_gflags = dict(
         sha256 = "9e1a38e2dcbb20bb10891b5a171de2e5da70e0a50fff34dd4b0c2c6d75043909",
         strip_prefix = "gflags-524b83d0264cb9f1b2d134c564ef1aa23f207a41",
@@ -106,9 +106,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/gperftools/gperftools/releases/download/gperftools-2.9.1/gperftools-2.9.1.tar.gz"],
     ),
     com_github_grpc_grpc = dict(
-        sha256 = "b55696fb249669744de3e71acc54a9382bea0dce7cd5ba379b356b12b82d4229",
-        strip_prefix = "grpc-1.51.1",
-        urls = ["https://github.com/grpc/grpc/archive/refs/tags/v1.51.1.tar.gz"],
+        sha256 = "7bf97c11cf3808d650a3a025bbf9c5f922c844a590826285067765dfd055d228",
+        strip_prefix = "grpc-1.74.1",
+        urls = ["https://github.com/grpc/grpc/archive/refs/tags/v1.74.1.tar.gz"],
     ),
     # August 19, 2020.
     com_github_google_sentencepiece = dict(
@@ -232,9 +232,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/pixie-io/libpypa/archive/eba8ec485a6c5e566d0d7a0716a06c91837c9d2f.tar.gz"],
     ),
     com_google_absl = dict(
-        sha256 = "91ac87d30cc6d79f9ab974c51874a704de9c2647c40f6932597329a282217ba8",
-        strip_prefix = "abseil-cpp-20220623.1",
-        urls = ["https://github.com/abseil/abseil-cpp/archive/refs/tags/20220623.1.tar.gz"],
+        sha256 = "9b7a064305e9fd94d124ffa6cc358592eb42b5da588fb4e07d09254aa40086db",
+        strip_prefix = "abseil-cpp-20250512.1",
+        urls = ["https://github.com/abseil/abseil-cpp/archive/refs/tags/20250512.1.tar.gz"],
     ),
     com_google_benchmark = dict(
         sha256 = "3aff99169fa8bdee356eaa1f691e835a6e57b1efeadb8a0f9f228531158246ac",
@@ -257,16 +257,15 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/flatbuffers/archive/refs/tags/v2.0.6.tar.gz"],
     ),
     com_google_googletest = dict(
-        sha256 = "81964fe578e9bd7c94dfdb09c8e4d6e6759e19967e397dbea48d1c10e45d0df2",
-        strip_prefix = "googletest-release-1.12.1",
-        urls = ["https://github.com/google/googletest/archive/refs/tags/release-1.12.1.tar.gz"],
+        sha256 = "65fab701d9829d38cb77c14acdc431d2108bfdbf8979e40eb8ae567edf10b27c",
+        strip_prefix = "googletest-1.17.0",
+        urls = ["https://github.com/google/googletest/archive/refs/tags/v1.17.0.tar.gz"],
     ),
     com_google_protobuf = dict(
-        sha256 = "63c5539a8506dc6bccd352a857cea106e0a389ce047a3ff0a78fe3f8fede410d",
-        strip_prefix = "protobuf-24487dd1045c7f3d64a21f38a3f0c06cc4cf2edb",
+        sha256 = "07a43d88fe5a38e434c7f94129cad56a4c43a51f99336074d0799c2f7d4e44c5",
+        strip_prefix = "protobuf-30.2",
         urls = [
-            "https://storage.googleapis.com/grpc-bazel-mirror/github.com/protocolbuffers/protobuf/archive/24487dd1045c7f3d64a21f38a3f0c06cc4cf2edb.tar.gz",
-            "https://github.com/protocolbuffers/protobuf/archive/24487dd1045c7f3d64a21f38a3f0c06cc4cf2edb.tar.gz",
+            "https://github.com/protocolbuffers/protobuf/archive/v30.2.tar.gz",
         ],
     ),
     com_google_protobuf_javascript = dict(
@@ -451,6 +450,11 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["http://musl.libc.org/releases/musl-1.2.3.tar.gz"],
         manual_license_name = "libc/musl",
     ),
+    rules_cc = dict(
+	sha256 = "abc605dd850f813bb37004b77db20106a19311a96b2da1c92b789da529d28fe1",
+	strip_prefix = "rules_cc-0.0.17",
+	urls = ["https://github.com/bazelbuild/rules_cc/releases/download/0.0.17/rules_cc-0.0.17.tar.gz"],
+    ),
     rules_foreign_cc = dict(
         sha256 = "6041f1374ff32ba711564374ad8e007aef77f71561a7ce784123b9b4b88614fc",
         strip_prefix = "rules_foreign_cc-0.8.0",
@@ -460,6 +464,12 @@ REPOSITORY_LOCATIONS = dict(
         sha256 = "9d04041ac92a0985e344235f5d946f71ac543f1b1565f2cdbc9a2aaee8adf55b",
         strip_prefix = "rules_python-0.26.0",
         urls = ["https://github.com/bazelbuild/rules_python/archive/refs/tags/0.26.0.tar.gz"],
+    ),
+    rules_java = dict(
+	sha256 = "a64ab04616e76a448c2c2d8165d836f0d2fb0906200d0b7c7376f46dd62e59cc",
+	urls = [
+	    "https://github.com/bazelbuild/rules_java/releases/download/8.6.2/rules_java-8.6.2.tar.gz",
+	],
     ),
     rules_jvm_external = dict(
         urls = ["https://github.com/bazelbuild/rules_jvm_external/archive/refs/tags/5.2.tar.gz"],
@@ -493,7 +503,16 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "cpuinfo-5e63739504f0f8e18e941bd63b2d6d42536c7d90",
         urls = ["https://github.com/pytorch/cpuinfo/archive/5e63739504f0f8e18e941bd63b2d6d42536c7d90.tar.gz"],
     ),
+    with_cfg = dict(
+        sha256 = "c7af6227d24499438fa0bb96fe4034e163d8c807b06f7c0645f3654448268b84",
+        strip_prefix = "with_cfg.bzl-0.11.0",
+        urls = [
+            "https://github.com/fmeum/with_cfg.bzl/releases/download/v0.11.0/with_cfg.bzl-v0.11.0.tar.gz"
+        ],
+    ),
 )
+
+REPOSITORY_LOCATIONS['with_cfg.bzl'] = REPOSITORY_LOCATIONS.pop('with_cfg')
 
 # To modify one of the forked repos below:
 #  1. Make the changes to the repo and push the changes to the `pixie` on github.
