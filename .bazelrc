@@ -70,8 +70,6 @@ common --enable_platform_specific_config
 common:linux --repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
 # --platforms is only set on linux, because we don't have a linux cross-compiling setup on macos.
 build:linux --platforms=//bazel/cc_toolchains:linux-x86_64
-# Likewise, we only have cc_toolchain definitions for our linux compilers, so we only enable toolchain resolution on linux.
-build:linux --incompatible_enable_cc_toolchain_resolution
 build:linux --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
 
 # Common options from clang.
@@ -140,7 +138,7 @@ test:gcc --config=tmp-sandbox
 build:asan --config=clang
 build:asan --//bazel:sanitizer=asan
 build:asan --features=asan
-build:asan --test_timeout="120,600,1800,3600"
+build:asan --test_timeout="180,600,1800,3600"
 build:asan --define PL_CONFIG_ASAN=1
 build:asan --define tcmalloc=disabled
 build:asan --build_tag_filters=-no_asan
@@ -259,7 +257,7 @@ build:remote --experimental_remote_downloader=grpcs://remote.buildbuddy.io
 build:remote --remote_timeout=1h
 build:remote --remote_retries=5
 build:remote --spawn_strategy=remote,local
-build:remote --experimental_remote_cache_compression
+build:remote --remote_cache_compression
 build:remote --jobs=100
 test:remote --jobs=100
 build:remote --nolegacy_important_outputs
@@ -267,4 +265,5 @@ build:remote --build_metadata=VISIBILITY=PUBLIC
 coverage:remote --strategy=CoverageReport=local,remote
 coverage:remote --experimental_fetch_all_coverage_outputs
 coverage:remote --experimental_split_coverage_postprocessing
+# See if this can be removed
 coverage:remote --experimental_remote_download_regex=.*/(coverage.dat$|_coverage/_coverage_report.dat$)
