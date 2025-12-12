@@ -15,6 +15,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 load("//bazel/cc_toolchains:clang.bzl", "clang_register_toolchain")
+load("//bazel/cc_toolchains:local_clang.bzl", "local_clang_register_toolchain")
 
 def _pl_register_cc_toolchains():
     clang_register_toolchain(
@@ -51,4 +52,35 @@ def _pl_register_cc_toolchains():
         "//bazel/cc_toolchains:cc-toolchain-gcc-x86_64-gnu",
     )
 
+def _pl_register_local_clang_toolchain(
+        name = "clang-local",
+        llvm_path = "/home/dev/LLVM-21.1.7-Linux-X64",
+        clang_version = "21.1.7"):
+    """Register a local LLVM/Clang toolchain for testing.
+
+    This is useful for testing new clang versions before building a
+    custom Pixie clang distribution.
+
+    Args:
+        name: Name for the toolchain (default: "clang-local")
+        llvm_path: Absolute path to local LLVM installation
+        clang_version: Clang version string (e.g., "21.1.7")
+
+    Usage in WORKSPACE:
+        load("//bazel/cc_toolchains:toolchains.bzl", "pl_register_local_clang_toolchain")
+        pl_register_local_clang_toolchain()
+
+    Then build with:
+        bazel build --extra_toolchains=@clang-local//:toolchain //your:target
+    """
+    local_clang_register_toolchain(
+        name = name,
+        llvm_path = llvm_path,
+        clang_version = clang_version,
+        target_arch = "x86_64",
+        libc_version = "glibc_host",
+        use_for_host_tools = False,
+    )
+
 pl_register_cc_toolchains = _pl_register_cc_toolchains
+pl_register_local_clang_toolchain = _pl_register_local_clang_toolchain
