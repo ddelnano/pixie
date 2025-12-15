@@ -18,39 +18,40 @@ load("//bazel/cc_toolchains:clang.bzl", "clang_register_toolchain")
 load("//bazel/cc_toolchains:local_clang.bzl", "local_clang_register_toolchain")
 
 def _pl_register_cc_toolchains():
-    clang_register_toolchain(
-        name = "clang-15.0-x86_64",
-        toolchain_repo = "com_llvm_clang_15",
-        target_arch = "x86_64",
-        clang_version = "15.0.6",
-        libc_version = "glibc_host",
-    )
-    clang_register_toolchain(
-        name = "clang-15.0-x86_64-glibc2.36-sysroot",
-        toolchain_repo = "com_llvm_clang_15",
-        target_arch = "x86_64",
-        clang_version = "15.0.6",
-        libc_version = "glibc2_36",
-    )
-    clang_register_toolchain(
-        name = "clang-15.0-aarch64-glibc2.36-sysroot",
-        toolchain_repo = "com_llvm_clang_15",
-        target_arch = "aarch64",
-        clang_version = "15.0.6",
-        libc_version = "glibc2_36",
-    )
-    clang_register_toolchain(
-        name = "clang-15.0-exec",
-        toolchain_repo = "com_llvm_clang_15",
-        target_arch = "x86_64",
-        clang_version = "15.0.6",
-        libc_version = "glibc_host",
-        use_for_host_tools = True,
-    )
+    pass
+    # clang_register_toolchain(
+    #     name = "clang-15.0-x86_64",
+    #     toolchain_repo = "com_llvm_clang_15",
+    #     target_arch = "x86_64",
+    #     clang_version = "15.0.6",
+    #     libc_version = "glibc_host",
+    # )
+    # clang_register_toolchain(
+    #     name = "clang-15.0-x86_64-glibc2.36-sysroot",
+    #     toolchain_repo = "com_llvm_clang_15",
+    #     target_arch = "x86_64",
+    #     clang_version = "15.0.6",
+    #     libc_version = "glibc2_36",
+    # )
+    # clang_register_toolchain(
+    #     name = "clang-15.0-aarch64-glibc2.36-sysroot",
+    #     toolchain_repo = "com_llvm_clang_15",
+    #     target_arch = "aarch64",
+    #     clang_version = "15.0.6",
+    #     libc_version = "glibc2_36",
+    # )
+    # clang_register_toolchain(
+    #     name = "clang-15.0-exec",
+    #     toolchain_repo = "com_llvm_clang_15",
+    #     target_arch = "x86_64",
+    #     clang_version = "15.0.6",
+    #     libc_version = "glibc_host",
+    #     use_for_host_tools = True,
+    # )
 
-    native.register_toolchains(
-        "//bazel/cc_toolchains:cc-toolchain-gcc-x86_64-gnu",
-    )
+    # native.register_toolchains(
+    #     "//bazel/cc_toolchains:cc-toolchain-gcc-x86_64-gnu",
+    # )
 
 def _pl_register_local_clang_toolchain(
         name = "clang-local",
@@ -80,6 +81,14 @@ def _pl_register_local_clang_toolchain(
         target_arch = "x86_64",
         libc_version = "glibc_host",
         use_for_host_tools = False,
+    )
+    local_clang_register_toolchain(
+        name = "clang-exec",
+        llvm_path = llvm_path,
+        clang_version = clang_version,
+        target_arch = "x86_64",
+        libc_version = "glibc_host",
+        use_for_host_tools = True,
     )
 
 pl_register_cc_toolchains = _pl_register_cc_toolchains

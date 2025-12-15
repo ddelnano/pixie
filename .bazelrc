@@ -110,10 +110,9 @@ test:clang-libstdc++ --config=tmp-sandbox
 
 # Build with local LLVM installation for testing new clang versions.
 # Usage: bazel build --config=clang-local //your:target
-# Note: Uses processwrapper-sandbox to avoid strict sandbox mount restrictions.
+# The toolchain copies LLVM files to the external repo to work with Bazel's sandbox.
 build:clang-local --config=clang
-build:clang-local --extra_toolchains=@clang-local//:toolchain
-build:clang-local --spawn_strategy=local
+build:clang-local --extra_toolchains=@clang-local//:toolchain,@clang-exec//:toolchain
 
 build:qemu-bpf --config=clang-base
 build:qemu-bpf --//bazel:enable_libcpp

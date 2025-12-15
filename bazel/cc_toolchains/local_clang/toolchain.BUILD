@@ -360,9 +360,8 @@ toolchain(
         "@platforms//cpu:{target_arch}",
         "@platforms//os:linux",
     ] + (["@px//bazel/cc_toolchains:is_exec_true"] if {use_for_host_tools} else ["@px//bazel/cc_toolchains:is_exec_false"]),
-    target_settings = [
-        "@px//bazel/cc_toolchains:compiler_clang",
-    ] + {target_libc_constraints},
+    # Note: For local testing toolchain, we don't restrict target_settings
+    # to make it easier to use with different configurations.
     toolchain = ":cc_toolchain",
     toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
 )

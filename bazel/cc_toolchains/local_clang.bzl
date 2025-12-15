@@ -21,9 +21,40 @@ load("//bazel/cc_toolchains:utils.bzl", "abi")
 load("//bazel/cc_toolchains/sysroots:sysroots.bzl", "sysroot_repo_name")
 
 def _local_clang_toolchain_impl(rctx):
-    # Create a symlink to the local LLVM installation
+    # Copy the local LLVM installation to make it accessible in Bazel's sandbox.
+    # Symlinking doesn't work reliably in sandboxed Docker environments because
+    # the sandbox can't bind mount external paths.
     toolchain_path = "toolchain"
-    rctx.symlink(rctx.attr.llvm_path, toolchain_path)
+
+    # First verify the source path exists
+    if not rctx.path(rctx.attr.llvm_path).exists:
+        fail("LLVM path does not exist: " + rctx.attr.llvm_path)
+
+    # Create the toolchain directory
+    rctx.execute(["mkdir", "-p", toolchain_path])
+
+    # Copy essential directories (bin, lib, include) to keep size manageable
+    # while ensuring all toolchain files are available in the sandbox.
+    for subdir in ["bin", "lib", "include"]:
+        src = rctx.attr.llvm_path + "/" + subdir
+        dst = toolchain_path + "/" + subdir
+
+        # Verify source subdirectory exists
+        if not rctx.path(src).exists:
+            fail("LLVM subdirectory does not exist: " + src)
+
+        # Copy with error checking
+        result = rctx.execute(
+            ["cp", "-rL", src, dst],
+            timeout = 1200,  # 20 minutes for large directories
+            quiet = False,
+        )
+        if result.return_code != 0:
+            fail("Failed to copy {src} to {dst}: {stderr}".format(
+                src = src,
+                dst = dst,
+                stderr = result.stderr,
+            ))
 
     # For local LLVM releases, libc++ is bundled in the same directory.
     # However, the lib structure is different: LLVM 21+ puts libc++ at
@@ -37,24 +68,37 @@ def _local_clang_toolchain_impl(rctx):
     rctx.execute(["mkdir", "-p", libcxx_path + "/include/c++"])
     rctx.execute(["mkdir", "-p", libcxx_path + "/lib"])
 
-    # Symlink the include directory (headers are at include/c++/v1)
-    rctx.symlink(toolchain_path + "/include/c++/v1", libcxx_path + "/include/c++/v1")
+    # Copy the include directory (headers are at include/c++/v1)
+    # We copy instead of symlink so we can add target-specific files
+    rctx.execute(["cp", "-rL", toolchain_path + "/include/c++/v1", libcxx_path + "/include/c++/v1"])
 
-    # Symlink the target-specific include directory if it exists
+    # Copy target-specific headers (like __config_site) into the main include directory
+    # This is needed because toolchain_features.bzl only adds the main libcxx include path
     target_include_path = toolchain_path + "/include/" + target_triple + "/c++/v1"
     if rctx.path(target_include_path).exists:
-        rctx.execute(["mkdir", "-p", libcxx_path + "/include/" + target_triple + "/c++"])
-        rctx.symlink(target_include_path, libcxx_path + "/include/" + target_triple + "/c++/v1")
+        # Copy all files from target-specific dir to main include dir
+        rctx.execute(["cp", "-rL", target_include_path + "/.", libcxx_path + "/include/c++/v1/"])
 
     # Symlink lib files from lib/<target-triple>/ to lib/
     # This makes the structure compatible with toolchain_features.bzl
     target_lib_path = toolchain_path + "/lib/" + target_triple
     for lib_file in ["libc++.a", "libc++abi.a", "libc++.so", "libc++.so.1", "libc++.so.1.0",
-                     "libc++abi.so", "libc++abi.so.1", "libc++abi.so.1.0",
-                     "libunwind.a", "libunwind.so", "libunwind.so.1", "libunwind.so.1.0"]:
+                     "libc++abi.so", "libc++abi.so.1", "libc++abi.so.1.0"]:
         src = target_lib_path + "/" + lib_file
         if rctx.path(src).exists:
             rctx.symlink(src, libcxx_path + "/lib/" + lib_file)
+
+    # Copy system GNU libunwind libraries (required by gperftools, threadstacks, etc.)
+    # LLVM's bundled libunwind is incompatible (different API - unw_* vs _ULx86_64_*)
+    system_lib_path = "/usr/lib/x86_64-linux-gnu"
+    for lib_file in ["libunwind.so.8", "libunwind-x86_64.so.8"]:
+        src = system_lib_path + "/" + lib_file
+        if rctx.path(src).exists:
+            # Copy the actual file (following symlinks)
+            rctx.execute(["cp", "-L", src, libcxx_path + "/lib/" + lib_file])
+            # Create the -l compatible symlink (libunwind.so -> libunwind.so.8)
+            base_name = lib_file.rsplit(".so", 1)[0] + ".so"
+            rctx.execute(["ln", "-sf", lib_file, libcxx_path + "/lib/" + base_name])
 
     sysroot_repo = sysroot_repo_name(rctx.attr.target_arch, rctx.attr.libc_version, "build")
     sysroot_path = ""
