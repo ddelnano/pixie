@@ -213,11 +213,13 @@ PostgresSelectReqRespGen::PostgresSelectReqRespGen(size_t total_size) : SingleRe
   // Estimate CmdCmpl size based on the number of rows we would have without the CmdCmpl message.
   int num_rows_estimate = remaining / row_bytes.size();
   CmdCmpl cmd_cmpl;
-  cmd_cmpl.cmd_tag = absl::StrCat("SELECT ", num_rows_estimate);
+  std::string cmd_tag_estimate = absl::StrCat("SELECT ", num_rows_estimate);
+  cmd_cmpl.cmd_tag = cmd_tag_estimate;
   remaining -= CmdCmplToByteString(cmd_cmpl).size();
 
   int num_rows = remaining / row_bytes.size();
-  cmd_cmpl.cmd_tag = absl::StrCat("SELECT ", num_rows);
+  std::string cmd_tag = absl::StrCat("SELECT ", num_rows);
+  cmd_cmpl.cmd_tag = cmd_tag;
   auto cmd_cmpl_bytes = CmdCmplToByteString(cmd_cmpl);
 
   resp_bytes_ = row_desc_bytes;
