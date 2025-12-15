@@ -35,7 +35,11 @@ configure_make(
     configure_options = [
         "--enable-shared=no",
         "--disable-frame-pointers",
-        "--enable-libunwind",
+        # TODO(ddelnano): Determine if libunwind8 deb should be used or clang's native unwinder.
+        # Need to understand if the clang docker build omits the unwinder library.
+        # Disable GNU libunwind - LLVM's bundled libunwind is incompatible (different API).
+        # gperftools will use alternative stack unwinding methods.
+        # "--disable-libunwind",
         "--host x86_64-unknown-linux-gnu",
     ],
     lib_source = "@com_github_gperftools_gperftools//:all",
