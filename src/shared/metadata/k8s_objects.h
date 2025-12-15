@@ -105,7 +105,7 @@ class K8sMetadataObject {
   /**
    * The ID assigned by K8s that is unique in both space and time.
    */
-  const UID uid_ = 0;
+  const UID uid_;
 
   /**
    * The namespace for this object.
