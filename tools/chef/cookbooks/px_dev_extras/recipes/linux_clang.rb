@@ -18,22 +18,6 @@ if ! platform_family?('debian')
   return
 end
 
-remote_file '/tmp/libtinfo5.deb' do
-  source node['libtinfo5']['deb']
-  mode '0644'
-  checksum node['libtinfo5']['deb_sha256']
-end
-
-dpkg_package 'libtinfo5' do
-  source '/tmp/libtinfo5.deb'
-  action :install
-  version node['libtinfo5']['version']
-end
-
-file '/tmp/libtinfo5.deb' do
-  action :delete
-end
-
 remote_file '/tmp/clang.deb' do
   source node['clang']['deb']
   mode '0644'
@@ -50,12 +34,12 @@ file '/tmp/clang.deb' do
   action :delete
 end
 
-ENV['PATH'] = "/opt/px_dev/tools/clang-15.0/bin:#{ENV['PATH']}"
-ENV['LD_LIBRARY_PATH'] = "/opt/px_dev/tools/clang-15.0/lib:#{ENV['LD_LIBRARY_PATH']}"
+ENV['PATH'] = "/opt/px_dev/tools/clang-21.1/bin:#{ENV['PATH']}"
+ENV['LD_LIBRARY_PATH'] = "/opt/px_dev/tools/clang-21.1/lib:#{ENV['LD_LIBRARY_PATH']}"
 ENV['CC'] = "clang"
 ENV['CXX'] = "clang++"
 
 # Provide LLD as a system linker.
 execute 'lld alternatives selection' do
-  command 'update-alternatives --install "/usr/bin/ld.lld" "lld" "/opt/px_dev/tools/clang-15.0/bin/lld" 10'
+  command 'update-alternatives --install "/usr/bin/ld.lld" "lld" "/opt/px_dev/tools/clang-21.1/bin/lld" 10'
 end
