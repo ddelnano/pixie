@@ -29,7 +29,7 @@ tool_paths = {
     "ar": "{toolchain_path}/bin/llvm-ar",
     "cpp": "{toolchain_path}/bin/clang-cpp",
     "dwp": "{toolchain_path}/bin/llvm-dwp",
-    "gcc": "{toolchain_path}/bin/clang-15",
+    "gcc": "{toolchain_path}/bin/clang-21",
     "ld": "{toolchain_path}/bin/ld.lld",
     "llvm-cov": "{toolchain_path}/bin/llvm-cov",
     "nm": "{toolchain_path}/bin/llvm-nm",
@@ -39,7 +39,7 @@ tool_paths = {
 }
 
 includes = [
-    "{toolchain_path}/lib/clang/15.0.6/include",
+    "{toolchain_path}/lib/clang/21/include",
     "{sysroot_include_prefix}/usr/local/include",
     "{sysroot_include_prefix}/usr/include/x86_64-linux-gnu",
     "{sysroot_include_prefix}/usr/include",
