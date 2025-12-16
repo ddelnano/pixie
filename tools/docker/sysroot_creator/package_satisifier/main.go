@@ -19,29 +19,43 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
+	"strings"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
+)
+
+// stringSliceFlag is a flag.Value implementation for string slices.
+type stringSliceFlag []string
+
+func (s *stringSliceFlag) String() string {
+	return strings.Join(*s, ",")
+}
+
+func (s *stringSliceFlag) Set(value string) error {
+	*s = append(*s, value)
+	return nil
+}
+
+var (
+	packageDatabaseFile string
+	specs               stringSliceFlag
 )
 
 func init() {
-	pflag.String("pkgdb", "", "Debian distribution extracted Packages.xz file.")
-	pflag.StringSlice("specs", []string{}, "List of yaml files specifying packages to include/exclude in the sysroot")
+	flag.StringVar(&packageDatabaseFile, "pkgdb", "", "Debian distribution extracted Packages.xz file.")
+	flag.Var(&specs, "specs", "Yaml file specifying packages to include/exclude in the sysroot (can be specified multiple times)")
 }
 
 func main() {
-	pflag.Parse()
-	viper.BindPFlags(pflag.CommandLine)
+	flag.Parse()
 	log.SetOutput(os.Stderr)
 
-	packageDatabaseFile := viper.GetString("pkgdb")
 	if packageDatabaseFile == "" {
 		log.Fatal("must specify pkgdb")
 	}
-	specs := viper.GetStringSlice("specs")
 	if len(specs) == 0 {
 		log.Fatal("must specify at least one spec")
 	}
