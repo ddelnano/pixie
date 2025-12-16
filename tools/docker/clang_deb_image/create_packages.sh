@@ -107,4 +107,4 @@ fpm -p "/image/${CLANG_LINTER_DEB_IMAGE_NAME}" \
 
 popd
 
-cp "/opt/clang-15.0-min.tar.gz" "/image/${MIN_CLANG_TAR_FILE_NAME}"
+cp "/opt/clang-21.1-min.tar.gz" "/image/${MIN_CLANG_TAR_FILE_NAME}"
