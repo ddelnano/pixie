@@ -1,40 +1,43 @@
 diff --git a/llvm/include/llvm/Object/Decompressor.h b/llvm/include/llvm/Object/Decompressor.h
-index 35f4ebe2e5d6..d063eff48022 100644
+index 852b71ac8..0ce52272c 100644
 --- a/llvm/include/llvm/Object/Decompressor.h
 +++ b/llvm/include/llvm/Object/Decompressor.h
-@@ -12,6 +12,7 @@
+@@ -11,6 +11,7 @@
+ 
  #include "llvm/ADT/ArrayRef.h"
  #include "llvm/ADT/StringRef.h"
- #include "llvm/Support/Error.h"
 +#include "llvm/Object/ObjectFile.h"
-
- namespace llvm {
- namespace object {
-@@ -41,10 +42,14 @@ public:
+ #include "llvm/Support/Compiler.h"
+ #include "llvm/Support/Compression.h"
+ #include "llvm/Support/Error.h"
+@@ -42,10 +43,17 @@ public:
    /// Return memory buffer size required for decompression.
    uint64_t getDecompressedSize() { return DecompressedSize; }
-
-+  static bool isGnuStyle(StringRef Name);
-+  static bool isCompressed(const object::SectionRef &Section);
+ 
++  /// Check if section name indicates GNU-style compressed section.
++  LLVM_ABI static bool isGnuStyle(StringRef Name);
++
++  /// Check if section is compressed (either SHF_COMPRESSED or GNU-style).
++  LLVM_ABI static bool isCompressed(const object::SectionRef &Section);
 +
  private:
    Decompressor(StringRef Data);
-
-   Error consumeCompressedZLibHeader(bool Is64Bit, bool IsLittleEndian);
+ 
+   Error consumeCompressedHeader(bool Is64Bit, bool IsLittleEndian);
 +  Error consumeGnuCompressedHeader();
-
+ 
    StringRef SectionData;
    uint64_t DecompressedSize;
 diff --git a/llvm/lib/DWP/DWP.cpp b/llvm/lib/DWP/DWP.cpp
-index 346f4dfd290d..e61611d916e0 100644
+index b565edbfe..cabaff1df 100644
 --- a/llvm/lib/DWP/DWP.cpp
 +++ b/llvm/lib/DWP/DWP.cpp
-@@ -275,10 +275,11 @@ static Error createError(StringRef Name, Error E) {
-
+@@ -330,10 +330,11 @@ static Error createError(StringRef Name, Error E) {
+ 
  static Error
  handleCompressedSection(std::deque<SmallString<32>> &UncompressedSections,
 -                        SectionRef Sec, StringRef Name, StringRef &Contents) {
-+                        SectionRef Sec, StringRef& Name, StringRef &Contents) {
++                        SectionRef Sec, StringRef &Name, StringRef &Contents) {
    auto *Obj = dyn_cast<ELFObjectFileBase>(Sec.getObject());
    if (!Obj ||
 -      !(static_cast<ELFSectionRef>(Sec).getFlags() & ELF::SHF_COMPRESSED))
@@ -43,66 +46,58 @@ index 346f4dfd290d..e61611d916e0 100644
      return Error::success();
    bool IsLE = isa<object::ELF32LEObjectFile>(Obj) ||
                isa<object::ELF64LEObjectFile>(Obj);
-@@ -292,6 +293,9 @@ handleCompressedSection(std::deque<SmallString<32>> &UncompressedSections,
+@@ -347,6 +348,10 @@ handleCompressedSection(std::deque<SmallString<32>> &UncompressedSections,
    if (Error E = Dec->resizeAndDecompress(UncompressedSections.back()))
      return createError(Name, std::move(E));
-
-+  if (Decompressor::isGnuStyle(Name)) {
+ 
++  // Strip the 'z' prefix from GNU-style compressed section names.
++  if (Decompressor::isGnuStyle(Name))
 +    Name = Name.substr(2);
-+  }
++
    Contents = UncompressedSections.back();
    return Error::success();
  }
 diff --git a/llvm/lib/DebugInfo/DWARF/DWARFContext.cpp b/llvm/lib/DebugInfo/DWARF/DWARFContext.cpp
-index 19d7d659a86a..2e567d8bc7ee 100644
+index 6d0a94d8a..e96b3370f 100644
 --- a/llvm/lib/DebugInfo/DWARF/DWARFContext.cpp
 +++ b/llvm/lib/DebugInfo/DWARF/DWARFContext.cpp
-@@ -1645,7 +1645,7 @@ class DWARFObjInMemory final : public DWARFObject {
+@@ -2091,7 +2091,7 @@ class DWARFObjInMemory final : public DWARFObject {
    /// provided by Data. Otherwise leaves it unchanged.
    Error maybeDecompress(const object::SectionRef &Sec, StringRef Name,
                          StringRef &Data) {
 -    if (!Sec.isCompressed())
 +    if (!Decompressor::isCompressed(Sec))
        return Error::success();
-
+ 
      Expected<Decompressor> Decompressor =
 diff --git a/llvm/lib/Object/Decompressor.cpp b/llvm/lib/Object/Decompressor.cpp
-index 3842ec92ccfc..b598ecc82856 100644
+index 39baf2f0c..7c67d5cbe 100644
 --- a/llvm/lib/Object/Decompressor.cpp
 +++ b/llvm/lib/Object/Decompressor.cpp
-@@ -5,7 +5,7 @@
- // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
- //
- //===----------------------------------------------------------------------===//
--
-+//
- #include "llvm/Object/Decompressor.h"
- #include "llvm/BinaryFormat/ELF.h"
- #include "llvm/Object/ObjectFile.h"
-@@ -23,6 +23,11 @@ Expected<Decompressor> Decompressor::create(StringRef Name, StringRef Data,
-     return createError("zlib is not available");
-
+@@ -21,6 +21,11 @@ using namespace object;
+ Expected<Decompressor> Decompressor::create(StringRef Name, StringRef Data,
+                                             bool IsLE, bool Is64Bit) {
    Decompressor D(Data);
-+  if (Decompressor::isGnuStyle(Name)){
++  if (isGnuStyle(Name)) {
 +    if (Error Err = D.consumeGnuCompressedHeader())
 +      return std::move(Err);
 +    return D;
 +  }
-   if (Error Err = D.consumeCompressedZLibHeader(Is64Bit, IsLE))
+   if (Error Err = D.consumeCompressedHeader(Is64Bit, IsLE))
      return std::move(Err);
    return D;
-@@ -60,3 +65,35 @@ Error Decompressor::decompress(MutableArrayRef<uint8_t> Buffer) {
-   return compression::zlib::uncompress(arrayRefFromStringRef(SectionData),
-                                        Buffer.data(), Size);
+@@ -68,3 +73,35 @@ Error Decompressor::decompress(MutableArrayRef<uint8_t> Output) {
+                                  arrayRefFromStringRef(SectionData),
+                                  Output.data(), Output.size());
  }
 +
 +bool Decompressor::isGnuStyle(StringRef Name) {
-+  return Name.startswith(".zdebug");
++  return Name.starts_with(".zdebug");
 +}
 +
 +Error Decompressor::consumeGnuCompressedHeader() {
-+  if (!SectionData.startswith("ZLIB"))
-+    return createError("corrupted compressed section header");
++  if (!SectionData.starts_with("ZLIB"))
++    return createError("corrupted GNU-style compressed section header");
 +
 +  SectionData = SectionData.substr(4);
 +
@@ -112,13 +107,13 @@ index 3842ec92ccfc..b598ecc82856 100644
 +  DecompressedSize = read64be(SectionData.data());
 +  SectionData = SectionData.substr(8);
 +
++  CompressionType = DebugCompressionType::Zlib;
 +  return Error::success();
 +}
 +
-+bool Decompressor::isCompressed(const object::SectionRef& Section) {
-+  if (Section.isCompressed()) {
++bool Decompressor::isCompressed(const object::SectionRef &Section) {
++  if (Section.isCompressed())
 +    return true;
-+  }
 +
 +  Expected<StringRef> SecNameOrErr = Section.getName();
 +  if (SecNameOrErr)

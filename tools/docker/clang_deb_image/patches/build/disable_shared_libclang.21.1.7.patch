@@ -1,5 +1,5 @@
 diff --git a/clang/tools/clang-shlib/CMakeLists.txt b/clang/tools/clang-shlib/CMakeLists.txt
-index 9c1f8ea45..208833b63 100644
+index a4d0aa577..e7294f0d4 100644
 --- a/clang/tools/clang-shlib/CMakeLists.txt
 +++ b/clang/tools/clang-shlib/CMakeLists.txt
 @@ -3,6 +3,8 @@ if (NOT LLVM_ENABLE_PIC)
@@ -12,16 +12,16 @@ index 9c1f8ea45..208833b63 100644
  
  foreach (lib ${clang_libs})
 diff --git a/clang/tools/libclang/CMakeLists.txt b/clang/tools/libclang/CMakeLists.txt
-index c6b3b44a7..8f1f8f289 100644
+index 2b1e266f0..6a58ffe3e 100644
 --- a/clang/tools/libclang/CMakeLists.txt
 +++ b/clang/tools/libclang/CMakeLists.txt
-@@ -111,7 +111,8 @@ if (LLVM_EXPORTED_SYMBOL_FILE)
- endif()
- 
- if(LLVM_ENABLE_PIC OR (WIN32 AND NOT LIBCLANG_BUILD_STATIC))
--  set(ENABLE_SHARED SHARED)
-+  #  set(ENABLE_SHARED SHARED)
-+  unset(ENABLE_SHARED)
+@@ -112,7 +112,8 @@ if(LLVM_ENABLE_PIC OR ((WIN32 OR CYGWIN) AND NOT LIBCLANG_BUILD_STATIC))
  endif()
  
  if(NOT LLVM_ENABLE_PIC OR LIBCLANG_BUILD_STATIC)
+-  set(ENABLE_STATIC STATIC)
++  #   set(ENABLE_STATIC STATIC)
++  unset(ENABLE_SHARED)
+ endif()
+ 
+ if (MSVC AND ENABLE_SHARED AND ENABLE_STATIC)

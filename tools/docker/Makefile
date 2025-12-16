@@ -29,8 +29,8 @@ DEV_EXTRAS_DIGEST = $$(grep DEV_IMAGE_WITH_EXTRAS_DIGEST $(DOCKER_PROPERTIES_FIL
 DEV_EXTRAS_IMAGE = "gcr.io/pixie-oss/pixie-dev-public/dev_image_with_extras:$(DEV_EXTRAS_TAG)"
 
 ## Clang deb parameters
-CLANG_VERSION := 15.0
-CLANG_SUFFIX := pl13
+CLANG_VERSION := 21.1
+CLANG_SUFFIX := pl1
 
 CLANG_TAG="$(CLANG_VERSION)-$(CLANG_SUFFIX)"
 
@@ -38,14 +38,6 @@ clang_deb_fname := "clang-$(CLANG_TAG).deb"
 clang_linters_deb_fname := "clang-linters-$(CLANG_TAG).deb"
 clang_deb_image_tag := "gcr.io/pixie-oss/pixie-dev-public/clang_deb_builder_image:$(CLANG_VERSION)"
 CLANG_BUILD_DIR := "$(BUILD_DIR)/clang-$(CLANG_TAG)"
-
-## libtinfo5 parameters
-# This is the latest libtinfo5 deb from bionic upstream. Since Ubuntu 24.04 and later
-# use newer versions, this is needed to make the pixie built clang binary happy by providing
-# its dynamically linked dependencies (libtinfo5).
-LIBTINFO5_DEB_IMAGE_VERSION := 6.3-2ubuntu0.1
-LIBTINFO5_DEB_DOWNLOAD := http://us.archive.ubuntu.com/ubuntu/pool/universe/n/ncurses/libtinfo5_$(LIBTINFO5_DEB_IMAGE_VERSION)_amd64.deb
-libtinfo5_deb_fname := libtinfo5-$(LIBTINFO5_DEB_IMAGE_VERSION).deb
 
 ## gperftools parameters
 GPERFTOOLS_DEB_IMAGE_VERSION := 2.10-pl1
@@ -169,15 +161,6 @@ upload_clang_deb: build_clang_deb_image ## Target to build and upload clang deb 
 	cat $(CLANG_BUILD_DIR)/sha256sums
 
 ##############################################
-# libtinfo5 upload
-##############################################
-.PHONY: upload_libtinfo5_deb
-upload_libtinfo5_deb:
-	mkdir -p $(BUILD_DIR)
-	wget $(LIBTINFO5_DEB_DOWNLOAD) -O $(PWD)/$(BUILD_DIR)/$(libtinfo5_deb_fname)
-	$(GH_RELEASE_UPLOAD) libtinfo5 $(LIBTINFO5_DEB_IMAGE_VERSION) $(PWD)/$(BUILD_DIR)/$(libtinfo5_deb_fname)
-
-##############################################
 # GPerftools build
 ##############################################
 .PHONY: build_gperftools_deb_image
@@ -188,7 +171,6 @@ build_gperftools_deb_image:
 upload_gperftools_deb: build_gperftools_deb_image ## Target to build and upload gperftools deb image
 	mkdir -p $(BUILD_DIR)
 	$(DOCKER) run --rm -e DEB_NAME=$(gperftools_deb_fname) -e DEB_VERSION=$(GPERFTOOLS_DEB_IMAGE_VERSION) -v $(PWD)/$(BUILD_DIR):/image $(gperftools_deb_image_tag)
-	gsutil cp $(PWD)/$(BUILD_DIR)/$(gperftools_deb_fname) $(gperftools_deb_gs_path)
 	$(GH_RELEASE_UPLOAD) gperftools $(GPERFTOOLS_DEB_IMAGE_VERSION) $(PWD)/$(BUILD_DIR)/$(gperftools_deb_fname)
 	@echo "SHA: "
 	sha256sum $(PWD)/$(BUILD_DIR)/$(gperftools_deb_fname)
@@ -205,7 +187,6 @@ build_graalvm_archive_image:
 upload_graalvm_archive: build_graalvm_archive_image
 	mkdir -p $(BUILD_DIR)
 	$(DOCKER) run --rm -v $(PWD)/$(BUILD_DIR):/archive $(GRAALVM_ARCHIVE_IMAGE_TAG)
-	gsutil cp $(PWD)/$(BUILD_DIR)/$(GRAALVM_ARCHIVE_FNAME) $(GRAALVM_ARCHIVE_GS_PATH)
 	$(GH_RELEASE_UPLOAD) graalvm $(GRAALVM_IMAGE_VERSION) $(PWD)/$(BUILD_DIR)/$(GRAALVM_ARCHIVE_FNAME)
 	@echo "SHA: "
 	sha256sum $(PWD)/$(BUILD_DIR)/$(GRAALVM_ARCHIVE_FNAME)
@@ -251,7 +232,6 @@ $(LINUX_HEADERS_ARM64_MERGED_FILE): $(LINUX_HEADER_ARM64_TARGETS)
 
 .PHONY: upload_linux_headers
 upload_linux_headers:  $(LINUX_HEADERS_X86_64_MERGED_FILE) $(LINUX_HEADERS_ARM64_MERGED_FILE) ## Target to build and upload linux headers image
-	gsutil cp $^ $(LINUX_HEADERS_GS_PATH)
 	$(GH_RELEASE_UPLOAD) linux-headers $(LINUX_HEADERS_REV) $^
 	sha256sum $^
 
@@ -266,7 +246,6 @@ build_all_sysroots: sysroot_creator/Dockerfile sysroot_creator/build_all_sysroot
 
 .PHONY: upload_all_sysroots
 upload_all_sysroots: build_all_sysroots
-	gsutil cp $(SYSROOT_BUILD_DIR)/* $(SYSROOT_GS_PATH)
 	$(GH_RELEASE_UPLOAD) sysroots $(SYSROOT_REV) $(SYSROOT_BUILD_DIR)/*
 	sha256sum $(SYSROOT_BUILD_DIR)/*
 

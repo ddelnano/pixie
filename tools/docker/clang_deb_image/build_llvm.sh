@@ -60,7 +60,7 @@ install_dir=""
 build_type=""
 sysroot=""
 target_arch=""
-common_patches=("/patches/zdebug.15.0.6.patch")
+common_patches=("/patches/zdebug.21.1.7.patch")
 extra_patches=()
 extra_cmake_options=()
 
@@ -192,6 +192,7 @@ reset_git_repo() {
 
 run_llvm_build() {
   local projects_to_build="${projects_to_build}"
+  local runtimes_to_build="${runtimes_to_build}"
   local target_archs="${target_archs}"
   local build_arch="${build_arch:-x86_64}"
   local build_os="${build_os:-linux}"
@@ -235,11 +236,13 @@ run_llvm_build() {
     "-DLLVM_INCLUDE_TESTS=OFF"
     "-DLLVM_DEFAULT_TARGET_TRIPLE=${default_triple}"
     "-DLLVM_ENABLE_PROJECTS=${projects_to_build}"
+    "-DLLVM_ENABLE_RUNTIMES=${runtimes_to_build}"
     "-DCMAKE_C_FLAGS=${target_cflags}"
     "-DCMAKE_CXX_FLAGS=${target_cxxflags}"
     "-DCMAKE_EXE_LINKER_FLAGS=${target_ldflags}"
     "-DCMAKE_SHARED_LINKER_FLAGS=${target_ldflags}"
     "-DCMAKE_MODULE_LINKER_FLAGS=${target_ldflags}"
+    "-DLIBCXXABI_USE_LLVM_UNWINDER=OFF"
   )
 
   if [[ "${target_arch}" != "${build_arch}" ]] || [ -n "${sysroot}" ]; then
@@ -264,6 +267,15 @@ run_llvm_build() {
   fi
   cmake_options+=("${extra_cmake_options[@]}")
 
+  # Symlink host compiler's resource headers into build tree for runtimes build.
+  # The runtimes build sets -resource-dir to the build tree, but we're using
+  # an external clang, so we need its built-in headers (stddef.h, etc.)
+  host_resource_dir=$("${c_compiler_path}" -print-resource-dir)
+  if [ -d "${host_resource_dir}" ]; then
+    mkdir -p "${cmake_dir}/lib/clang"
+    ln -s "${host_resource_dir}" "${cmake_dir}/lib/clang/$(basename "${host_resource_dir}")"
+  fi
+
   cmake -G Ninja "${cmake_options[@]}" "${llvm_git_path}"/llvm
 
   if [[ "${#install_targets[@]}" -eq 0 ]]; then
@@ -281,14 +293,32 @@ build_full_clang() {
   projects_to_build="clang;clang-tools-extra;polly;llvm;lld;compiler-rt"
   target_archs="X86;AArch64"
   extra_cmake_options+=("-DLLVM_STATIC_LINK_CXX_STDLIB=ON")
-  extra_patches+=("/patches/install_tblgen.15.0.6.patch")
   run_llvm_build
 }
 
 build_libcxx() {
-  projects_to_build="libcxx;libcxxabi"
+  # libcxx and libcxxabi are runtimes in LLVM 14+, not projects
+  runtimes_to_build="libcxx;libcxxabi"
   target_archs="BPF;X86;AArch64"
   install_targets=("cxx" "cxxabi")
+  extra_cmake_options+=("-DLLVM_ENABLE_LIBCXX=ON")
+  # extra_cmake_options+=("-DLIBCXX_CXX_ABI=libcxxabi")
+  # extra_cmake_options+=("-DLIBCXX_HAS_GCC_S_LIB=OFF")
+
+  # When building with a sysroot, add -nostdinc++ to prevent clang from finding
+  # GCC's C++ headers (libstdc++). We're building our own C++ stdlib so we don't
+  # want GCC's headers interfering with #include_next chains.
+  # Use RUNTIMES_CMAKE_ARGS to pass this to the runtimes sub-build, not the main
+  # CMake configuration (which would break feature detection like atomic checks).
+  # Also pass linker flags since the runtimes sub-build doesn't inherit them.
+  if [ -n "${sysroot}" ]; then
+    local runtimes_args="-DCMAKE_CXX_FLAGS=-nostdinc++"
+    runtimes_args="${runtimes_args};-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld"
+    runtimes_args="${runtimes_args};-DCMAKE_SHARED_LINKER_FLAGS=-fuse-ld=lld"
+    runtimes_args="${runtimes_args};-DCMAKE_MODULE_LINKER_FLAGS=-fuse-ld=lld"
+    extra_cmake_options+=("-DRUNTIMES_CMAKE_ARGS=${runtimes_args}")
+  fi
+
   run_llvm_build
 }
 
@@ -311,8 +341,7 @@ build_minimal_clang() {
     "-DLLVM_BUILD_SHARED_LIBS=OFF"
     "-DCLANG_PLUGIN_SUPPORT=OFF")
   extra_patches+=(
-    "/patches/static_tinfo.15.0.6.patch"
-    "/patches/disable_shared_libclang.15.0.6.patch")
+    "/patches/disable_shared_libclang.21.1.7.patch")
   target_ldflags="${target_ldflags} -static-libgcc"
   with_host_tblgen
   run_llvm_build
