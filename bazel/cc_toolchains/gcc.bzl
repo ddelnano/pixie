@@ -26,7 +26,7 @@ def _gcc_x86_64_gnu():
         "gcov": "/usr/bin/gcov-12",
         "ld": "/usr/bin/ld.gold",
         # TODO(zasgar): Fix this or remove this.
-        "llvm-cov": "/opt/clang-15.0/bin/llvm-cov",
+        "llvm-cov": "/opt/clang-21.1/bin/llvm-cov",
         "nm": "/usr/bin/nm",
         "objcopy": "/usr/bin/objcopy",
         "objdump": "/usr/bin/objdump",

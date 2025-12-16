@@ -288,119 +288,130 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "oneTBB-e6104c9599f7f10473caf545199f7468c0a8e52f",
         urls = ["https://github.com/oneapi-src/oneTBB/archive/e6104c9599f7f10473caf545199f7468c0a8e52f.tar.gz"],
     ),
-    com_llvm_clang_15 = dict(
-        sha256 = "13924fc595146bf2480f8c853bb1b995ef511ee2d7eb6f5c19ab429e31caaf98",
+    com_llvm_clang_21 = dict(
+        sha256 = "6d060ddd8838d553aef75ccc4e9782774a83ee03fc8682bbff3ce6bcf40b1c19",
         urls = [
-            "https://github.com/pixie-io/dev-artifacts/releases/download/clang%2F15.0-pl12/clang-min-15.0-pl12.tar.gz",
-            "https://storage.googleapis.com/pixie-dev-public/clang/15.0-pl12/clang-min-15.0-pl12.tar.gz",
+            "https://github.com/ddelnano/dev-artifacts/releases/download/clang%2F21.1-pl1/clang-min-21.1-pl1.tar.gz",
         ],
         manual_license_name = "llvm/llvm-project",
     ),
     com_llvm_lib_x86_64_glibc_host = dict(
-        sha256 = "bd71e0fc496c10804840827161f183f2430304d2f272b622a3c101744c4799d2",
+        sha256 = "3878a0ae65b76eca4ccbbeb12e9a40adb1ad89e5bd66ce9a71ba6f6a00375d75",
         strip_prefix = "",
         urls = [
-            "https://github.com/pixie-io/dev-artifacts/releases/download/clang%2F15.0-pl12/llvm-15.0-pl12-libstdc%2B%2B.tar.gz",
-            "https://storage.googleapis.com/pixie-dev-public/clang/15.0-pl12/llvm-15.0-pl12-libstdc%2B%2B.tar.gz",
+            "https://github.com/ddelnano/dev-artifacts/releases/download/clang%2F21.1-pl1/llvm-21.1-pl1-libstdc%2B%2B.tar.gz",
         ],
         manual_license_name = "llvm/llvm-project",
     ),
     com_llvm_lib_libcpp_x86_64_glibc_host = dict(
-        sha256 = "f7c126bced889730b4b7f63a3c4290895ce8943d87b279558a6e7ed835eb1ef9",
+        sha256 = "ddf025a60f057057cdc932d8635f499a7c708c8932747629cb8e6446c4197efc",
         strip_prefix = "",
         urls = [
-            "https://github.com/pixie-io/dev-artifacts/releases/download/clang%2F15.0-pl12/llvm-15.0-pl12-libcxx.tar.gz",
-            "https://storage.googleapis.com/pixie-dev-public/clang/15.0-pl12/llvm-15.0-pl12-libcxx.tar.gz",
+            "https://github.com/ddelnano/dev-artifacts/releases/download/clang%2F21.1-pl1/llvm-21.1-pl1-libcxx.tar.gz",
         ],
         manual_license_name = "llvm/llvm-project",
     ),
     com_llvm_lib_libcpp_x86_64_glibc_host_asan = dict(
-        sha256 = "c50fd3b3c9b359f1112646aed544f274d28372cb464bc3e1ad11e25c4da6ed3c",
+        sha256 = "3b3d48e677ed726d802440a52884eec23ac80077c189c4af00618a7656172ede",
         strip_prefix = "",
         urls = [
-            "https://github.com/pixie-io/dev-artifacts/releases/download/clang%2F15.0-pl12/llvm-15.0-pl12-libcxx-asan.tar.gz",
-            "https://storage.googleapis.com/pixie-dev-public/clang/15.0-pl12/llvm-15.0-pl12-libcxx-asan.tar.gz",
+            "https://github.com/ddelnano/dev-artifacts/releases/download/clang%2F21.1-pl1/llvm-21.1-pl1-libcxx-asan.tar.gz",
         ],
         manual_license_name = "llvm/llvm-project",
     ),
     com_llvm_lib_libcpp_x86_64_glibc_host_msan = dict(
-        sha256 = "b176a2df6f31f07bc4c2675c82523cf290cc29a037af33798ad6786b161ef570",
+        sha256 = "b9acb1e2173f1a885a891a26edada7d59681656e8a0c2a20734a3412288a0c8d",
         strip_prefix = "",
         urls = [
-            "https://github.com/pixie-io/dev-artifacts/releases/download/clang%2F15.0-pl12/llvm-15.0-pl12-libcxx-msan.tar.gz",
-            "https://storage.googleapis.com/pixie-dev-public/clang/15.0-pl12/llvm-15.0-pl12-libcxx-msan.tar.gz",
+            "https://github.com/ddelnano/dev-artifacts/releases/download/clang%2F21.1-pl1/llvm-21.1-pl1-libcxx-msan.tar.gz",
         ],
         manual_license_name = "llvm/llvm-project",
     ),
     com_llvm_lib_libcpp_x86_64_glibc_host_tsan = dict(
-        sha256 = "13ba581991271197a33aa35576d62ffa687e56b4799aadb8b91e4a30e1ebe57f",
+        sha256 = "25e934c3eda40f7e5f9ffaa0a162d9a8e8d65fd767fbd9102ae1587e0bbda45b",
         strip_prefix = "",
         urls = [
-            "https://github.com/pixie-io/dev-artifacts/releases/download/clang%2F15.0-pl12/llvm-15.0-pl12-libcxx-tsan.tar.gz",
-            "https://storage.googleapis.com/pixie-dev-public/clang/15.0-pl12/llvm-15.0-pl12-libcxx-tsan.tar.gz",
+            "https://github.com/ddelnano/dev-artifacts/releases/download/clang%2F21.1-pl1/llvm-21.1-pl1-libcxx-tsan.tar.gz",
         ],
         manual_license_name = "llvm/llvm-project",
     ),
     com_llvm_lib_x86_64_glibc2_36 = dict(
-        sha256 = "22dbfc1fe13c4809b7df94360f45d7ce2064bcd954ab642a7053c79f95fe21ad",
+        sha256 = "516c203d75cbd55e367f1d4e1f8b66f901641f5b4be06e71ec9b05ecdaa81d08",
         strip_prefix = "",
         urls = [
-            "https://github.com/pixie-io/dev-artifacts/releases/download/clang%2F15.0-pl12/llvm-15.0-pl12-libstdc++-x86_64-sysroot.tar.gz",
-            "https://storage.googleapis.com/pixie-dev-public/clang/15.0-pl12/llvm-15.0-pl12-libstdc++-x86_64-sysroot.tar.gz",
+            "https://github.com/ddelnano/dev-artifacts/releases/download/clang%2F21.1-pl1/llvm-21.1-pl1-libstdc++-x86_64-sysroot.tar.gz",
         ],
         manual_license_name = "llvm/llvm-project",
     ),
     com_llvm_lib_libcpp_x86_64_glibc2_36 = dict(
-        sha256 = "fba4ba91f794809fb74d8736a0b281589eb3faa1064a55b03f18fabea22d4318",
+        sha256 = "fcf5fce7a80a7eceeb2a1ea53f97960b440561a8942af8ec709ad8ccc268fc81",
         strip_prefix = "",
         urls = [
-            "https://github.com/pixie-io/dev-artifacts/releases/download/clang%2F15.0-pl12/llvm-15.0-pl12-libcxx-x86_64-sysroot.tar.gz",
-            "https://storage.googleapis.com/pixie-dev-public/clang/15.0-pl12/llvm-15.0-pl12-libcxx-x86_64-sysroot.tar.gz",
+            "https://github.com/ddelnano/dev-artifacts/releases/download/clang%2F21.1-pl1/llvm-21.1-pl1-libcxx-x86_64-sysroot.tar.gz",
+        ],
+        manual_license_name = "llvm/llvm-project",
+    ),
+    com_llvm_lib_libcpp_x86_64_glibc2_36_asan = dict(
+        sha256 = "d562a59588b388c61426d41eb16381018dd7309f51e134b80bb3e2447651ec67",
+        strip_prefix = "",
+        urls = [
+            "https://github.com/ddelnano/dev-artifacts/releases/download/clang%2F21.1-pl1/llvm-21.1-pl1-libcxx-x86_64-sysroot-asan.tar.gz",
+        ],
+        manual_license_name = "llvm/llvm-project",
+    ),
+    com_llvm_lib_libcpp_x86_64_glibc2_36_msan = dict(
+        sha256 = "acdc38736d84c1aa3e443b8ff8b181cbf54c185810ea0fe3436815682eb30695",
+        strip_prefix = "",
+        urls = [
+            "https://github.com/ddelnano/dev-artifacts/releases/download/clang%2F21.1-pl1/llvm-21.1-pl1-libcxx-x86_64-sysroot-msan.tar.gz",
+        ],
+        manual_license_name = "llvm/llvm-project",
+    ),
+    com_llvm_lib_libcpp_x86_64_glibc2_36_tsan = dict(
+        sha256 = "620bc0e18e2def6e65969b17349500005d7bc8490b3b7e51cfed23a24bbdfd4e",
+        strip_prefix = "",
+        urls = [
+            "https://github.com/ddelnano/dev-artifacts/releases/download/clang%2F21.1-pl1/llvm-21.1-pl1-libcxx-x86_64-sysroot-tsan.tar.gz",
         ],
         manual_license_name = "llvm/llvm-project",
     ),
     com_llvm_lib_aarch64_glibc2_36 = dict(
-        sha256 = "a38c075733a18e59d41994e18ea0e4944779d8d971dc1f825dc52a81253c602e",
+        sha256 = "9cba87ed21eb52ffffeda810beaa11083e8f533f4eeaa9e71e65d19e786aa4d1",
         strip_prefix = "",
         urls = [
-            "https://github.com/pixie-io/dev-artifacts/releases/download/clang%2F15.0-pl12/llvm-15.0-pl12-libstdc++-aarch64-sysroot.tar.gz",
-            "https://storage.googleapis.com/pixie-dev-public/clang/15.0-pl12/llvm-15.0-pl12-libstdc++-aarch64-sysroot.tar.gz",
+            "https://github.com/ddelnano/dev-artifacts/releases/download/clang%2F21.1-pl1/llvm-21.1-pl1-libstdc++-aarch64-sysroot.tar.gz",
         ],
         manual_license_name = "llvm/llvm-project",
     ),
     com_llvm_lib_libcpp_aarch64_glibc2_36 = dict(
-        sha256 = "d8583cbd55a66c6ea2d53268b3ae4829dae6d9e16e5d8040646f2cf1b7d8cdde",
+        sha256 = "6dec1d20ccbca494dab47e32b33de573d920105210f8204f2e4abcede9ee0597",
         strip_prefix = "",
         urls = [
-            "https://github.com/pixie-io/dev-artifacts/releases/download/clang%2F15.0-pl12/llvm-15.0-pl12-libcxx-aarch64-sysroot.tar.gz",
-            "https://storage.googleapis.com/pixie-dev-public/clang/15.0-pl12/llvm-15.0-pl12-libcxx-aarch64-sysroot.tar.gz",
+            "https://github.com/ddelnano/dev-artifacts/releases/download/clang%2F21.1-pl1/llvm-21.1-pl1-libcxx-aarch64-sysroot.tar.gz",
         ],
         manual_license_name = "llvm/llvm-project",
     ),
     com_llvm_libcxx_x86_64_glibc_host = dict(
-        sha256 = "12321054fa99b953ffde02a1b100e8ba1f16b3769f2db7623e19c0cac9d2185a",
+        sha256 = "e4df841306074cd1af644748686b13644f41ca3af756243a34adae16b24322cb",
         strip_prefix = "",
         urls = [
-            "https://github.com/pixie-io/dev-artifacts/releases/download/clang%2F15.0-pl12/libcxx-15.0-pl12.tar.gz",
-            "https://storage.googleapis.com/pixie-dev-public/clang/15.0-pl12/libcxx-15.0-pl12.tar.gz",
+            "https://github.com/ddelnano/dev-artifacts/releases/download/clang%2F21.1-pl1/libcxx-21.1-pl1.tar.gz",
         ],
         manual_license_name = "llvm/llvm-project",
     ),
     com_llvm_libcxx_x86_64_glibc2_36 = dict(
-        sha256 = "6f0e66ba3c580f9cd2950f6c978d87234e876b8de3cdb8b3f0f827b57bdf2b64",
+        sha256 = "4eb0f28dfedafdb75e04b621ed9e6a6a211720f76ece98a4a86b43a991bb4979",
         strip_prefix = "",
         urls = [
-            "https://github.com/pixie-io/dev-artifacts/releases/download/clang%2F15.0-pl12/libcxx-15.0-pl12-x86_64-sysroot.tar.gz",
-            "https://storage.googleapis.com/pixie-dev-public/clang/15.0-pl12/libcxx-15.0-pl12-x86_64-sysroot.tar.gz",
+            "https://github.com/ddelnano/dev-artifacts/releases/download/clang%2F21.1-pl1/libcxx-21.1-pl1-x86_64-sysroot.tar.gz",
         ],
         manual_license_name = "llvm/llvm-project",
     ),
     com_llvm_libcxx_aarch64_glibc2_36 = dict(
-        sha256 = "f5d4b52a9c142f28f9e88e09ebd52c91f2749417e6dcda28e66c8b20688b9b1a",
+        sha256 = "3a45d9ac890a3bf822a4a2b6d8b5eafa9304cc88faefbbb8e379bbf7085d8e11",
         strip_prefix = "",
         urls = [
-            "https://github.com/pixie-io/dev-artifacts/releases/download/clang%2F15.0-pl12/libcxx-15.0-pl12-aarch64-sysroot.tar.gz",
-            "https://storage.googleapis.com/pixie-dev-public/clang/15.0-pl12/libcxx-15.0-pl12-aarch64-sysroot.tar.gz",
+            "https://github.com/ddelnano/dev-artifacts/releases/download/clang%2F21.1-pl1/libcxx-21.1-pl1-aarch64-sysroot.tar.gz",
         ],
         manual_license_name = "llvm/llvm-project",
     ),
