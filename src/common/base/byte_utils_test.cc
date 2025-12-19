@@ -111,9 +111,9 @@ TEST(UtilsTest, TestLEndianBytesToInt) {
       LEndianBytesToInt<int64_t>(std::string(ConstStringView("\xf0\xde\xbc\x9a\x78\x56\x34\xf2"))),
       -0xdcba98765432110);
 
-  // Verify other std::basic_string_view types are supported
-  EXPECT_EQ(LEndianBytesToInt<int64_t>(
-                CreateStringView<u8string_view::value_type>("\xf0\xde\xbc\x9a\x78\x56\x34\x12")),
+  // Verify std::span<const uint8_t> is supported
+  constexpr uint8_t kLeBytes[] = {0xf0, 0xde, 0xbc, 0x9a, 0x78, 0x56, 0x34, 0x12};
+  EXPECT_EQ(LEndianBytesToInt<int64_t>(u8string_view{kLeBytes, sizeof(kLeBytes)}),
             0x123456789abcdef0);
 }
 
@@ -245,9 +245,9 @@ TEST(UtilsTest, TestBEndianBytesToInt) {
       BEndianBytesToInt<int64_t>(std::string(ConstStringView("\xf2\x34\x56\x78\x9a\xbc\xde\xf0"))),
       -0xdcba98765432110);
 
-  // Verify other std::basic_string_view types are supported
-  EXPECT_EQ(BEndianBytesToInt<int64_t>(
-                CreateStringView<u8string_view::value_type>("\x12\x34\x56\x78\x9a\xbc\xde\xf0")),
+  // Verify std::span<const uint8_t> is supported
+  constexpr uint8_t kBeBytes[] = {0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0};
+  EXPECT_EQ(BEndianBytesToInt<int64_t>(u8string_view{kBeBytes, sizeof(kBeBytes)}),
             0x123456789abcdef0);
 }
 
@@ -285,13 +285,20 @@ TEST(UtilsTest, MemCpy) {
     EXPECT_EQ(val, 0x05040302);
   }
   {
-    std::basic_string_view<uint8_t> view(kUint8Arr);
-    int val = MemCpy<int>(view);
+    // Test with std::span<const uint8_t>
+    u8string_view span_view{kUint8Arr, 5};
+    int val = MemCpy<int>(span_view);
     EXPECT_EQ(val, 0x04030201);
     val = MemCpy<int>(kUint8Arr);
     EXPECT_EQ(val, 0x04030201);
     val = MemCpy<int>(kUint8Arr + 1);
     EXPECT_EQ(val, 0x05040302);
+  }
+  {
+    // Test with std::basic_string_view<uint8_t> (still supported)
+    std::basic_string_view<uint8_t> view(kUint8Arr);
+    int val = MemCpy<int>(view);
+    EXPECT_EQ(val, 0x04030201);
   }
 }
 

@@ -31,8 +31,6 @@
 #include "src/common/base/base.h"
 #include "src/stirling/obj_tools/utils.h"
 
-using ::px::utils::u8string;
-
 namespace px {
 namespace stirling {
 namespace obj_tools {
@@ -167,7 +165,7 @@ class ElfReader {
   /**
    * Returns the byte code for the symbol at the specified section.
    */
-  StatusOr<u8string> SymbolByteCode(std::string_view section, const SymbolInfo& symbol);
+  StatusOr<utils::u8string> SymbolByteCode(std::string_view section, const SymbolInfo& symbol);
 
   /**
    * Returns the binary address that corresponds to the given virtual address.
@@ -198,9 +196,28 @@ class ElfReader {
   ELFIO::Elf_Half ELFType();
 
   /**
-   * Returns the byte code of the data within the binary at the specified offset
+   * Returns the byte code of the data within the binary at the specified offset.
+   * Returns owned data (vector for uint8_t, string for char).
+   * Callers can assign to span/string_view since PX_ASSIGN_OR_RETURN keeps the StatusOr alive.
    */
-  template <typename TCharType = u8string::value_type>
+  StatusOr<utils::u8string> BinaryByteCode(size_t offset, size_t length) {
+    std::ifstream ifs(binary_path_, std::ios::binary);
+    if (!ifs.seekg(offset)) {
+      return error::Internal("Failed to seek position=$0 in binary=$1", offset, binary_path_);
+    }
+    utils::u8string byte_code(length);
+    auto* buf = reinterpret_cast<char*>(byte_code.data());
+    if (!ifs.read(buf, length)) {
+      return error::Internal("Failed to read size=$0 bytes from offset=$1 in binary=$2", length,
+                             offset, binary_path_);
+    }
+    return byte_code;
+  }
+
+  /**
+   * Returns the byte code of the data within the binary at the specified offset as a string.
+   */
+  template <typename TCharType>
   StatusOr<std::basic_string<TCharType>> BinaryByteCode(size_t offset, size_t length) {
     std::ifstream ifs(binary_path_, std::ios::binary);
     if (!ifs.seekg(offset)) {
@@ -235,7 +252,7 @@ class ElfReader {
   /**
    * Returns the byte code of the function specified by the symbol.
    */
-  StatusOr<px::utils::u8string> FuncByteCode(const SymbolInfo& func_symbol);
+  StatusOr<utils::u8string> FuncByteCode(const SymbolInfo& func_symbol);
 
   std::string binary_path_;
 
