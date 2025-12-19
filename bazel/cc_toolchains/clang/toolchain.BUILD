@@ -39,7 +39,7 @@ tool_paths = {
 }
 
 includes = [
-    "{toolchain_path}/lib/clang/21/include",
+    "{toolchain_path}/lib/clang/{clang_major_version}/include",
     "{sysroot_include_prefix}/usr/local/include",
     "{sysroot_include_prefix}/usr/include/x86_64-linux-gnu",
     "{sysroot_include_prefix}/usr/include",
@@ -71,13 +71,13 @@ cc_toolchain_config(
     cpu = "{target_arch}",
     cxx_builtin_include_directories = includes,
     cxx_flags = [
-        "-std=c++17",
+        "-std=c++20",
         "-fPIC",
     ],
     dbg_compile_flags = ["-g"],
     enable_sanitizers = not {use_for_host_tools},
     host_system_name = "{host_arch}-unknown-linux-{host_abi}",
-    libclang_rt_path = "external/{this_repo}/{toolchain_path}/lib/clang/{clang_version}/lib/linux",
+    libclang_rt_path = "external/{this_repo}/{toolchain_path}/lib/clang/{clang_major_version}/lib/linux",
     libcxx_path = "external/{this_repo}/{libcxx_path}",
     link_flags = [
         "-target",

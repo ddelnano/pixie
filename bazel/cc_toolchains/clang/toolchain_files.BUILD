@@ -74,7 +74,7 @@ filegroup(
 filegroup(
     name = "toolchain_include",
     srcs = glob([
-        "{toolchain_path}/lib/clang/{clang_version}/include/**",
+        "{toolchain_path}/lib/clang/{clang_major_version}/include/**",
     ]),
 )
 
@@ -82,7 +82,7 @@ filegroup(
     name = "toolchain_lib",
     srcs = glob([
         "{toolchain_path}/lib/libc++*",
-        "{toolchain_path}/lib/clang/{clang_version}/lib/linux/**",
+        "{toolchain_path}/lib/clang/{clang_major_version}/lib/linux/**",
     ]),
 )
 
