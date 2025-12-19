@@ -21,6 +21,7 @@
 #include <llvm/DebugInfo/DWARF/DWARFContext.h>
 #include <llvm/Support/TargetSelect.h>
 
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -35,12 +36,12 @@ namespace obj_tools {
  * When the optional value is not present, an error with the provided message is returned.
  */
 template <typename TValueType>
-StatusOr<TValueType> AdaptLLVMOptional(llvm::Optional<TValueType>&& llvm_opt,
+StatusOr<TValueType> AdaptLLVMOptional(std::optional<TValueType>&& llvm_opt,
                                        std::string_view msg) {
-  if (!llvm_opt.hasValue()) {
+  if (!llvm_opt.has_value()) {
     return error::Internal(msg);
   }
-  return llvm_opt.getValue();
+  return llvm_opt.value();
 }
 
 /**

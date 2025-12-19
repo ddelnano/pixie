@@ -18,7 +18,7 @@
 
 #include <llvm/BinaryFormat/Dwarf.h>
 #include <llvm/Config/llvm-config.h>
-#include <llvm/DebugInfo/DWARF/DWARFExpression.h>
+#include <llvm/DebugInfo/DWARF/LowLevel/DWARFExpression.h>
 #include <llvm/Support/ScopedPrinter.h>
 
 #include "src/stirling/obj_tools/dwarf_reader.h"
@@ -173,7 +173,7 @@ DwarfReader::DetectSourceLanguageFromCUDIE(const llvm::DWARFDie& unit_die) {
   PX_ASSIGN_OR_RETURN(const DWARFFormValue& lang_attr,
                       GetAttribute(unit_die, llvm::dwarf::DW_AT_language));
   auto source_language =
-      static_cast<llvm::dwarf::SourceLanguage>(lang_attr.getAsUnsignedConstant().getValue());
+      static_cast<llvm::dwarf::SourceLanguage>(lang_attr.getAsUnsignedConstant().value());
   return std::make_pair(source_language, compiler);
 }
 
@@ -192,7 +192,7 @@ void DwarfReader::IndexDIEs(
 
       if (die.isSubprogramDIE()) {
         auto spec_or =
-            AdaptLLVMOptional(llvm::dwarf::toReference(die.find(llvm::dwarf::DW_AT_specification)),
+            AdaptLLVMOptional(llvm::dwarf::toDebugInfoReference(die.find(llvm::dwarf::DW_AT_specification)),
                               "Could not find attribute DW_AT_specification");
         if (spec_or.ok()) {
           fn_spec_offsets[spec_or.ValueOrDie()] = die;
@@ -935,7 +935,7 @@ StatusOr<std::map<std::string, ArgInfo>> DwarfReader::GetFunctionArgInfo(
   // then a hidden first argument is introduced that becomes a pointer to the return value.
   // For more details, see: https://uclibc.org/docs/psABI-x86_64.pdf Section 3.2.3.
   // No return type means the function has a void return type.
-  if (function_die.find(llvm::dwarf::DW_AT_type).hasValue()) {
+  if (function_die.find(llvm::dwarf::DW_AT_type).has_value()) {
     PX_ASSIGN_OR_RETURN(const DWARFDie type_die, GetTypeDie(function_die));
 
     PX_ASSIGN_OR_RETURN(const TypeClass type_class, GetTypeClass(type_die));
@@ -984,7 +984,7 @@ StatusOr<RetValInfo> DwarfReader::GetFunctionRetValInfo(std::string_view functio
   PX_ASSIGN_OR_RETURN(const DWARFDie& function_die,
                       GetMatchingDIE(function_symbol_name, llvm::dwarf::DW_TAG_subprogram));
 
-  if (!function_die.find(llvm::dwarf::DW_AT_type).hasValue()) {
+  if (!function_die.find(llvm::dwarf::DW_AT_type).has_value()) {
     // No return type means the function has a void return type.
     return RetValInfo{.type_info = TypeInfo{.type = VarType::kVoid, .type_name = ""},
                       .byte_size = 0};
