@@ -23,8 +23,7 @@ namespace px {
 namespace stirling {
 namespace obj_tools {
 
-using px::utils::u8string_view;
-using read_ptr_func_t = std::function<uint64_t(u8string_view)>;
+using read_ptr_func_t = std::function<uint64_t(utils::u8string_view)>;
 
 // This symbol points to a static string variable that describes the Golang tool-chain version used
 // to build the executable. This symbol is embedded in a Golang executable's data section.
@@ -56,16 +55,17 @@ std::string_view kGoBuildInfoMagic =
 // https://github.com/golang/go/blob/aa97a012b4be393c1725c16a78b92dea81632378/src/debug/buildinfo/buildinfo.go#L282
 StatusOr<std::string> ReadGoString(ElfReader* elf_reader, uint64_t ptr_size, uint64_t ptr_addr,
                                    read_ptr_func_t read_ptr) {
-  PX_ASSIGN_OR_RETURN(u8string_view data_addr, elf_reader->BinaryByteCode(ptr_addr, ptr_size));
-  PX_ASSIGN_OR_RETURN(u8string_view data_len,
+  PX_ASSIGN_OR_RETURN(utils::u8string data_addr_bytes,
+                      elf_reader->BinaryByteCode(ptr_addr, ptr_size));
+  PX_ASSIGN_OR_RETURN(utils::u8string data_len_bytes,
                       elf_reader->BinaryByteCode(ptr_addr + ptr_size, ptr_size));
 
-  PX_ASSIGN_OR_RETURN(ptr_addr, elf_reader->VirtualAddrToBinaryAddr(read_ptr(data_addr)));
-  uint64_t str_length = read_ptr(data_len);
+  PX_ASSIGN_OR_RETURN(ptr_addr, elf_reader->VirtualAddrToBinaryAddr(read_ptr(data_addr_bytes)));
+  uint64_t str_length = read_ptr(data_len_bytes);
 
-  PX_ASSIGN_OR_RETURN(std::string_view go_version_bytecode,
+  PX_ASSIGN_OR_RETURN(std::string go_version_bytecode,
                       elf_reader->BinaryByteCode<char>(ptr_addr, str_length));
-  return std::string(go_version_bytecode);
+  return go_version_bytecode;
 }
 
 // Reads the Go version from the runtime.buildVersion symbol in the binary's data section.
@@ -93,14 +93,13 @@ StatusOr<std::pair<std::string, BuildInfo>> ReadBuildVersion(ElfReader* elf_read
   version_symbol.address = reinterpret_cast<uint64_t>(version_string.ptr);
   version_symbol.size = version_string.len;
 
-  PX_ASSIGN_OR_RETURN(utils::u8string str, elf_reader->SymbolByteCode(".data", version_symbol));
+  PX_ASSIGN_OR_RETURN(utils::u8string str_bytes, elf_reader->SymbolByteCode(".data", version_symbol));
+  std::string str(reinterpret_cast<const char*>(str_bytes.data()), str_bytes.size());
   // Strip go prefix from the version string.
-  if (str.size() >= 2 &&
-      str.substr(0, 2) == utils::u8string(reinterpret_cast<const unsigned char*>("go"), 2)) {
+  if (str.size() >= 2 && str.substr(0, 2) == "go") {
     str.erase(0, 2);  // Remove "go" from the beginning
   }
-  return std::make_pair(std::string(reinterpret_cast<const char*>(str.data()), str.size()),
-                        std::move(build_info));
+  return std::make_pair(std::move(str), std::move(build_info));
 }
 
 // Extracts the semantic version from a Go version string (e.g., "go1.20.3").
@@ -233,12 +232,12 @@ StatusOr<std::pair<std::string, BuildInfo>> ReadGoBuildInfo(ElfReader* elf_reade
     switch (endianness) {
       case 0x0: {
         if (ptr_size == 4) {
-          read_ptr = [&](u8string_view str_view) {
-            return utils::LEndianBytesToInt<uint32_t, 4>(str_view);
+          read_ptr = [&](utils::u8string_view byte_span) {
+            return utils::LEndianBytesToInt<uint32_t, 4>(byte_span);
           };
         } else if (ptr_size == 8) {
-          read_ptr = [&](u8string_view str_view) {
-            return utils::LEndianBytesToInt<uint64_t, 8>(str_view);
+          read_ptr = [&](utils::u8string_view byte_span) {
+            return utils::LEndianBytesToInt<uint64_t, 8>(byte_span);
           };
         } else {
           return error::NotFound(absl::Substitute(
@@ -248,12 +247,12 @@ StatusOr<std::pair<std::string, BuildInfo>> ReadGoBuildInfo(ElfReader* elf_reade
       }
       case 0x1:
         if (ptr_size == 4) {
-          read_ptr = [&](u8string_view str_view) {
-            return utils::BEndianBytesToInt<uint64_t, 4>(str_view);
+          read_ptr = [&](utils::u8string_view byte_span) {
+            return utils::BEndianBytesToInt<uint64_t, 4>(byte_span);
           };
         } else if (ptr_size == 8) {
-          read_ptr = [&](u8string_view str_view) {
-            return utils::BEndianBytesToInt<uint64_t, 8>(str_view);
+          read_ptr = [&](utils::u8string_view byte_span) {
+            return utils::BEndianBytesToInt<uint64_t, 8>(byte_span);
           };
         } else {
           return error::NotFound(absl::Substitute(
@@ -269,10 +268,13 @@ StatusOr<std::pair<std::string, BuildInfo>> ReadGoBuildInfo(ElfReader* elf_reade
     }
 
     // Reads the virtual address location of the runtime.buildVersion symbol.
-    PX_ASSIGN_OR_RETURN(auto runtime_version_vaddr,
-                        binary_decoder.ExtractString<u8string_view::value_type>(ptr_size));
-    PX_ASSIGN_OR_RETURN(auto mod_info_vaddr,
-                        binary_decoder.ExtractString<u8string_view::value_type>(ptr_size));
+    PX_ASSIGN_OR_RETURN(auto runtime_version_vaddr_sv,
+                        binary_decoder.ExtractString<uint8_t>(ptr_size));
+    PX_ASSIGN_OR_RETURN(auto mod_info_vaddr_sv, binary_decoder.ExtractString<uint8_t>(ptr_size));
+    // Convert basic_string_view to span for read_ptr
+    utils::u8string_view runtime_version_vaddr{runtime_version_vaddr_sv.data(),
+                                               runtime_version_vaddr_sv.size()};
+    utils::u8string_view mod_info_vaddr{mod_info_vaddr_sv.data(), mod_info_vaddr_sv.size()};
     PX_ASSIGN_OR_RETURN(uint64_t ptr_addr,
                         elf_reader->VirtualAddrToBinaryAddr(read_ptr(runtime_version_vaddr)));
 

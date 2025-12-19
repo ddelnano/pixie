@@ -20,17 +20,20 @@
 
 #include <cstdint>
 #include <cstring>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 #if __cplusplus >= 202002L
 #include <compare>
 #endif
 
 #include "src/common/base/logging.h"
 
-// Provide char_traits specialization for uint8_t to enable std::basic_string<uint8_t>
-// This is required by newer libc++ which only provides char_traits for standard char types.
+// Provide char_traits specialization for uint8_t to enable std::basic_string_view<uint8_t>.
+// This is required by BinaryDecoder and other code that uses basic_string_view<uint8_t>.
+// Newer libc++ only provides char_traits for standard char types.
 namespace std {
 template <>
 struct char_traits<uint8_t> {
@@ -95,8 +98,11 @@ struct char_traits<uint8_t> {
 namespace px {
 namespace utils {
 
-using u8string = std::basic_string<uint8_t>;
-using u8string_view = std::basic_string_view<uint8_t>;
+// Use std::vector and std::span for byte operations instead of basic_string<uint8_t>.
+// The char_traits specialization above is still needed for BinaryDecoder and other code
+// that uses std::basic_string_view<uint8_t>.
+using u8string = std::vector<uint8_t>;
+using u8string_view = std::span<const uint8_t>;
 
 template <size_t N>
 void ReverseBytes(const uint8_t* x, uint8_t* y) {
@@ -154,6 +160,19 @@ T LEndianBytesToInt(std::string_view buf) {
 template <typename T, size_t N = sizeof(T), typename TCharType = char>
 T LEndianBytesToInt(std::basic_string_view<TCharType> buf) {
   return LEndianBytesToIntInternal<T, TCharType, N>(buf);
+}
+
+// Overload for std::span<const uint8_t>
+template <typename T, size_t N = sizeof(T)>
+T LEndianBytesToInt(std::span<const uint8_t> buf) {
+  static_assert(N <= sizeof(T));
+  DCHECK_GE(buf.size(), N);
+
+  T result = 0;
+  for (size_t i = 0; i < N; i++) {
+    result = static_cast<uint8_t>(buf[N - 1 - i]) | (result << 8);
+  }
+  return result;
 }
 
 /**
@@ -238,6 +257,19 @@ T BEndianBytesToInt(std::basic_string_view<TCharType> buf) {
   return BEndianBytesToIntInternal<T, TCharType, N>(buf);
 }
 
+// Overload for std::span<const uint8_t>
+template <typename T, size_t N = sizeof(T)>
+T BEndianBytesToInt(std::span<const uint8_t> buf) {
+  static_assert(N <= sizeof(T));
+  DCHECK_GE(buf.size(), N);
+
+  T result = 0;
+  for (size_t i = 0; i < N; i++) {
+    result = static_cast<uint8_t>(buf[i]) | (result << 8);
+  }
+  return result;
+}
+
 /**
  * Convert a big-endian string of bytes to a float/double.
  *
@@ -273,6 +305,13 @@ template <typename TValueType, typename TByteType>
 TValueType MemCpy(const TByteType* buf) {
   static_assert(sizeof(TByteType) == 1);
   return MemCpy<TValueType>(static_cast<const void*>(buf));
+}
+
+// Overload for std::span
+template <typename TValueType, typename TByteType>
+TValueType MemCpy(std::span<TByteType> buf) {
+  static_assert(sizeof(TByteType) == 1);
+  return MemCpy<TValueType>(static_cast<const void*>(buf.data()));
 }
 
 }  // namespace utils

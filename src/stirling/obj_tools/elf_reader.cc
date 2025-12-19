@@ -570,6 +570,7 @@ std::vector<uint64_t> FindRetInsts(Arch arch, utils::u8string_view byte_code) {
   char buf[kBufSize] = {};
 
   uint64_t pc = 0;
+  // const_cast is safe here as LLVMDisasmInstruction doesn't modify the buffer
   auto* codes = const_cast<uint8_t*>(byte_code.data());
   size_t codes_size = byte_code.size();
   int inst_size = 0;
@@ -660,7 +661,7 @@ StatusOr<utils::u8string> ElfReader::SymbolByteCode(std::string_view section,
         "memory",
         symbol.name, symbol.size);
   }
-  utils::u8string byte_code(symbol.size, '\0');
+  utils::u8string byte_code(symbol.size);
   auto* buf = reinterpret_cast<char*>(byte_code.data());
   if (!ifs.read(buf, symbol.size)) {
     return error::Internal("Failed to read size=$0 bytes from offset=$1 in binary=$2", symbol.size,
