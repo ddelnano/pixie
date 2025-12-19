@@ -226,7 +226,7 @@ cc_toolchain_config(
     cpu = "{target_arch}",
     cxx_builtin_include_directories = includes,
     cxx_flags = [
-        "-std=c++17",
+        "-std=c++20",
         "-fPIC",
     ],
     dbg_compile_flags = ["-g"],

@@ -12,13 +12,13 @@ load("//bazel/cc_toolchains/sysroots:sysroots.bzl", "pl_sysroot_deps")
 
 pl_sysroot_deps()
 
-load("//bazel/cc_toolchains:toolchains.bzl", "pl_register_cc_toolchains", "pl_register_local_clang_toolchain")
+load("//bazel/cc_toolchains:toolchains.bzl", "pl_register_cc_toolchains")
 
 pl_register_cc_toolchains()
 
 # Register a local LLVM/Clang toolchain for testing new clang versions.
 # To use: bazel build --extra_toolchains=@clang-local//:toolchain //your:target
-pl_register_local_clang_toolchain()
+# pl_register_local_clang_toolchain()
 
 # Install Pixie Labs Dependencies.
 pl_deps()

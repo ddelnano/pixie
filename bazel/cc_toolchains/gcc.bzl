@@ -59,7 +59,7 @@ def _gcc_x86_64_gnu():
             "-Wunused-but-set-parameter",
             "-fno-omit-frame-pointer",
         ],
-        cxx_flags = ["-std=c++17"],
+        cxx_flags = ["-std=c++20"],
         opt_compile_flags = [
             "-g0",
             "-O2",
