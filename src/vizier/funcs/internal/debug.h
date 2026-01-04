@@ -17,8 +17,12 @@
  */
 
 #pragma once
+#include <fstream>
+#include <sstream>
 #include <string>
 #include <vector>
+
+#include <absl/strings/str_format.h>
 
 #include "src/carnot/udf/registry.h"
 #include "src/carnot/udf/udf.h"
@@ -135,7 +139,8 @@ class HeapSampleUDTF final : public HeapUDTFWithAsidFilter<HeapSampleUDTF> {
 
 class HeapGrowthStacksUDTF final : public HeapUDTFWithAsidFilter<HeapGrowthStacksUDTF> {
  public:
-  static constexpr auto Executor() { return carnot::udfspb::UDTFSourceExecutor::UDTF_ALL_AGENTS; }
+  /* static constexpr auto Executor() { return carnot::udfspb::UDTFSourceExecutor::UDTF_ALL_AGENTS; } */
+  static constexpr auto Executor() { return carnot::udfspb::UDTFSourceExecutor::UDTF_ALL_PEM; }
 
   static constexpr auto OutputRelation() {
     return MakeArray(ColInfo("asid", types::DataType::INT64, types::PatternType::GENERAL,
@@ -483,6 +488,40 @@ class HeapRangesUDTF final : public HeapUDTFWithAsidFilter<HeapRangesUDTF> {
   size_t idx_ = 0;
   std::vector<::base::MallocRange> ranges_;
 #endif
+};
+
+class AgentProcMapsContentUDTF final : public carnot::udf::UDTF<AgentProcMapsContentUDTF> {
+ public:
+  using Config = system::Config;
+  static constexpr auto Executor() {
+    // Kelvins don't mount the host filesystem and so cannot access /proc files.
+    return carnot::udfspb::UDTFSourceExecutor::UDTF_ALL_PEM;
+  }
+
+  static constexpr auto OutputRelation() {
+    return MakeArray(
+        ColInfo("asid", types::DataType::INT64, types::PatternType::GENERAL,
+                "The short ID of the agent", types::SemanticType::ST_ASID),
+        ColInfo("maps_content", types::DataType::STRING, types::PatternType::GENERAL,
+                "Raw content of /proc/self/maps"));
+  }
+
+  bool NextRecord(FunctionContext* ctx, RecordWriter* rw) {
+    auto pid = ctx->metadata_state()->pid();
+    auto maps_path = absl::StrFormat("/proc/%d/maps", pid);
+    std::ifstream maps_file(maps_path);
+    if (!maps_file.is_open()) {
+      LOG(ERROR) << "Failed to open " << maps_path;
+      return false;
+    }
+    std::stringstream buffer;
+    buffer << maps_file.rdbuf();
+
+    rw->Append<IndexOf("asid")>(ctx->metadata_state()->asid());
+    rw->Append<IndexOf("maps_content")>(buffer.str());
+
+    return false;
+  }
 };
 
 class HeapStatsNumericUDTF final : public HeapUDTFWithAsidFilter<HeapStatsNumericUDTF> {

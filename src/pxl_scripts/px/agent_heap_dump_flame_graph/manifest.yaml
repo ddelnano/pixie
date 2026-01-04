@@ -1,0 +1,3 @@
+---
+short: Agent Heap Dump Flame Graph
+long: Visualize agent (PEM/Kelvin) heap allocation patterns as a flame graph. Shows symbolized stack traces for memory allocations.

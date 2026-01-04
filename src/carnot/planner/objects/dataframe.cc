@@ -172,9 +172,13 @@ StatusOr<QLObjectPtr> JoinHandler(CompilerState* compiler_state, IR* graph, Oper
                                       suffix_strs.size());
   }
 
+  PX_ASSIGN_OR_RETURN(IntIR * pem_only, GetArgAs<IntIR>(ast, args, "_pem_only"));
+  bool pem_only_val = pem_only->val() > 0;
+
   PX_ASSIGN_OR_RETURN(JoinIR * join_op,
                       graph->CreateNode<JoinIR>(ast, std::vector<OperatorIR*>{op, right}, how_type,
                                                 left_on_cols, right_on_cols, suffix_strs));
+  join_op->set_pem_only(pem_only_val);
   return Dataframe::Create(compiler_state, join_op, visitor);
 }
 
@@ -461,14 +465,14 @@ Status Dataframe::Init() {
 
   /**
    * # Equivalent to the python method method syntax:
-   * def merge(self, right, how, left_on, right_on, suffixes=['_x', '_y']):
+   * def merge(self, right, how, left_on, right_on, suffixes=['_x', '_y'], _pem_only=False):
    *     ...
    */
   PX_ASSIGN_OR_RETURN(
       std::shared_ptr<FuncObject> mergefn,
       FuncObject::Create(
-          kMergeOpID, {"right", "how", "left_on", "right_on", "suffixes"},
-          {{"suffixes", "['_x', '_y']"}},
+          kMergeOpID, {"right", "how", "left_on", "right_on", "suffixes", "_pem_only"},
+          {{"suffixes", "['_x', '_y']"}, {"_pem_only", "0"}},
           /* has_variable_len_args */ false,
           /* has_variable_len_kwargs */ false,
           std::bind(&JoinHandler, compiler_state_, graph(), op(), std::placeholders::_1,

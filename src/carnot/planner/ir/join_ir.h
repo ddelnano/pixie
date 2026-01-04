@@ -46,7 +46,9 @@ class JoinIR : public OperatorIR {
   JoinIR() = delete;
   explicit JoinIR(int64_t id) : OperatorIR(id, IRNodeType::kJoin) {}
 
-  bool IsBlocking() const override { return true; }
+  bool IsBlocking() const override { return !pem_only_; }
+  bool pem_only() const { return pem_only_; }
+  void set_pem_only(bool pem_only) { pem_only_ = pem_only; }
 
   Status ToProto(planpb::Operator*) const override;
 
@@ -161,6 +163,11 @@ class JoinIR : public OperatorIR {
   // Whether this join was originally specified as a right join.
   // Used because we transform left joins into right joins but need to do some back transform.
   bool specified_as_right_ = false;
+
+  // Whether this join should run only on PEMs (non-blocking).
+  // Use this when both sides of the join come from the same PEM and downstream
+  // operators need to run on PEM (e.g., symbolization that needs local binaries).
+  bool pem_only_ = false;
 };
 
 }  // namespace planner

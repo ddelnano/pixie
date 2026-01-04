@@ -52,6 +52,8 @@ Status JoinIR::CopyFromNodeImpl(const IRNode* node,
 
   PX_RETURN_IF_ERROR(SetJoinColumns(new_left_columns, new_right_columns));
   suffix_strs_ = join_node->suffix_strs_;
+  pem_only_ = join_node->pem_only_;
+  specified_as_right_ = join_node->specified_as_right_;
   return Status::OK();
 }
 

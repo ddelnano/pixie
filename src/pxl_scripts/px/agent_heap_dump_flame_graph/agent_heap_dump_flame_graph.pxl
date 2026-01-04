@@ -1,0 +1,87 @@
+# Copyright 2018- The Pixie Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+#px:set analyze=True
+#px:set explain=True
+'''Agent Heap Dump Flame Graph
+
+Visualize agent (PEM/Kelvin) heap allocation patterns as a flame graph.
+This script collects heap growth stacks from agents, symbolizes them using
+the agent's memory mappings, and displays them in a format suitable for
+flame graph visualization.
+'''
+
+import px
+
+
+def heap_flame_graph():
+    # Get agent status to map ASIDs to hostnames
+    agents = px.GetAgentStatus()
+    agents.ip_address = px.pluck_array(px.split(agents.ip_address, ':'), 0)
+    agents.hostname_by_ip = px.pod_id_to_node_name(px.ip_to_pod_id(agents.ip_address))
+    agents.hostname = px.select(agents.hostname_by_ip == '', agents.hostname, agents.hostname_by_ip)
+    agents = agents[['asid', 'hostname']]
+
+    # Get agent metadata state including pod_name
+    agent_md = px._DebugMDState()
+    agent_md = agent_md[['asid', 'pod_name']]
+
+    # Get heap growth stacks from all agents (legacy gperftools text format)
+    heap_stacks = px._HeapGrowthStacks()
+
+    # Get raw /proc/maps content for symbolization
+    maps_content = px._DebugAgentProcMapsContent()
+
+    # Join heap data with maps data on ASID
+    df = heap_stacks.merge(maps_content, how='inner', left_on='asid', right_on='asid', _pem_only=1
+                           suffixes=['', '_maps'])
+
+    # Symbolize the heap profile using the memory mappings
+    # symbolize_pprof accepts legacy gperftools format and returns binary pprof
+    df.symbolized_pprof = px.symbolize_pprof(df.heap, df.maps_content)
+
+    # Convert symbolized pprof to folded stacks format
+    # value_index=1 means use alloc_space (bytes), value_index=0 would use alloc_objects (count)
+    # Output format is "frame1;frame2;frame3\tcount\n" (tab-separated)
+    df.folded_stacks = px.pprof_to_folded_stacks(df.symbolized_pprof, 1)
+
+    # Join with agent info to get hostname
+    df = df.merge(agents, how='inner', left_on='asid', right_on='asid', suffixes=['', '_agent'])
+
+    # Join with agent metadata to get pod_name
+    df = df.merge(agent_md, how='inner', left_on='asid', right_on='asid', suffixes=['', '_md'])
+
+    # Explode folded_stacks: each line is "stack_trace\tcount", split on newlines
+    # This converts multi-line folded stacks into individual rows
+    df = df[['asid', 'hostname', 'pod_name', 'folded_stacks']]
+    df = df.explode('folded_stacks')
+
+    # Filter out empty lines
+    df = df[df.folded_stacks != '']
+
+    # Parse each line: format is "frame1;frame2;frame3\tcount"
+    # Split on tab to separate stack trace from count
+    df.stack_trace = px.pluck_array(px.split(df.folded_stacks, '\t'), 0)
+    df.count = px.atoi(px.pluck_array(px.split(df.folded_stacks, '\t'), 1), 10)
+
+    # Extract namespace from pod_name (format: namespace/pod)
+    # Agent pods are typically named like "pl/vizier-pem-xxxxx"
+    df.namespace = px.pluck_array(px.split(df.pod_name, '/'), 0)
+    df.pod = px.pluck_array(px.split(df.pod_name, '/'), 1)
+    # Container name is typically pem or kelvin based on pod name
+    df.container = px.select(px.contains(df.pod, 'kelvin'), 'kelvin', 'pem')
+
+    return df[['hostname', 'namespace', 'pod', 'container', 'stack_trace', 'count']]
+
