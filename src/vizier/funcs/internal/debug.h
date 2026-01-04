@@ -355,6 +355,62 @@ class AgentProcSMapsUDTF final : public carnot::udf::UDTF<AgentProcSMapsUDTF> {
   int current_idx_ = 0;
 };
 
+class AgentProcMapsUDTF final : public carnot::udf::UDTF<AgentProcMapsUDTF> {
+ public:
+  using Config = system::Config;
+  using ProcParser = system::ProcParser;
+  static constexpr auto Executor() {
+    // Kelvins don't mount the host filesystem and so cannot access /proc files.
+    // If we change kelvins to allow access to the host filesystem, this UDTF could target
+    // all agents.
+    return carnot::udfspb::UDTFSourceExecutor::UDTF_ALL_PEM;
+  }
+
+  static constexpr auto OutputRelation() {
+    return MakeArray(
+        ColInfo("asid", types::DataType::INT64, types::PatternType::GENERAL,
+                "The short ID of the agent", types::SemanticType::ST_ASID),
+        ColInfo("address", types::DataType::STRING, types::PatternType::GENERAL, "address space"),
+        ColInfo("vmem_start", types::DataType::INT64, types::PatternType::GENERAL,
+                "start of the virtual memory region"),
+        ColInfo("vmem_end", types::DataType::INT64, types::PatternType::GENERAL,
+                "end of the virtual memory region"),
+        ColInfo("permissions", types::DataType::STRING, types::PatternType::GENERAL,
+                "memory region permissions"),
+        ColInfo("offset", types::DataType::STRING, types::PatternType::GENERAL,
+                "offset into the mapping"),
+        ColInfo("pathname", types::DataType::STRING, types::PatternType::GENERAL,
+                "name associated file"));
+  }
+
+  Status Init(FunctionContext* ctx) {
+    const ProcParser proc_parser;
+    return proc_parser.ParseProcPIDMaps(ctx->metadata_state()->pid(), &stats_);
+  }
+
+  bool NextRecord(FunctionContext* ctx, RecordWriter* rw) {
+    if (static_cast<size_t>(current_idx_) >= stats_.size()) {
+      return false;
+    }
+    auto map_entry = stats_[current_idx_];
+
+    rw->Append<IndexOf("asid")>(ctx->metadata_state()->asid());
+    rw->Append<IndexOf("address")>(map_entry.ToAddress());
+    rw->Append<IndexOf("vmem_start")>(static_cast<int64_t>(map_entry.vmem_start));
+    rw->Append<IndexOf("vmem_end")>(static_cast<int64_t>(map_entry.vmem_end));
+    rw->Append<IndexOf("permissions")>(map_entry.permissions);
+    rw->Append<IndexOf("offset")>(map_entry.offset);
+    rw->Append<IndexOf("pathname")>(map_entry.pathname);
+
+    ++current_idx_;
+    return static_cast<size_t>(current_idx_) < stats_.size();
+  }
+
+ private:
+  std::vector<ProcParser::ProcessSMaps> stats_;
+  int current_idx_ = 0;
+};
+
 class HeapReleaseFreeMemoryUDTF final : public HeapUDTFWithAsidFilter<HeapReleaseFreeMemoryUDTF> {
  public:
   static constexpr auto Executor() { return carnot::udfspb::UDTFSourceExecutor::UDTF_ALL_AGENTS; }

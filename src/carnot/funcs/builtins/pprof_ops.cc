@@ -18,6 +18,8 @@
 
 #include "src/carnot/funcs/builtins/pprof_ops.h"
 
+#include <absl/strings/str_cat.h>
+
 #include "src/carnot/udf/registry.h"
 #include "src/common/base/base.h"
 
@@ -25,10 +27,56 @@ namespace px {
 namespace carnot {
 namespace builtins {
 
+using px::shared::PProfProfile;
+
+types::StringValue SymbolizePProf::Exec(FunctionContext*, types::StringValue pprof_data,
+                                        types::StringValue maps_content) {
+  // Validate maps_content is not empty
+  if (maps_content.empty()) {
+    return "Error: Empty maps content";
+  }
+
+  PProfProfile pprof;
+
+  // Try to parse as binary protobuf first
+  bool parsed_as_binary = pprof.ParseFromString(pprof_data);
+
+  if (!parsed_as_binary) {
+    // Try to parse as legacy gperftools text format
+    auto legacy_result = px::shared::ParseLegacyHeapProfile(pprof_data);
+    if (!legacy_result.ok()) {
+      return absl::StrCat("Error: Failed to parse pprof data: ", legacy_result.status().msg());
+    }
+    pprof = legacy_result.ConsumeValueOrDie();
+  }
+
+  // Parse the memory mappings
+  auto mappings_result = px::shared::ParseProcMaps(maps_content);
+  if (!mappings_result.ok()) {
+    return absl::StrCat("Error: Failed to parse maps: ", mappings_result.status().msg());
+  }
+  auto mappings = mappings_result.ConsumeValueOrDie();
+
+  // Symbolize the pprof profile
+  auto symbolize_status = px::shared::SymbolizePProfProfile(&pprof, mappings);
+  if (!symbolize_status.ok()) {
+    return absl::StrCat("Error: Failed to symbolize: ", symbolize_status.msg());
+  }
+
+  // Serialize back to binary protobuf format
+  std::string output;
+  if (!pprof.SerializeToString(&output)) {
+    return "Error: Failed to serialize pprof to binary";
+  }
+
+  return output;
+}
+
 void RegisterPProfOpsOrDie(udf::Registry* registry) {
   CHECK(registry != nullptr);
 
   registry->RegisterOrDie<CreatePProfRowAggregate>("pprof");
+  registry->RegisterOrDie<SymbolizePProf>("symbolize_pprof");
 }
 
 }  // namespace builtins

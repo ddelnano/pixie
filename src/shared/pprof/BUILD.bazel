@@ -15,7 +15,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 load("@rules_cc//cc:defs.bzl", "cc_proto_library")
-load("//bazel:pl_build_system.bzl", "pl_cc_library")
+load("//bazel:pl_build_system.bzl", "pl_cc_library", "pl_cc_test")
 
 package(default_visibility = ["//src:__subpackages__"])
 
@@ -35,5 +35,18 @@ pl_cc_library(
     hdrs = glob(["*.h"]),
     deps = [
         ":pprof_proto_cc",
+        "//src/stirling/obj_tools:cc_library",
+    ],
+)
+
+pl_cc_test(
+    name = "pprof_test",
+    srcs = ["pprof_test.cc"],
+    data = glob(["testdata/**"]),
+    # This test requires access to binaries on the host filesystem for symbolization.
+    # Run with --spawn_strategy=local to disable sandboxing.
+    tags = ["no_sandbox"],
+    deps = [
+        ":cc_library",
     ],
 )

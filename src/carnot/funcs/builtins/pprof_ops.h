@@ -126,6 +126,92 @@ class CreatePProfRowAggregate : public udf::UDA {
   bool multiple_profiler_periods_found_ = false;
 };
 
+/**
+ * SymbolizePProf is a UDF that takes a pprof binary and a maps content string
+ * (from /proc/<pid>/maps) and returns a symbolized pprof.
+ *
+ * This allows symbolization of pprof profiles captured from agents by providing
+ * the virtual memory mappings at the time of capture.
+ */
+class SymbolizePProf : public udf::ScalarUDF {
+ public:
+  /**
+   * Symbolize a pprof profile using the provided memory maps.
+   *
+   * @param pprof_binary The binary-encoded pprof profile (from HeapGrowthStacksUDTF or similar)
+   * @param maps_content The content of /proc/<pid>/maps for the process that generated the pprof
+   * @return Symbolized pprof profile as a binary-encoded string
+   */
+  StringValue Exec(FunctionContext*, StringValue pprof_binary, StringValue maps_content);
+
+  static udf::ScalarUDFDocBuilder Doc() {
+    return udf::ScalarUDFDocBuilder("Symbolize a pprof profile using memory mappings.")
+        .Details(
+            "Takes an unsymbolized pprof profile (binary encoded) and the contents of "
+            "/proc/<pid>/maps from the process that generated the profile. Uses the memory "
+            "mappings to determine which binary/library each address belongs to, then "
+            "symbolizes the addresses using debug information from those binaries.")
+        .Example(R"doc(
+        | # Get heap growth stacks from agent
+        | heap_stacks = px._HeapGrowthStacks()
+        | # Get memory maps from the same agent
+        | maps = px._DebugAgentProcMaps()
+        | # Join on asid and symbolize
+        | df = heap_stacks.merge(maps, how='inner', left_on='asid', right_on='asid')
+        | df.symbolized = px.symbolize_pprof(df.heap, df.maps_content)
+        )doc")
+        .Arg("pprof_binary", "Binary-encoded pprof profile to symbolize")
+        .Arg("maps_content", "Contents of /proc/<pid>/maps for the source process")
+        .Returns("Symbolized pprof profile as binary-encoded string");
+  }
+};
+
+/**
+ * PProfToFoldedStacksUDF converts pprof data to folded stack trace format.
+ *
+ * Takes pprof data (legacy gperftools text format or binary protobuf) and
+ * /proc/<pid>/maps content, symbolizes the profile, and returns folded stacks
+ * suitable for flame graph generation (e.g., Brendan Gregg's FlameGraph tools).
+ *
+ * Output format: "root;caller1;caller2;leaf value\n" per unique stack.
+ */
+class PProfToFoldedStacksUDF : public udf::ScalarUDF {
+ public:
+  /**
+   * Convert pprof data to folded stacks format.
+   *
+   * @param pprof_data The pprof data (legacy text or binary protobuf)
+   * @param maps_content The content of /proc/<pid>/maps
+   * @param value_index Which sample value to use (0=alloc_objects, 1=alloc_space)
+   * @return Folded stack trace string
+   */
+  StringValue Exec(FunctionContext*, StringValue pprof_data, StringValue maps_content,
+                   Int64Value value_index);
+
+  static udf::ScalarUDFDocBuilder Doc() {
+    return udf::ScalarUDFDocBuilder("Convert pprof data to folded stack trace format.")
+        .Details(
+            "Takes pprof heap profile data (legacy gperftools text format or binary protobuf) "
+            "and /proc/<pid>/maps content. Symbolizes the addresses using the memory mappings "
+            "and returns a folded stack trace format suitable for flame graph tools.\n\n"
+            "Output format: 'root;caller1;caller2;leaf value' per line, where value is either "
+            "allocation count (value_index=0) or bytes allocated (value_index=1).")
+        .Example(R"doc(
+        | # Get heap growth stacks and maps from agent
+        | heap = px._HeapGrowthStacks()
+        | maps = px._DebugAgentProcMaps()
+        | # Join and convert to folded format for flame graphs
+        | df = heap.merge(maps, how='inner', left_on='asid', right_on='asid')
+        | df.folded = px.pprof_to_folded_stacks(df.pprof_data, df.maps_content, 1)
+        )doc")
+        .Arg("pprof_data", "PProf data (legacy text format or binary protobuf)")
+        .Arg("maps_content", "Contents of /proc/<pid>/maps")
+        .Arg("value_index",
+             "Which sample value to use: 0=alloc_objects (count), 1=alloc_space (bytes)")
+        .Returns("Folded stack trace string for flame graph generation");
+  }
+};
+
 void RegisterPProfOpsOrDie(udf::Registry* registry);
 
 }  // namespace builtins
