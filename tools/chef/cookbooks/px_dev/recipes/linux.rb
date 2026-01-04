@@ -28,7 +28,8 @@ apt_pkg_list = [
   'crun',
   'curl',
   # Not the newest docker CE from official docker repository, but should suffice.
-  'docker.io',
+  # TODO(ddelnano): This fails to install with jules
+  #'docker.io',
   'git',
   'libncurses6',
   'lcov',
