@@ -60,6 +60,7 @@ pl_cc_bpf_test(
     deps = [
         ":cc_library",
         "//src/common/exec:cc_library",
+        "//src/stirling/obj_tools/testdata/cc:addr_book",
         "//src/stirling/obj_tools/testdata/cc:test_exe_fixture",
         "//src/stirling/testing:cc_library",
     ],
@@ -70,6 +71,7 @@ pl_cc_bpf_test(
     timeout = "long",
     srcs = ["stirling_dt_bpf_test.cc"],
     data = [
+        "//src/stirling/obj_tools/testdata/cc:addr_book",
         "//src/stirling/obj_tools/testdata/cc:test_exe",
         "//src/stirling/obj_tools/testdata/go:test_go_1_23_binary",
         "//src/stirling/obj_tools/testdata/go:test_go_1_24_binary",

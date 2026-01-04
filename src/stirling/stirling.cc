@@ -58,6 +58,7 @@
 #include "src/stirling/source_connectors/socket_tracer/socket_trace_connector.h"
 #include "src/stirling/source_connectors/stirling_error/stirling_error_connector.h"
 
+#include "src/stirling/source_connectors/dynamic_object/dynamic_object_connector.h"
 #include "src/stirling/source_connectors/dynamic_tracer/dynamic_tracing/dynamic_tracer.h"
 #include "src/stirling/source_connectors/tcp_stats/tcp_stats_connector.h"
 
@@ -71,8 +72,7 @@ namespace stirling {
 
 namespace {
 
-#define REGISTRY_PAIR(source) \
-  { SourceRegistry::CreateRegistryElement<source>(source::kName) }
+#define REGISTRY_PAIR(source) {SourceRegistry::CreateRegistryElement<source>(source::kName)}
 const std::vector<SourceRegistry::RegistryElement> kAllSources = {
     REGISTRY_PAIR(JVMStatsConnector),          REGISTRY_PAIR(PIDRuntimeConnector),
     REGISTRY_PAIR(ProcStatConnector),          REGISTRY_PAIR(SeqGenConnector),
@@ -202,6 +202,11 @@ class StirlingImpl final : public Stirling {
       std::unique_ptr<dynamic_tracing::ir::logical::TracepointDeployment> program) override;
   StatusOr<stirlingpb::Publish> GetTracepointInfo(sole::uuid trace_id) override;
   Status RemoveTracepoint(sole::uuid trace_id) override;
+  void RegisterObjectProfile(
+      sole::uuid trace_id,
+      std::unique_ptr<dynamic_tracing::ir::logical::TracepointDeployment> program) override;
+  StatusOr<stirlingpb::Publish> GetObjectProbeStatus(sole::uuid trace_id) override;
+  StatusOr<stirlingpb::Publish> GetObjectProbeInfo(sole::uuid trace_id) override;
   void GetPublishProto(stirlingpb::Publish* publish_pb) override;
   void RegisterDataPushCallback(DataPushCallback f) override { data_push_callback_ = f; }
   void RegisterAgentMetadataCallback(AgentMetadataCallback f) override {
@@ -530,6 +535,24 @@ StatusOr<std::unique_ptr<SourceConnector>> CreateDynamicSourceConnector(
 
     return DynamicBPFTraceConnector::Create(source_name, tracepoint);
   }
+
+  // Check for program.probers.tracepoint.type here for OI
+  auto probe_type = tracepoint.program().probes(0).tracepoint().type();
+  LOG(INFO) << absl::Substitute("Creating DynamicTraceConnector with probe type: $0",
+                                magic_enum::enum_name(probe_type));
+  if (probe_type == dynamic_tracing::ir::shared::Tracepoint::OI_ENTRY ||
+      probe_type == dynamic_tracing::ir::shared::Tracepoint::OI_RETURN) {
+    // Object introspection requires a UPID or pod process target.
+    if (!tracepoint_deployment->has_deployment_spec()) {
+      return error::InvalidArgument("Object introspection requires a deployment_spec.");
+    }
+    const auto& deployment_spec = tracepoint_deployment->deployment_spec();
+    if (!deployment_spec.has_upid_list() && !deployment_spec.has_pod_process()) {
+      return error::InvalidArgument(
+          "Object introspection requires either upid_list or pod_process in deployment_spec.");
+    }
+    return DynamicObjectTraceConnector::Create(source_name, tracepoint_deployment);
+  }
   return DynamicTraceConnector::Create(source_name, tracepoint_deployment);
 }
 
@@ -624,6 +647,18 @@ void StirlingImpl::RegisterTracepoint(
       return;
     }
 
+    // Skip ResolveTargetObjPaths for object introspection probes since they
+    // require the UPID/pod_process to remain unresolved for later processing.
+    auto tracepoint = program->tracepoints(0);
+    if (tracepoint.has_program() && tracepoint.program().probes_size() > 0) {
+      auto probe_type = tracepoint.program().probes(0).tracepoint().type();
+      if (probe_type == dynamic_tracing::ir::shared::Tracepoint::OI_ENTRY ||
+          probe_type == dynamic_tracing::ir::shared::Tracepoint::OI_RETURN) {
+        // Object introspection probes handle target resolution separately.
+        // Continue to deployment without resolving paths.
+        goto deploy_tracepoint;
+      }
+    }
     Status s = dynamic_tracing::ResolveTargetObjPaths(conn_ctx->GetK8SMetadata(),
                                                       program->mutable_deployment_spec());
 
@@ -640,6 +675,7 @@ void StirlingImpl::RegisterTracepoint(
     }
   }
 
+deploy_tracepoint:
   // Initialize the status of this trace to pending.
   {
     absl::base_internal::SpinLockHolder lock(&dynamic_trace_status_map_lock_);
@@ -672,6 +708,26 @@ Status StirlingImpl::RemoveTracepoint(sole::uuid trace_id) {
   t.detach();
 
   return Status::OK();
+}
+
+void StirlingImpl::RegisterObjectProfile(
+    sole::uuid trace_id,
+    std::unique_ptr<dynamic_tracing::ir::logical::TracepointDeployment> program) {
+  PX_UNUSED(trace_id);
+  PX_UNUSED(program);
+  // TODO(ddelnano): Implement object profiling registration.
+}
+
+StatusOr<stirlingpb::Publish> StirlingImpl::GetObjectProbeStatus(sole::uuid trace_id) {
+  PX_UNUSED(trace_id);
+  // TODO(ddelnano): Implement object probe status retrieval.
+  return error::Unimplemented("Object probe status not yet implemented.");
+}
+
+StatusOr<stirlingpb::Publish> StirlingImpl::GetObjectProbeInfo(sole::uuid trace_id) {
+  PX_UNUSED(trace_id);
+  // TODO(ddelnano): Implement object probe info retrieval.
+  return error::Unimplemented("Object probe info not yet implemented.");
 }
 
 void StirlingImpl::GetPublishProto(stirlingpb::Publish* publish_pb) {

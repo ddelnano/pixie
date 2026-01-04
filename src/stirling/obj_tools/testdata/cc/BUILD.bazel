@@ -72,6 +72,10 @@ filegroup(
     srcs = [
         "prebuilt_test_exe",
     ],
+    visibility = [
+        "//src/shared/pprof:__pkg__",
+        "//src/stirling:__subpackages__",
+    ],
 )
 
 #------------------------------------------------------------------------------
@@ -115,4 +119,26 @@ genrule(
 filegroup(
     name = "lib_foo",
     srcs = ["lib_foo_so"],
+)
+
+# AddrBook binary for object profiling tests.
+cc_clang_binary(
+    name = "addr_book",
+    srcs = ["AddrBook.cpp"],
+    copts = [
+        "-O0",
+        "-g",
+    ],
+    features = [
+        # disable the default optimization flags so we can set our own for this target.
+        "-default_opt_level_flags",
+        # disable sanitiziers so that the binary is deterministic regardless of bazel config.
+        "-asan",
+        "-msan",
+        "-tsan",
+    ],
+    linkopts = [
+        "-Wl,--build-id",
+        "-no-pie",
+    ],
 )

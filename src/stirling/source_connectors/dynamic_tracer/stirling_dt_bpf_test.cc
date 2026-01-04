@@ -55,7 +55,6 @@ class BinaryRunner {
 
   ~BinaryRunner() { trace_target_.Kill(); }
 
- private:
   SubProcess trace_target_;
 };
 
@@ -192,6 +191,37 @@ class DynamicTraceAPITest : public StirlingDynamicTraceBPFTest {
     }
   }
   )";
+
+  const std::string kAddrBookBinaryPath =
+      BazelRunfilePath("src/stirling/obj_tools/testdata/cc/addr_book_/addr_book");
+
+  static constexpr std::string_view kAddrBookTracepointDeploymentTxtPB = R"(
+  ttl {
+    seconds: 30
+  }
+  count: 2
+  deployment_spec {
+    upid_list {
+      upids {
+        pid: $0
+      }
+    }
+  }
+  tracepoints {
+    program {
+      language: CPP
+      probes {
+        name: "probe0"
+        tracepoint {
+          symbol: "_ZN11AddressBook12DumpContactsEv"
+          type: OI_ENTRY
+        }
+        targets: "arg0"
+        targets: "arg1"
+      }
+    }
+  }
+  )";
 };
 
 TEST_F(DynamicTraceAPITest, DynamicTraceAPI) {
@@ -215,6 +245,41 @@ TEST_F(DynamicTraceAPITest, DynamicTraceAPI) {
   ASSERT_OK(WaitForStatus(trace_id));
 
   // TODO(oazizi): Expand test when RegisterTracepoint produces other states.
+}
+
+TEST_F(DynamicTraceAPITest, ObjectProfileAPI) {
+  BinaryRunner trace_target;
+  trace_target.Run(kAddrBookBinaryPath);
+  auto pid = trace_target.trace_target_.child_pid();
+  LOG(INFO) << absl::Substitute("BinaryRunner binary=$0 pid=$1", kAddrBookBinaryPath, pid);
+
+  StatusOr<stirlingpb::Publish> s;
+
+  sole::uuid trace_id = sole::uuid4();
+
+  // Checking status of non-existent trace should return NOT_FOUND.
+  s = stirling_->GetTracepointInfo(trace_id);
+  EXPECT_EQ(s.code(), px::statuspb::Code::NOT_FOUND);
+
+  auto trace_program = Prepare(kAddrBookTracepointDeploymentTxtPB, std::to_string(pid));
+  stirling_->RegisterTracepoint(trace_id, std::move(trace_program));
+
+  // Immediately after registering, state should be pending.
+  // TODO(oazizi): How can we make sure this is not flaky?
+  s = stirling_->GetTracepointInfo(trace_id);
+  EXPECT_EQ(s.code(), px::statuspb::Code::RESOURCE_UNAVAILABLE) << s.ToString();
+
+  // Should deploy.
+  ASSERT_OK(WaitForStatus(trace_id));
+
+  // Run Stirling data collector to start TransferDataImpl calls.
+  ASSERT_OK(stirling_->RunAsThread());
+
+  // Give some time for the subprocess to capture data.
+  sleep(10);
+
+  // Stop Stirling.
+  stirling_->Stop();
 }
 
 TEST_F(DynamicTraceAPITest, NonExistentBinary) {

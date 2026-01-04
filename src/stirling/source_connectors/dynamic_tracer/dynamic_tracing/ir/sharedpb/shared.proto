@@ -119,6 +119,13 @@ message Tracepoint {
     ENTRY = 1;
     // Intermediate and physical IR uses this to specify a BPF return probe.
     RETURN = 2;
+
+    // Used in logical IR to specify an object probe on function entry.
+    OI_ENTRY = 3;
+    // Used in logical IR to specify an object probe on function return.
+    OI_RETURN = 4;
+    // Used in logical IR to specify a global object probe.
+    OI_GLOBAL = 5;
   }
   // This has to be LOGICAL for logical IR.
   Type type = 2;

@@ -135,6 +135,8 @@ message Probe {
   repeated OutputAction output_actions = 9;
   // Used for debugging to print variable defined above.
   repeated shared.Printk printks = 10;
+  // Object introspection targets to capture.
+  repeated string targets = 12;
 }
 
 // TODO(yzhao): This is equivalent to Program.
@@ -182,4 +184,8 @@ message TracepointDeployment {
     // This is not done at the beginning to minimize the work for supporting bpftrace.
   }
   repeated Tracepoint tracepoints = 4;
+  // The number of successful subprocess completions required before the trace is done.
+  // Used for object introspection to control how many times the data collection
+  // subprocess should complete successfully.
+  int32 count = 5;
 }

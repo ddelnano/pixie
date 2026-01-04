@@ -129,6 +129,23 @@ class Stirling : public NotCopyable {
   virtual Status RemoveTracepoint(sole::uuid trace_id) = 0;
 
   /**
+   * Registers an object profiling probe.
+   */
+  virtual void RegisterObjectProfile(
+      sole::uuid trace_id,
+      std::unique_ptr<dynamic_tracing::ir::logical::TracepointDeployment> program) = 0;
+
+  /**
+   * Returns the status of the object probe registration for the trace identified by the input ID.
+   */
+  virtual StatusOr<stirlingpb::Publish> GetObjectProbeStatus(sole::uuid trace_id) = 0;
+
+  /**
+   * Returns the info of the object probe for the trace identified by the input ID.
+   */
+  virtual StatusOr<stirlingpb::Publish> GetObjectProbeInfo(sole::uuid trace_id) = 0;
+
+  /**
    * Populate the Publish Proto object. Agent calls this function to get the Publish
    * proto message. The proto publish message contains information (InfoClassSchema) on
    * all the Source Connectors that can be run to gather data and information on the types
