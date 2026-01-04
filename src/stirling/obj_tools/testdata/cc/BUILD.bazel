@@ -73,6 +73,7 @@ filegroup(
         "prebuilt_test_exe",
     ],
     visibility = [
+        "//src/carnot/funcs/builtins:__pkg__",
         "//src/shared/pprof:__pkg__",
         "//src/stirling:__subpackages__",
     ],

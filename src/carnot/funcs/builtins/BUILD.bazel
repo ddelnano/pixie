@@ -211,6 +211,10 @@ pl_cc_test(
 pl_cc_test(
     name = "pprof_ops_test",
     srcs = ["pprof_ops_test.cc"],
+    data = [
+        "//src/stirling/obj_tools/testdata/cc:prebuilt_exe",
+    ],
+    tags = ["no_sandbox"],
     deps = [
         ":cc_library",
         "//src/carnot/udf:udf_testutils",

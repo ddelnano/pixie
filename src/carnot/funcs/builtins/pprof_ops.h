@@ -24,6 +24,7 @@
 
 #include "src/carnot/udf/registry.h"
 #include "src/carnot/udf/udf.h"
+#include "src/carnot/udfspb/udfs.pb.h"
 #include "src/shared/pprof/pprof.h"
 
 namespace px {
@@ -144,6 +145,10 @@ class SymbolizePProf : public udf::ScalarUDF {
    */
   StringValue Exec(FunctionContext*, StringValue pprof_binary, StringValue maps_content);
 
+  // This UDF must run on PEMs because it needs access to the local filesystem
+  // to read binaries for symbolization based on the memory mappings.
+  static udfspb::UDFSourceExecutor Executor() { return udfspb::UDFSourceExecutor::UDF_PEM; }
+
   static udf::ScalarUDFDocBuilder Doc() {
     return udf::ScalarUDFDocBuilder("Symbolize a pprof profile using memory mappings.")
         .Details(
@@ -169,9 +174,9 @@ class SymbolizePProf : public udf::ScalarUDF {
 /**
  * PProfToFoldedStacksUDF converts pprof data to folded stack trace format.
  *
- * Takes pprof data (legacy gperftools text format or binary protobuf) and
- * /proc/<pid>/maps content, symbolizes the profile, and returns folded stacks
- * suitable for flame graph generation (e.g., Brendan Gregg's FlameGraph tools).
+ * Takes pprof data (binary protobuf, typically already symbolized via SymbolizePProf)
+ * and returns folded stacks suitable for flame graph generation
+ * (e.g., Brendan Gregg's FlameGraph tools).
  *
  * Output format: "root;caller1;caller2;leaf value\n" per unique stack.
  */
@@ -180,19 +185,16 @@ class PProfToFoldedStacksUDF : public udf::ScalarUDF {
   /**
    * Convert pprof data to folded stacks format.
    *
-   * @param pprof_data The pprof data (legacy text or binary protobuf)
-   * @param maps_content The content of /proc/<pid>/maps
+   * @param pprof_data The pprof data (binary protobuf, should be symbolized first)
    * @param value_index Which sample value to use (0=alloc_objects, 1=alloc_space)
    * @return Folded stack trace string
    */
-  StringValue Exec(FunctionContext*, StringValue pprof_data, StringValue maps_content,
-                   Int64Value value_index);
+  StringValue Exec(FunctionContext*, StringValue pprof_data, Int64Value value_index);
 
   static udf::ScalarUDFDocBuilder Doc() {
     return udf::ScalarUDFDocBuilder("Convert pprof data to folded stack trace format.")
         .Details(
-            "Takes pprof heap profile data (legacy gperftools text format or binary protobuf) "
-            "and /proc/<pid>/maps content. Symbolizes the addresses using the memory mappings "
+            "Takes pprof binary protobuf data (should be symbolized first via symbolize_pprof) "
             "and returns a folded stack trace format suitable for flame graph tools.\n\n"
             "Output format: 'root;caller1;caller2;leaf value' per line, where value is either "
             "allocation count (value_index=0) or bytes allocated (value_index=1).")
@@ -200,12 +202,12 @@ class PProfToFoldedStacksUDF : public udf::ScalarUDF {
         | # Get heap growth stacks and maps from agent
         | heap = px._HeapGrowthStacks()
         | maps = px._DebugAgentProcMaps()
-        | # Join and convert to folded format for flame graphs
+        | # Join, symbolize, then convert to folded format
         | df = heap.merge(maps, how='inner', left_on='asid', right_on='asid')
-        | df.folded = px.pprof_to_folded_stacks(df.pprof_data, df.maps_content, 1)
+        | df.symbolized = px.symbolize_pprof(df.pprof_data, df.maps_content)
+        | df.folded = px.pprof_to_folded_stacks(df.symbolized, 1)
         )doc")
-        .Arg("pprof_data", "PProf data (legacy text format or binary protobuf)")
-        .Arg("maps_content", "Contents of /proc/<pid>/maps")
+        .Arg("pprof_data", "PProf binary protobuf data (should be symbolized first)")
         .Arg("value_index",
              "Which sample value to use: 0=alloc_objects (count), 1=alloc_space (bytes)")
         .Returns("Folded stack trace string for flame graph generation");

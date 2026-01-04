@@ -72,11 +72,31 @@ types::StringValue SymbolizePProf::Exec(FunctionContext*, types::StringValue ppr
   return output;
 }
 
+types::StringValue PProfToFoldedStacksUDF::Exec(FunctionContext*, types::StringValue pprof_data,
+                                                 types::Int64Value value_index) {
+  PProfProfile pprof;
+
+  // Parse as binary protobuf
+  if (!pprof.ParseFromString(pprof_data)) {
+    return "Error: Failed to parse pprof data as binary protobuf";
+  }
+
+  // Convert to folded stacks format
+  auto folded_result = px::shared::PProfToFoldedStacks(pprof, value_index.val);
+  if (!folded_result.ok()) {
+    return absl::StrCat("Error: Failed to convert to folded stacks: ",
+                        folded_result.status().msg());
+  }
+
+  return folded_result.ConsumeValueOrDie();
+}
+
 void RegisterPProfOpsOrDie(udf::Registry* registry) {
   CHECK(registry != nullptr);
 
   registry->RegisterOrDie<CreatePProfRowAggregate>("pprof");
   registry->RegisterOrDie<SymbolizePProf>("symbolize_pprof");
+  registry->RegisterOrDie<PProfToFoldedStacksUDF>("pprof_to_folded_stacks");
 }
 
 }  // namespace builtins

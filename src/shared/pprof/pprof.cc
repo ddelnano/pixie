@@ -527,7 +527,8 @@ StatusOr<std::string> PProfToFoldedStacks(const PProfProfile& profile, int value
     }
 
     if (!frames.empty()) {
-      absl::StrAppend(&result, absl::StrJoin(frames, ";"), " ", value, "\n");
+      // Use tab as delimiter between stack trace and count since function names can contain spaces
+      absl::StrAppend(&result, absl::StrJoin(frames, ";"), "\t", value, "\n");
     }
   }
 

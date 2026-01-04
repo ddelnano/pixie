@@ -187,18 +187,19 @@ TEST(PProfToFoldedStacks, ConvertsSymbolizedProfile) {
   std::string folded = result.ConsumeValueOrDie();
 
   // Expected output (root→leaf order):
-  // main;foo;bar 1000
-  // main;foo 500
-  EXPECT_THAT(folded, HasSubstr("main;foo;bar 1000"));
-  EXPECT_THAT(folded, HasSubstr("main;foo 500"));
+  // main;foo;bar\t1000
+  // main;foo\t500
+  // Note: tab character is used as delimiter since function names can contain spaces
+  EXPECT_THAT(folded, HasSubstr("main;foo;bar\t1000"));
+  EXPECT_THAT(folded, HasSubstr("main;foo\t500"));
 
   // Test with alloc_objects (value_index=0)
   auto result_count = PProfToFoldedStacks(profile, 0);
   ASSERT_OK(result_count);
   std::string folded_count = result_count.ConsumeValueOrDie();
 
-  EXPECT_THAT(folded_count, HasSubstr("main;foo;bar 5"));
-  EXPECT_THAT(folded_count, HasSubstr("main;foo 3"));
+  EXPECT_THAT(folded_count, HasSubstr("main;foo;bar\t5"));
+  EXPECT_THAT(folded_count, HasSubstr("main;foo\t3"));
 }
 
 TEST(PProfToFoldedStacks, HandlesUnsymbolizedProfile) {
@@ -240,7 +241,7 @@ TEST(PProfToFoldedStacks, HandlesUnsymbolizedProfile) {
   // Should use hex addresses as fallback
   EXPECT_THAT(folded, HasSubstr("0x1234"));
   EXPECT_THAT(folded, HasSubstr("0x5678"));
-  EXPECT_THAT(folded, HasSubstr(" 100"));
+  EXPECT_THAT(folded, HasSubstr("\t100"));
 }
 
 // This test requires the actual binaries to exist on disk.
