@@ -18,9 +18,13 @@
 
 #include "src/shared/pprof/pprof.h"
 
+#include <filesystem>
 #include <fstream>
+#include <set>
 #include <string>
 
+#include <absl/strings/str_format.h>
+#include <absl/strings/str_join.h>
 #include <google/protobuf/text_format.h>
 
 #include "src/common/base/file.h"
@@ -333,6 +337,88 @@ TEST(SymbolizePProf, SymbolizesRealData) {
   } else {
     LOG(WARNING) << "Symbolization failed (expected if binaries don't exist): " << status.msg();
   }
+}
+
+// Test symbolization with a known test binary that has symbols.
+// This test uses prebuilt_test_exe which has known functions like CanYouFindThis at 0x4011d0.
+TEST(SymbolizePProf, SymbolizesWithTestBinary) {
+  // Get path to prebuilt_test_exe
+  const auto test_exe_path =
+      testing::BazelRunfilePath("src/stirling/obj_tools/testdata/cc/prebuilt_test_exe");
+
+  // Verify the binary exists
+  ASSERT_TRUE(std::filesystem::exists(test_exe_path))
+      << "Test binary not found: " << test_exe_path;
+
+  // Known symbol addresses from prebuilt_test_exe (from nm output):
+  // 0x4011d0 T CanYouFindThis
+  // 0x401290 T main
+  constexpr uint64_t kCanYouFindThisAddr = 0x4011d0;
+  constexpr uint64_t kMainAddr = 0x401290;
+
+  // Create synthetic legacy heap profile data with these addresses.
+  // Format: "count: bytes [count: bytes] @ 0xaddr1 0xaddr2 ..."
+  // The addresses are in leaf-to-root order (call stack order).
+  const std::string legacy_pprof = absl::StrFormat(
+      "heap profile:    2: 1000 [   2: 1000] @ growth\n"
+      "     1: 500 [     1: 500] @ 0x%x 0x%x\n",
+      kCanYouFindThisAddr, kMainAddr);
+
+  // Create synthetic maps content pointing to our test binary.
+  // Format: start-end perms offset dev inode pathname
+  // The prebuilt_test_exe is a non-PIE executable, so it loads at its compiled addresses.
+  // We need a mapping that covers addresses 0x401000-0x402000 with offset 0.
+  const std::string maps_content = absl::StrFormat(
+      "00400000-00405000 r-xp 00000000 00:00 12345      %s\n",
+      test_exe_path.string());
+
+  // Parse the legacy pprof format
+  auto pprof_result = ParseLegacyHeapProfile(legacy_pprof);
+  ASSERT_OK(pprof_result);
+  auto profile = pprof_result.ConsumeValueOrDie();
+
+  // Verify we have the expected sample
+  ASSERT_EQ(profile.sample_size(), 1);
+  ASSERT_EQ(profile.location_size(), 2);
+
+  // Parse the maps
+  auto maps_result = ParseProcMaps(maps_content);
+  ASSERT_OK(maps_result);
+  auto mappings = maps_result.ConsumeValueOrDie();
+  ASSERT_EQ(mappings.size(), 1);
+
+  // Symbolize the profile
+  auto status = SymbolizePProfProfile(&profile, mappings);
+  ASSERT_OK(status);
+
+  // Verify symbolization worked - we should have functions now
+  EXPECT_GT(profile.function_size(), 0) << "Expected functions to be created during symbolization";
+
+  // Build a set of all function names in the profile
+  std::set<std::string> function_names;
+  for (const auto& func : profile.function()) {
+    if (func.name() > 0 && func.name() < profile.string_table_size()) {
+      function_names.insert(profile.string_table(func.name()));
+    }
+  }
+
+  // Verify that our known functions were symbolized
+  EXPECT_TRUE(function_names.count("CanYouFindThis") > 0)
+      << "Expected 'CanYouFindThis' to be symbolized. Found functions: "
+      << absl::StrJoin(function_names, ", ");
+  EXPECT_TRUE(function_names.count("main") > 0)
+      << "Expected 'main' to be symbolized. Found functions: "
+      << absl::StrJoin(function_names, ", ");
+
+  // Verify folded stacks output contains the symbolized names
+  auto folded_result = PProfToFoldedStacks(profile, 1);
+  ASSERT_OK(folded_result);
+  std::string folded = folded_result.ConsumeValueOrDie();
+
+  EXPECT_THAT(folded, HasSubstr("CanYouFindThis"))
+      << "Folded stacks should contain 'CanYouFindThis'. Got: " << folded;
+  EXPECT_THAT(folded, HasSubstr("main"))
+      << "Folded stacks should contain 'main'. Got: " << folded;
 }
 
 }  // namespace shared

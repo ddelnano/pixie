@@ -406,8 +406,18 @@ Status SymbolizePProfProfile(PProfProfile* profile, const std::vector<MemoryMapp
       continue;
     }
 
-    // Convert virtual address to binary address
-    uint64_t binary_addr = found_mapping->VirtualToBinaryAddr(addr);
+    // Convert virtual address to binary address.
+    // For non-PIE binaries (ET_EXEC), the binary address equals the runtime virtual address.
+    // For PIE binaries (ET_DYN), the binary address is runtime_addr - vmem_start
+    // (since PIE ELF segments typically have vaddr starting at 0).
+    uint64_t binary_addr;
+    if (elf_reader->ELFType() == ELFIO::ET_DYN) {
+      // PIE binary or shared library: subtract the mapping base
+      binary_addr = addr - found_mapping->vmem_start;
+    } else {
+      // Non-PIE executable: addresses are absolute
+      binary_addr = addr;
+    }
 
     // Look up the symbol
     std::string_view symbol = symbolizer->Lookup(binary_addr);

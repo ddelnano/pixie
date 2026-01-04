@@ -42,7 +42,9 @@ pl_cc_library(
 pl_cc_test(
     name = "pprof_test",
     srcs = ["pprof_test.cc"],
-    data = glob(["testdata/**"]),
+    data = glob(["testdata/**"]) + [
+        "//src/stirling/obj_tools/testdata/cc:prebuilt_exe",
+    ],
     # This test requires access to binaries on the host filesystem for symbolization.
     # Run with --spawn_strategy=local to disable sandboxing.
     tags = ["no_sandbox"],
