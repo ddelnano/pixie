@@ -92,6 +92,9 @@ message Probe {
   // The variable to be inserted into the output table must be one of the above
   // args, ret_vals, and function_latency.
   repeated OutputAction output_actions = 6;
+
+  // Used by the object profiler to specify which arguments or return values to introspect.
+  repeated string targets = 7;
 }
 
 message TracepointSpec {

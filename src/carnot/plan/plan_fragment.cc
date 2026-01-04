@@ -80,6 +80,9 @@ Status PlanFragmentWalker::CallWalkFn(const Operator& op) {
     case planpb::OperatorType::JOIN_OPERATOR:
       PX_RETURN_IF_ERROR(CallAs<JoinOperator>(on_join_walk_fn_, op));
       break;
+    case planpb::OperatorType::EXPLODE_OPERATOR:
+      PX_RETURN_IF_ERROR(CallAs<ExplodeOperator>(on_explode_walk_fn_, op));
+      break;
     case planpb::OperatorType::UNION_OPERATOR:
       PX_RETURN_IF_ERROR(CallAs<UnionOperator>(on_union_walk_fn_, op));
       break;

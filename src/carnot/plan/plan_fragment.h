@@ -71,6 +71,7 @@ class PlanFragmentWalker {
   using LimitWalkFn = std::function<Status(const LimitOperator&)>;
   using UnionWalkFn = std::function<Status(const UnionOperator&)>;
   using JoinWalkFn = std::function<Status(const JoinOperator&)>;
+  using ExplodeWalkFn = std::function<Status(const ExplodeOperator&)>;
   using GRPCSinkWalkFn = std::function<Status(const GRPCSinkOperator&)>;
   using GRPCSourceWalkFn = std::function<Status(const GRPCSourceOperator&)>;
   using UDTFSourceWalkFn = std::function<Status(const UDTFSourceOperator&)>;
@@ -157,6 +158,16 @@ class PlanFragmentWalker {
     return *this;
   }
 
+  /**
+   * Register callback for when an explode operator is encountered.
+   * @param fn The function to call when an ExplodeOperator is encountered.
+   * @return self to allow chaining
+   */
+  PlanFragmentWalker& OnExplode(const ExplodeWalkFn& fn) {
+    on_explode_walk_fn_ = fn;
+    return *this;
+  }
+
   PlanFragmentWalker& OnGRPCSource(const GRPCSourceWalkFn& fn) {
     on_grpc_source_walk_fn_ = fn;
     return *this;
@@ -201,6 +212,7 @@ class PlanFragmentWalker {
   LimitWalkFn on_limit_walk_fn_;
   UnionWalkFn on_union_walk_fn_;
   JoinWalkFn on_join_walk_fn_;
+  ExplodeWalkFn on_explode_walk_fn_;
   GRPCSinkWalkFn on_grpc_sink_walk_fn_;
   GRPCSourceWalkFn on_grpc_source_walk_fn_;
   UDTFSourceWalkFn on_udtf_source_walk_fn_;

@@ -327,6 +327,29 @@ class JoinOperator : public Operator {
   planpb::JoinOperator pb_;
 };
 
+class ExplodeOperator : public Operator {
+ public:
+  explicit ExplodeOperator(int64_t id) : Operator(id, planpb::EXPLODE_OPERATOR) {}
+  ~ExplodeOperator() override = default;
+
+  StatusOr<table_store::schema::Relation> OutputRelation(
+      const table_store::schema::Schema& schema, const PlanState& state,
+      const std::vector<int64_t>& input_ids) const override;
+  Status Init(const planpb::ExplodeOperator& pb);
+  std::string DebugString() const override;
+
+  int64_t explode_column_index() const { return pb_.explode_column_index(); }
+  const std::string& delimiter() const { return delimiter_; }
+  const std::vector<int64_t>& selected_cols() const { return selected_cols_; }
+  const std::vector<std::string>& column_names() const { return column_names_; }
+
+ private:
+  std::vector<int64_t> selected_cols_;
+  std::vector<std::string> column_names_;
+  std::string delimiter_;
+  planpb::ExplodeOperator pb_;
+};
+
 class UDTFSourceOperator : public Operator {
  public:
   explicit UDTFSourceOperator(int64_t id) : Operator(id, planpb::UDTF_SOURCE_OPERATOR) {}

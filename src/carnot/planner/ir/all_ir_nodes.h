@@ -24,6 +24,7 @@
 #include "src/carnot/planner/ir/data_ir.h"
 #include "src/carnot/planner/ir/drop_ir.h"
 #include "src/carnot/planner/ir/empty_source_ir.h"
+#include "src/carnot/planner/ir/explode_ir.h"
 #include "src/carnot/planner/ir/expression_ir.h"
 #include "src/carnot/planner/ir/filter_ir.h"
 #include "src/carnot/planner/ir/float_ir.h"

@@ -434,6 +434,45 @@ constexpr char kJoinOperatorNoTime1[] = R"(
   rows_per_batch: 10
 )";
 
+// Explode operator that explodes column 1 (string) by newline delimiter.
+// Input: columns 0 (int), 1 (string to explode), 2 (int)
+// Output: same columns with column 1 exploded
+constexpr char kExplodeOperator1[] = R"(
+  explode_column_index: 1
+  delimiter: "\n"
+  columns {
+    node: 0
+    index: 0
+  }
+  columns {
+    node: 0
+    index: 1
+  }
+  columns {
+    node: 0
+    index: 2
+  }
+  column_names: "col0"
+  column_names: "col1"
+  column_names: "col2"
+)";
+
+// Explode operator with custom delimiter (semicolon).
+constexpr char kExplodeOperatorSemicolon[] = R"(
+  explode_column_index: 0
+  delimiter: ";"
+  columns {
+    node: 0
+    index: 0
+  }
+  columns {
+    node: 0
+    index: 1
+  }
+  column_names: "exploded"
+  column_names: "other"
+)";
+
 // Full outer, time ordered joins are not supported.
 constexpr char kBadJoin1[] = R"(
   type: FULL_OUTER
@@ -1507,6 +1546,22 @@ planpb::Operator CreateTestErrorJoin1PB() {
 planpb::Operator CreateTestErrorJoin2PB() {
   planpb::Operator op;
   auto op_proto = absl::Substitute(kOperatorProtoTmpl, "JOIN_OPERATOR", "join_op", kBadJoin2);
+  CHECK(google::protobuf::TextFormat::MergeFromString(op_proto, &op)) << "Failed to parse proto";
+  return op;
+}
+
+planpb::Operator CreateTestExplode1PB() {
+  planpb::Operator op;
+  auto op_proto =
+      absl::Substitute(kOperatorProtoTmpl, "EXPLODE_OPERATOR", "explode_op", kExplodeOperator1);
+  CHECK(google::protobuf::TextFormat::MergeFromString(op_proto, &op)) << "Failed to parse proto";
+  return op;
+}
+
+planpb::Operator CreateTestExplodeSemicolonPB() {
+  planpb::Operator op;
+  auto op_proto = absl::Substitute(kOperatorProtoTmpl, "EXPLODE_OPERATOR", "explode_op",
+                                   kExplodeOperatorSemicolon);
   CHECK(google::protobuf::TextFormat::MergeFromString(op_proto, &op)) << "Failed to parse proto";
   return op;
 }

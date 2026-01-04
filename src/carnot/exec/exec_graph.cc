@@ -27,6 +27,7 @@
 #include "src/carnot/exec/empty_source_node.h"
 #include "src/carnot/exec/equijoin_node.h"
 #include "src/carnot/exec/exec_node.h"
+#include "src/carnot/exec/explode_node.h"
 #include "src/carnot/exec/filter_node.h"
 #include "src/carnot/exec/grpc_router.h"
 #include "src/carnot/exec/grpc_sink_node.h"
@@ -86,6 +87,9 @@ Status ExecutionGraph::Init(table_store::schema::Schema* schema, plan::PlanState
       })
       .OnJoin([&](auto& node) {
         return OnOperatorImpl<plan::JoinOperator, EquijoinNode>(node, &descriptors);
+      })
+      .OnExplode([&](auto& node) {
+        return OnOperatorImpl<plan::ExplodeOperator, ExplodeNode>(node, &descriptors);
       })
       .OnGRPCSource([&](auto& node) {
         auto s = OnOperatorImpl<plan::GRPCSourceOperator, GRPCSourceNode>(node, &descriptors);

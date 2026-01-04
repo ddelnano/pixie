@@ -111,6 +111,7 @@ enum OperatorType {
   LIMIT_OPERATOR = 2300;
   UNION_OPERATOR = 2400;
   JOIN_OPERATOR = 2500;
+  EXPLODE_OPERATOR = 2600;
   // Sink operators are range 9000-10000.
   MEMORY_SINK_OPERATOR = 9000;
   GRPC_SINK_OPERATOR = 9100;
@@ -149,6 +150,8 @@ message Operator {
     EmptySourceOperator empty_source_op = 13;
     // OTelExportSinkOperator writes the input table to an OpenTelemetry endpoint.
     OTelExportSinkOperator otel_sink_op = 14 [ (gogoproto.customname) = "OTelSinkOp" ];
+    // ExplodeOperator splits a column containing delimited values into multiple rows.
+    ExplodeOperator explode_op = 15;
   }
 }
 
@@ -340,6 +343,25 @@ message JoinOperator {
   repeated string column_names = 4;
   // Number of rows we send over per output batch.
   uint64 rows_per_batch = 5;
+}
+
+// Explode splits a column containing delimited values into multiple rows.
+// Similar to Apache Spark's explode function.
+// Given an input row with columns [a, b, c] where column b contains "x\ny\nz",
+// exploding column b with delimiter "\n" produces three rows:
+//   [a, "x", c]
+//   [a, "y", c]
+//   [a, "z", c]
+message ExplodeOperator {
+  // The index of the column to explode (must be a STRING column).
+  int64 explode_column_index = 1;
+  // The delimiter to use for splitting the string (default is newline "\n").
+  string delimiter = 2;
+  // Defines the columns that are passed from the previous operator.
+  // The explode_column_index column will be replaced with the exploded value.
+  repeated Column columns = 3;
+  // The names for the output columns.
+  repeated string column_names = 4;
 }
 
 // UDTFSourceOperator represents a table generating function.

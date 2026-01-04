@@ -1006,6 +1006,39 @@ attributes {
 })proto"));
 }
 
+const char kExplodeQuery[] = R"pxl(
+import px
+
+df = px.DataFrame(table='http_events', start_time='-5m')
+df.stacks = 'func1;func2 100\nfunc3;func4 200'
+df = df.explode('stacks')
+px.display(df)
+)pxl";
+
+TEST_F(LogicalPlannerTest, ExplodeOperator) {
+  auto planner = LogicalPlanner::Create(info_).ConsumeValueOrDie();
+  auto state = testutils::CreateTwoPEMsOneKelvinPlannerState(testutils::kHttpEventsSchema);
+  ASSERT_OK_AND_ASSIGN(auto plan, planner->Plan(MakeQueryRequest(state, kExplodeQuery)));
+  ASSERT_OK(plan->ToProto());
+}
+
+const char kExplodeWithDelimiterQuery[] = R"pxl(
+import px
+
+df = px.DataFrame(table='http_events', start_time='-5m')
+df.items = 'a;b;c'
+df = df.explode('items', delimiter=';')
+px.display(df)
+)pxl";
+
+TEST_F(LogicalPlannerTest, ExplodeOperatorWithDelimiter) {
+  auto planner = LogicalPlanner::Create(info_).ConsumeValueOrDie();
+  auto state = testutils::CreateTwoPEMsOneKelvinPlannerState(testutils::kHttpEventsSchema);
+  ASSERT_OK_AND_ASSIGN(auto plan,
+                       planner->Plan(MakeQueryRequest(state, kExplodeWithDelimiterQuery)));
+  ASSERT_OK(plan->ToProto());
+}
+
 TEST_F(LogicalPlannerTest, GenerateOTelScript) {
   auto planner = LogicalPlanner::Create(info_).ConsumeValueOrDie();
   auto state = testutils::CreateTwoPEMsOneKelvinPlannerState(testutils::kHttpEventsSchema);

@@ -418,6 +418,38 @@ class Dataframe : public QLObject {
     px.DataFrame: the parent DataFrame in streaming mode.
   )doc";
 
+  inline static constexpr char kExplodeOpID[] = "explode";
+  inline static constexpr char kExplodeOpDocstring[] = R"doc(
+  Explodes a column containing delimited values into multiple rows.
+
+  Similar to Apache Spark's explode function. Given an input row with a column
+  containing "x\ny\nz", exploding that column with delimiter "\n" produces three rows
+  with "x", "y", and "z" respectively in that column position. All other columns
+  are replicated for each output row.
+
+  This is useful for converting multi-line string data (like folded stack traces)
+  into individual rows for visualization.
+
+  Examples:
+    df = px.DataFrame('stacks')
+    # Explode the folded_stacks column by newline (default)
+    df = df.explode('folded_stacks')
+  Examples:
+    df = px.DataFrame('data')
+    # Explode with a custom delimiter
+    df = df.explode('items', delimiter=';')
+
+  :topic: dataframe_ops
+  :opname: Explode
+
+  Args:
+    column (str): The name of the string column to explode.
+    delimiter (str, default '\n'): The delimiter to use for splitting the string.
+
+  Returns:
+    px.DataFrame: DataFrame with the specified column exploded into multiple rows.
+  )doc";
+
   // Attribute names.
   inline static constexpr char kMetadataAttrName[] = "ctx";
 

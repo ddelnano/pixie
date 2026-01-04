@@ -19,6 +19,7 @@
 #include "src/carnot/planner/objects/dataframe.h"
 #include "src/carnot/planner/ast/ast_visitor.h"
 #include "src/carnot/planner/ir/ast_utils.h"
+#include "src/carnot/planner/ir/explode_ir.h"
 #include "src/carnot/planner/objects/collection_object.h"
 #include "src/carnot/planner/objects/expr_object.h"
 #include "src/carnot/planner/objects/funcobject.h"
@@ -419,6 +420,27 @@ StatusOr<QLObjectPtr> StreamHandler(CompilerState* compiler_state, IR* graph, Op
   return Dataframe::Create(compiler_state, stream_op, visitor);
 }
 
+/**
+ * @brief Implements the explode() method and creates the explode node.
+ *
+ */
+StatusOr<QLObjectPtr> ExplodeHandler(CompilerState* compiler_state, IR* graph, OperatorIR* op,
+                                     const pypa::AstPtr& ast, const ParsedArgs& args,
+                                     ASTVisitor* visitor) {
+  PX_ASSIGN_OR_RETURN(StringIR * column_name, GetArgAs<StringIR>(ast, args, "column"));
+  PX_ASSIGN_OR_RETURN(StringIR * delimiter_node, GetArgAs<StringIR>(ast, args, "delimiter"));
+
+  // Create the column reference for the explode column.
+  PX_ASSIGN_OR_RETURN(ColumnIR * explode_column,
+                      graph->CreateNode<ColumnIR>(ast, column_name->str(), /* parent_op_idx */ 0));
+
+  std::string delimiter = delimiter_node->str();
+
+  PX_ASSIGN_OR_RETURN(ExplodeIR * explode_op,
+                      graph->CreateNode<ExplodeIR>(ast, op, explode_column, delimiter));
+  return Dataframe::Create(compiler_state, explode_op, visitor);
+}
+
 Status Dataframe::Init() {
   PX_ASSIGN_OR_RETURN(
       std::shared_ptr<FuncObject> constructor_fn,
@@ -601,6 +623,23 @@ Status Dataframe::Init() {
                                          ast_visitor()));
   PX_RETURN_IF_ERROR(stream_fn->SetDocString(kStreamOpDocstring));
   AddMethod(kStreamOpId, stream_fn);
+
+  /**
+   * # Equivalent to the python method syntax:
+   * def explode(self, column, delimiter='\n'):
+   *     ...
+   */
+  PX_ASSIGN_OR_RETURN(
+      std::shared_ptr<FuncObject> explode_fn,
+      FuncObject::Create(kExplodeOpID, {"column", "delimiter"}, {{"delimiter", "'\\n'"}},
+                         /* has_variable_len_args */ false,
+                         /* has_variable_len_kwargs */ false,
+                         std::bind(&ExplodeHandler, compiler_state_, graph(), op(),
+                                   std::placeholders::_1, std::placeholders::_2,
+                                   std::placeholders::_3),
+                         ast_visitor()));
+  PX_RETURN_IF_ERROR(explode_fn->SetDocString(kExplodeOpDocstring));
+  AddMethod(kExplodeOpID, explode_fn);
 
   PX_ASSIGN_OR_RETURN(auto md, MetadataObject::Create(op(), ast_visitor()));
   return AssignAttribute(kMetadataAttrName, md);

@@ -79,6 +79,8 @@ std::unique_ptr<Operator> Operator::FromProto(const planpb::Operator& pb, int64_
       return CreateOperator<UnionOperator>(id, pb.union_op());
     case planpb::JOIN_OPERATOR:
       return CreateOperator<JoinOperator>(id, pb.join_op());
+    case planpb::EXPLODE_OPERATOR:
+      return CreateOperator<ExplodeOperator>(id, pb.explode_op());
     case planpb::UDTF_SOURCE_OPERATOR:
       return CreateOperator<UDTFSourceOperator>(id, pb.udtf_source_op());
     case planpb::EMPTY_SOURCE_OPERATOR:
@@ -647,6 +649,82 @@ planpb::JoinOperator::ParentColumn JoinOperator::time_column() const {
   auto pos = std::distance(column_names().begin(),
                            std::find(column_names().begin(), column_names().end(), "time_"));
   return output_columns()[pos];
+}
+
+/**
+ * Explode Operator Implementation.
+ */
+std::string ExplodeOperator::DebugString() const {
+  return absl::Substitute("Op:Explode(column_idx=$0, delimiter='$1', selected=[$2])",
+                          explode_column_index(), delimiter_, absl::StrJoin(selected_cols_, ","));
+}
+
+Status ExplodeOperator::Init(const planpb::ExplodeOperator& pb) {
+  pb_ = pb;
+
+  // Default delimiter is newline if not specified.
+  delimiter_ = pb_.delimiter().empty() ? "\n" : pb_.delimiter();
+
+  selected_cols_.reserve(pb_.columns_size());
+  for (auto i = 0; i < pb_.columns_size(); ++i) {
+    selected_cols_.push_back(pb_.columns(i).index());
+  }
+
+  column_names_.reserve(pb_.column_names_size());
+  for (auto i = 0; i < pb_.column_names_size(); ++i) {
+    column_names_.emplace_back(pb_.column_names(i));
+  }
+
+  is_initialized_ = true;
+  return Status::OK();
+}
+
+StatusOr<table_store::schema::Relation> ExplodeOperator::OutputRelation(
+    const table_store::schema::Schema& schema, const PlanState& /*state*/,
+    const std::vector<int64_t>& input_ids) const {
+  DCHECK(is_initialized_) << "Not initialized";
+
+  if (input_ids.size() != 1) {
+    return error::InvalidArgument("Explode operator must have exactly one input");
+  }
+  if (!schema.HasRelation(input_ids[0])) {
+    return error::NotFound("Missing relation ($0) for input of ExplodeOperator", input_ids[0]);
+  }
+
+  for (auto i = 0; i < pb_.columns_size(); ++i) {
+    int64_t node = pb_.columns(i).node();
+    if (node != input_ids[0]) {
+      return error::InvalidArgument(
+          "Column $0 does not belong to the expected input node $1, got $2", i, input_ids[0], node);
+    }
+  }
+
+  PX_ASSIGN_OR_RETURN(auto input_relation, schema.GetRelation(input_ids[0]));
+
+  // Validate that the explode column is of STRING type.
+  auto explode_idx = pb_.explode_column_index();
+  if (explode_idx < 0 || explode_idx >= static_cast<int64_t>(input_relation.NumColumns())) {
+    return error::InvalidArgument("Explode column index $0 is out of bounds", explode_idx);
+  }
+  if (input_relation.GetColumnType(explode_idx) != types::STRING) {
+    return error::InvalidArgument("Explode column must be of STRING type, got $0",
+                                  types::ToString(input_relation.GetColumnType(explode_idx)));
+  }
+
+  table_store::schema::Relation output_relation;
+  for (size_t i = 0; i < selected_cols_.size(); ++i) {
+    auto selected_col_idx = selected_cols_[i];
+    CHECK_LT(selected_col_idx, static_cast<int64_t>(input_relation.NumColumns()))
+        << absl::Substitute("Column index $0 is out of bounds, number of columns is $1",
+                            selected_col_idx, input_relation.NumColumns());
+
+    // The output type is the same as input type (explode column stays STRING).
+    output_relation.AddColumn(input_relation.GetColumnType(selected_col_idx),
+                              column_names_[i],
+                              input_relation.GetColumnDesc(selected_col_idx));
+  }
+
+  return output_relation;
 }
 
 Status UDTFSourceOperator::Init(const planpb::UDTFSourceOperator& pb) {
