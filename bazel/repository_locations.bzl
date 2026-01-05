@@ -51,11 +51,12 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "grammars-v4-e53d7a1228505bfc80d8637808ef60e7eea92cc2",
         sha256 = "9858e4a9944cac85830e6cf8edd9d567227af96d8b75f0b31accc525ec842c30",
     ),
-    com_github_apache_arrow = dict(
-        sha256 = "487ae884d035d9c8bbc052199268e6259d22cf502ee976e02661ee3f8e9468c0",
-        strip_prefix = "arrow-ecbb9de0b4c8739347f7ffa9e7aee7e46926bbab",
-        urls = ["https://github.com/pixie-io/arrow/archive/ecbb9de0b4c8739347f7ffa9e7aee7e46926bbab.tar.gz"],
-    ),
+    # Temporarily commented out to use local version
+    # com_github_apache_arrow = dict(
+    #     sha256 = "487ae884d035d9c8bbc052199268e6259d22cf502ee976e02661ee3e8e9468c0",
+    #     strip_prefix = "arrow-ecbb9de0b4c8739347f7ffa9e7aee7e46926bbab",
+    #     urls = ["https://github.com/pixie-io/arrow/archive/ecbb9de0b4c8739347f7ffa9e7aee7e46926bbab.tar.gz"],
+    # ),
     com_github_ariafallah_csv_parser = dict(
         sha256 = "c722047128c97b7a3f38d0c320888d905692945e4a96b6ebd6d208686764644a",
         strip_prefix = "csv-parser-e3c1207f4de50603a4946dc5daa0633ce31a9257",
@@ -546,6 +547,9 @@ GIT_REPOSITORY_LOCATIONS = dict(
 # WARNING: doing this has some downsides, so don't do it for production builds. For instance,
 # cflags and other settings set by bazel (eg -O3) won't be used, since you have to do the building manually.
 LOCAL_REPOSITORY_LOCATIONS = dict(
+    com_github_apache_arrow = dict(
+        path = "/tmp/arrow-22.0.0",
+    ),
     com_github_iovisor_bcc = dict(
         path = "/home/user/pixie-io/bcc",
     ),
