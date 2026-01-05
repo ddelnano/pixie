@@ -149,7 +149,7 @@ def _cc_deps():
     _bazel_repo("com_github_jupp0r_prometheus_cpp", patch_cmds = ["rm -rf pull push 3rdparty"])
 
     # Dependencies where we provide an external BUILD file.
-    _bazel_repo("com_github_apache_arrow", build_file = "//bazel/external:arrow.BUILD")
+    _local_repo("com_github_apache_arrow", build_file = "//bazel/external:arrow.BUILD")
     _bazel_repo("com_github_ariafallah_csv_parser", build_file = "//bazel/external:csv_parser.BUILD")
     _bazel_repo("com_github_arun11299_cpp_jwt", build_file = "//bazel/external:cpp_jwt.BUILD")
     _bazel_repo("com_github_cameron314_concurrentqueue", build_file = "//bazel/external:concurrentqueue.BUILD")
