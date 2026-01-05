@@ -32,8 +32,11 @@
 #include "src/carnot/planner/logical_planner.h"
 #include "src/carnot/planpb/plan.pb.h"
 #include "src/common/base/time.h"
+#include "src/shared/schema/utils.h"
 #include "src/shared/scriptspb/scripts.pb.h"
+#include "src/stirling/stirling.h"
 #include "src/table_store/schema/relation.h"
+#include "src/table_store/schema/schema.h"
 #include "src/table_store/schemapb/schema.pb.h"
 
 using px::carnot::planner::distributedpb::LogicalPlannerResult;
@@ -179,3 +182,31 @@ void PlannerFree(PlannerPtr planner_ptr) {
 }
 
 void StrFree(char* str) { delete str; }
+
+char* DumpSchemas(int* resultLen) {
+  auto source_registry = px::stirling::CreateProdSourceRegistry();
+  auto sources = source_registry->sources();
+
+  absl::flat_hash_map<std::string, px::table_store::schema::Relation> rel_map;
+  for (const auto& reg_element : sources) {
+    for (auto schema : reg_element.schema) {
+      px::table_store::schema::Relation relation;
+      for (const auto& element : schema.elements()) {
+        relation.AddColumn(element.type(), std::string(element.name()), element.stype(),
+                           element.desc());
+      }
+      rel_map[schema.name()] = relation;
+    }
+  }
+  px::table_store::schemapb::Schema schema_pb;
+  PX_CHECK_OK(px::table_store::schema::Schema::ToProto(&schema_pb, rel_map));
+  std::string output;
+  schema_pb.SerializeToString(&output);
+
+  *resultLen = output.size();
+  char* ret = new char[output.size()];
+  memcpy(ret, output.data(), output.size());
+  return ret;
+}
+
+void SchemaStrFree(char* str) { delete[] str; }

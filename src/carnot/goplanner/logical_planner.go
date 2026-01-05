@@ -41,6 +41,7 @@ import (
 	"px.dev/pixie/src/carnot/planner/plannerpb"
 	"px.dev/pixie/src/carnot/udfspb"
 	"px.dev/pixie/src/common/base/statuspb"
+	"px.dev/pixie/src/table_store/schemapb"
 )
 
 // GoPlanner wraps the C Planner.
@@ -162,4 +163,21 @@ func GetCompilerErrorContext(status *statuspb.Status, errorPB *compilerpb.Compil
 func HasContext(status *statuspb.Status) bool {
 	context := status.GetContext()
 	return context != nil
+}
+
+// DumpSchemas dumps all the table schemas from stirling.
+func DumpSchemas() (*schemapb.Schema, error) {
+	var resLen C.int
+	res := C.DumpSchemas(&resLen)
+	defer C.SchemaStrFree(res)
+	schemaBytes := C.GoBytes(unsafe.Pointer(res), resLen)
+	if resLen == 0 {
+		return nil, errors.New("no result returned")
+	}
+
+	schema := &schemapb.Schema{}
+	if err := proto.Unmarshal(schemaBytes, schema); err != nil {
+		return nil, fmt.Errorf("error: '%s'; string: '%s'", err, string(schemaBytes))
+	}
+	return schema, nil
 }

@@ -42,7 +42,6 @@ import (
 	"px.dev/pixie/src/carnot/planner/distributedpb"
 	"px.dev/pixie/src/carnot/planner/plannerpb"
 	"px.dev/pixie/src/carnot/udfspb"
-	"px.dev/pixie/src/e2e_test/vizier/planner/dump_schemas/godumpschemas"
 	"px.dev/pixie/src/table_store/schemapb"
 	"px.dev/pixie/src/utils"
 	funcs "px.dev/pixie/src/vizier/funcs/go"
@@ -207,7 +206,7 @@ func scriptToQueryRequest(s *script) (*plannerpb.QueryRequest, error) {
 }
 
 func loadSchemas() (*schemapb.Schema, error) {
-	return godumpschemas.DumpSchemas()
+	return goplanner.DumpSchemas()
 }
 
 func makePEMCarnotInfo(id uuid.UUID) *distributedpb.CarnotInfo {
