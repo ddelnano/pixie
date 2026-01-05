@@ -64,9 +64,6 @@ pl_cc_library(
         "//src/carnot/planner/compiler:cc_library",
         "//src/carnot/planner/compilerpb:compiler_status_pl_cc_proto",
         "//src/carnot/planner/distributedpb:distributed_plan_pl_cc_proto",
-        "//src/shared/schema:cc_library",
-        "//src/stirling:cc_library",
-        "//src/table_store/schema:cc_library",
     ],
 )
 

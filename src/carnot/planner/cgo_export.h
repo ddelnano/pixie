@@ -94,21 +94,6 @@ void PlannerFree(PlannerPtr planner_ptr);
  */
 void StrFree(char* str);
 
-/**
- * @brief Dumps all the table schemas from stirling.
- *
- * @param resultLen Variable to store the length of the return value
- * @return char* The serialized table_store.schemapb.Schema proto.
- */
-char* DumpSchemas(int* resultLen);
-
-/**
- * @brief Frees the memory of the schema string.
- *
- * @param str
- */
-void SchemaStrFree(char* str);
-
 #ifdef __cplusplus
 }
 #endif
