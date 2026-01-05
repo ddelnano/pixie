@@ -31,5 +31,6 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "@boringssl//:ssl",
+        "@com_github_nlohmann_json//:json",
     ],
 )

@@ -63,9 +63,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/AriaFallah/csv-parser/archive/e3c1207f4de50603a4946dc5daa0633ce31a9257.tar.gz"],
     ),
     com_github_arun11299_cpp_jwt = dict(
-        sha256 = "6dbf93969ec48d97ecb6c157014985846df8c01995a0011c21f4e2c146594922",
-        strip_prefix = "cpp-jwt-1.1.1",
-        urls = ["https://github.com/arun11299/cpp-jwt/archive/refs/tags/v1.1.1.tar.gz"],
+        sha256 = "7e5ec6891254c8f00128952ed6b9a73d827539136c3b804563521a0042abe72c",
+        strip_prefix = "cpp-jwt-1.5.1",
+        urls = ["https://github.com/arun11299/cpp-jwt/archive/refs/tags/v1.5.1.tar.gz"],
     ),
     com_github_bazelbuild_buildtools = dict(
         sha256 = "39c59cb5352892292cbe3174055aac187edcb5324c9b4e2d96cb6e40bd753877",
