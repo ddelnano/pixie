@@ -28,21 +28,6 @@ load("//bazel:linux_headers.bzl", "linux_headers")
 load("//bazel:pl_qemu_kernels.bzl", "qemu_kernel_deps")
 load("//bazel/external/ubuntu_packages:packages.bzl", "download_ubuntu_packages")
 
-def _local_puller_repo_impl(rctx):
-    """Create a repo structure that matches http_file's output for the puller binary."""
-    rctx.symlink(rctx.attr.puller_path, "file/downloaded")
-    rctx.file("file/BUILD.bazel", """
-exports_files(["downloaded"])
-""")
-    rctx.file("BUILD.bazel", "")
-
-local_puller_repo = repository_rule(
-    implementation = _local_puller_repo_impl,
-    attrs = {
-        "puller_path": attr.string(mandatory = True),
-    },
-)
-
 # Sets up package manager which we use build deploy images.
 def _package_manager_setup():
     download_ubuntu_packages()
@@ -67,24 +52,10 @@ bazel_version_repository = repository_rule(
     local = True,
 )
 
-def pl_workspace_setup(local_puller_path = None):
-    """Setup the Pixie workspace.
-
-    Args:
-        local_puller_path: Optional path to a local puller-linux-amd64 binary.
-                          If provided, this will be used instead of downloading from rules_docker.
-    """
+def pl_workspace_setup():
     buildifier_dependencies()
 
     bazel_version_repository(name = "bazel_version")
-
-    # If a local puller is provided, register it before container_repositories()
-    # so rules_docker will skip downloading its own version.
-    if local_puller_path:
-        local_puller_repo(
-            name = "go_puller_linux_amd64",
-            puller_path = local_puller_path,
-        )
 
     container_repositories()
     container_deps()

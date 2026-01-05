@@ -111,9 +111,7 @@ apple_support_dependencies()
 
 load("//bazel:pl_workspace.bzl", "pl_container_images", "pl_model_files", "pl_workspace_setup")
 
-# Use local puller binary to work around rules_docker puller failures with newer Go/glibc.
-# To disable, change to: pl_workspace_setup()
-pl_workspace_setup(local_puller_path = "/home/dev/code/pixie/puller-linux-amd64")
+pl_workspace_setup()
 
 load("@rules_python//python:repositories.bzl", "py_repositories", "python_register_toolchains")
 
