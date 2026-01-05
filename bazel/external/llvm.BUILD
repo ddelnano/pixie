@@ -68,6 +68,8 @@ cc_library(
         "lib/libLLVMBPFCodeGen.a",
         "lib/libLLVMBPFDesc.a",
         "lib/libLLVMBPFInfo.a",
+        "lib/libLLVMTargetParser.a",
+        "lib/libLLVMCodeGenTypes.a",
         "lib/libLLVMOrcJIT.a",
         "lib/libLLVMMCJIT.a",
         "lib/libLLVMJITLink.a",
@@ -101,6 +103,8 @@ cc_library(
         "lib/libLLVMAsmPrinter.a",
         "lib/libLLVMSelectionDAG.a",
         "lib/libLLVMCodeGen.a",
+        "lib/libLLVMCGData.a",
+        "lib/libLLVMIRPrinter.a",
         "lib/libLLVMIRReader.a",
         "lib/libLLVMAsmParser.a",
         "lib/libLLVMInterfaceStub.a",
@@ -118,6 +122,7 @@ cc_library(
         "lib/libLLVMDebugInfoPDB.a",
         "lib/libLLVMDebugInfoMSF.a",
         "lib/libLLVMDebugInfoDWARF.a",
+        "lib/libLLVMDebugInfoDWARFLowLevel.a",
         "lib/libLLVMObject.a",
         "lib/libLLVMTextAPI.a",
         "lib/libLLVMMCParser.a",
@@ -149,6 +154,8 @@ cc_library(
     linkopts = [
         # Terminal info for llvm
         "-ltinfo",
+        # ZSTD compression library
+        "-lzstd",
     ],
     linkstatic = 1,
     visibility = ["//visibility:public"],
