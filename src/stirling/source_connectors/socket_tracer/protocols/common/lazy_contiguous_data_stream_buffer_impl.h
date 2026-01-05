@@ -98,6 +98,9 @@ class LazyContiguousDataStreamBufferImpl : public DataStreamBufferImpl {
     uint64_t timestamp;
     std::string data;
 
+    // Constructor for creating events.
+    Event(uint64_t ts, std::string d) : timestamp(ts), data(std::move(d)) {}
+
     // Only allow moving events.
     Event(Event&&) = default;
     Event& operator=(Event&&) = default;
