@@ -1,0 +1,92 @@
+## Goal
+
+Integrate Object Introspection (OI) into Pixie so that OI's memory profiling data flows through Pixie's data pipeline and is queryable via pxl scripts with native visualizations (histogram and flame graph).
+
+## Background
+
+### Object Introspection
+
+Object Introspection (OI) is a memory profiling tool for C++ objects. It dynamically instruments a running process to capture the precise memory occupancy of entire object hierarchies — including all containers and dynamic allocations — with no code modification or recompilation. See @/home/ddelnano/code/object-introspection/README.md .
+
+OI outputs nested JSON describing each object's static size, dynamic size, padding savings, and recursively its members and container elements. See @/home/ddelnano/code/object-introspection/website/docs/addrbook-this.md for a concrete example of this output structure.
+
+### Why This Matters
+
+OI enables two categories of memory optimization:
+
+1. **Container sizing** — Profiling reveals the actual element count distribution for dynamically-sized containers (e.g., `std::vector`, `folly::small_vector`). If a `small_vector<T, 10>` is mostly used with 1–4 elements, it can be resized to dramatically reduce memory footprint. See @/home/ddelnano/code/pixie-worktree/oi-applied-example1.png .
+
+2. **Padding and layout issues** — A flame graph of an object's nested memory footprint exposes padding waste and alignment problems (e.g., bad struct packing from code generation like Thrift/Protobuf annotations). See @/home/ddelnano/code/pixie-worktree/oi-applied-example2.png .
+
+### Current State (commit 374c9a7b7)
+
+The branch `ddelnano/implement-object-tracing` has initial scaffolding:
+
+- **Test**: `src/stirling/source_connectors/dynamic_tracer/stirling_dt_bpf_test.cc` — `DynamicTraceAPITest.ObjectProfileAPI` launches an AddrBook binary (based on OI's AddrBook example at @/home/ddelnano/code/object-introspection/examples/web/AddrBook ), deploys a tracepoint with `OI_ENTRY` type, and runs Stirling's data collector.
+- **Connector**: `src/stirling/source_connectors/dynamic_object/dynamic_object_connector.{h,cc}` — `DynamicObjectTraceConnector` manages a subprocess lifecycle (start, monitor, relaunch) against a target PID with TTL and count semantics. Currently it reads the target process's stdout via `cat /proc/<pid>/fd/1` as a placeholder for the real OI binary.
+- **Table**: A minimal `object_trace` table with only a `time` column — no actual OI data is stored.
+- **Tracepoint proto**: Uses `OI_ENTRY` tracepoint type and `targets` field on probes to specify which arguments to introspect.
+
+## Gaps
+
+1. **Real OI binary integration** — The connector currently reads target stdout instead of invoking an actual OI binary (`oid`). It needs to invoke `oid` with the correct probe specification (e.g., `entry:_ZN11AddressBook12DumpContactsEv:this`) against the target PID and parse its JSON output.
+
+2. **DataTable schema** — The `object_trace` table needs a statically-defined schema that can represent OI's nested output structure. This table must store the object name, type name, sizes, padding savings, and the nested member hierarchy. See `src/stirling/source_connectors/socket_tracer/http_table.h` for an example of a statically-defined table.
+
+3. **Data persistence** — `TransferDataImpl` must parse OI's JSON output and write rows into the DataTable.
+
+4. **PXL scripts for visualization** — Two pxl scripts are needed:
+
+   a. **Histogram** — Show the distribution of a container's element counts (e.g., how many entries does `AddressBook::Entries` typically have?). Reference: @/home/ddelnano/code/pixie-worktree/src/pxl_scripts/px/mysql_stats or @/home/ddelnano/code/pixie-worktree/src/pxl_scripts/px/pgsql_stats for histogram patterns.
+
+   b. **Flame graph** — Show an object's memory hierarchy as a flame graph where each level represents a member/sub-member and width represents memory footprint. Must support selecting a depth range to focus on specific levels of the object hierarchy. Reference: @/home/ddelnano/code/pixie-worktree/src/pxl_scripts/px/perf_flamegraph for flame graph patterns (`.pxl` for data querying, `vis.json` for visualization wiring).
+
+## Implementation Plan
+
+### Phase 1: DataTable Schema
+
+Define a static table schema in a new header (e.g., `object_trace_table.h`) with columns:
+- `time_` — timestamp
+- `upid` — target process identifier
+- `object_name` — name of the introspected object (e.g., "this")
+- `type_name` — C++ type name (e.g., "AddressBook")
+- `static_size` — static memory footprint in bytes
+- `dynamic_size` — dynamic memory footprint in bytes
+- `padding_savings` — potential padding savings in bytes
+- `members_json` — JSON string of the full nested member hierarchy
+
+### Phase 2: OI Binary Integration
+
+Update `DynamicObjectTraceConnector`:
+- Replace the `cat /proc/<pid>/fd/1` subprocess with an invocation of the `oid` binary.
+- Construct the probe specification from the tracepoint deployment proto's symbol and targets.
+- Parse the resulting JSON output file (`oid_out.json`).
+- Write parsed data into the DataTable via `TransferDataImpl`.
+
+### Phase 3: PXL Scripts
+
+Create two pxl script directories under `src/pxl_scripts/`:
+
+1. **`px/object_memory_histogram/`** — Queries the `object_trace` table, extracts container element counts from `members_json`, and renders a histogram visualization.
+
+2. **`px/object_memory_flamegraph/`** — Queries the `object_trace` table, transforms the nested `members_json` into a folded stack format (parent > child > grandchild), and renders a flame graph. Supports filtering by depth to focus on specific levels.
+
+### Phase 4: End-to-End Test
+
+Update `DynamicTraceAPITest.ObjectProfileAPI` to:
+- Assume `oid` is accessible to the test binary.
+- Verify that OI data flows into the `object_trace` DataTable with expected columns populated.
+- Validate the AddrBook example produces correct hierarchy data.
+
+## How to Run
+
+```
+bazel test --config bpf \
+  src/stirling/source_connectors/dynamic_tracer:stirling_dt_bpf_test \
+  --test_arg='--gtest_filter=DynamicTraceAPITest.ObjectProfileAPI' \
+  --test_output=all
+```
+
+All targets use Bazel exclusively for compilation and test execution.
+
+Devise a plan for implementing this and then proceed with the implementation.
