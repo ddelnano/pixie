@@ -86,7 +86,11 @@ The histogram pxl script bins on `element_count` with `px.bin()` and aggregates 
 
 ## Implementation Plan
 
-### Phase 1: DataTable Schemas
+The implementation is split into two milestones. Milestone 1 uses mock OI data to build and validate the entire pipeline end-to-end (tables, flattening, pxl scripts) without depending on the real `oid` binary. Milestone 2 swaps in the real binary. This ensures the data pipeline and visualizations are fully working and testable before introducing external tool complexity.
+
+### Milestone 1: Mock Data End-to-End Pipeline
+
+#### Phase 1A: DataTable Schemas
 
 Define two static table schemas in `src/stirling/source_connectors/dynamic_object/`:
 
@@ -94,17 +98,19 @@ Define two static table schemas in `src/stirling/source_connectors/dynamic_objec
 
 2. **`object_container_stats_table.h`** — The histogram table with `time_`, `upid`, `container_path`, `container_type`, `element_count`, and `total_size` columns.
 
-### Phase 2: OI Binary Integration and JSON Flattening
+#### Phase 1B: Mock OI Data Generator and JSON Flattening
 
-Update `DynamicObjectTraceConnector`:
-- Replace the `cat /proc/<pid>/fd/1` subprocess with an invocation of the `oid` binary.
-- Construct the probe specification from the tracepoint deployment proto's symbol and targets (e.g., `entry:<mangled_symbol>:this`).
-- Parse the resulting JSON output file (`oid_out.json`) using rapidjson.
-- Recursively walk the JSON tree to emit rows:
+Update `DynamicObjectTraceConnector` to generate mock OI JSON output that simulates an AddrBook object growing over time, then flatten it into both tables:
+
+- **Mock data generator**: On each `TransferDataImpl` call, produce a JSON document matching OI's output format (see @/home/ddelnano/code/object-introspection/website/docs/addrbook-this.md for the structure). The mock should simulate an `AddressBook` whose `Entries` vector grows by 1–3 contacts per capture cycle. Each `Contact` has `firstName`, `lastName`, and `number` string members with randomized dynamic sizes. This produces varying `element_count` values for the histogram and growing `count` values for the flamegraph across successive captures.
+
+- **JSON flattening logic** (shared with Milestone 2): Recursively walk the JSON tree using rapidjson to emit rows:
   - For each node: emit a row into `object_memory_traces` with the semicolon-delimited ancestor path as `stack_trace` and the node's memory size as `count`.
   - For each container node (identified by having a `length` or element array in OI output): emit a row into `object_container_stats` with the element count and total size.
 
-### Phase 3: PXL Scripts
+The flattening logic should be factored into a reusable function (e.g., `FlattenOIJson`) that takes a JSON document and writes to the two tables. This function will be called by both the mock generator (Milestone 1) and the real `oid` output parser (Milestone 2).
+
+#### Phase 1C: PXL Scripts
 
 Create two pxl script directories under `src/pxl_scripts/`:
 
@@ -112,14 +118,38 @@ Create two pxl script directories under `src/pxl_scripts/`:
 
 2. **`px/object_container_histogram/`** — Queries the `object_container_stats` table, filters by `container_path`, bins on `element_count` using `px.bin()`, and aggregates with `groupby('element_count_bin').agg(count=('time_', px.count))`. Follows the histogram pattern from @/home/ddelnano/code/pixie-worktree/src/pxl_scripts/px/mysql_stats .
 
-### Phase 4: End-to-End Test
+#### Phase 1D: End-to-End Test with Mock Data
 
-Update `DynamicTraceAPITest.ObjectProfileAPI` to:
-- Assume `oid` is accessible to the test binary.
-- Verify that OI data flows into both DataTables with expected columns populated.
-- For `object_memory_traces`: assert that rows exist with `stack_trace` paths like `"AddressBook"`, `"AddressBook;Entries"`, etc., and that `count` values are > 0.
-- For `object_container_stats`: assert that a row exists for `container_path="AddressBook.Entries"` with `element_count` > 0.
-- Validate the AddrBook example produces correct hierarchy data.
+Update `DynamicTraceAPITest.ObjectProfileAPI` to validate the full mock pipeline:
+- Verify that data flows into both DataTables with expected columns populated.
+- For `object_memory_traces`: assert that rows exist with `stack_trace` paths like `"AddressBook"`, `"AddressBook;Entries"`, `"AddressBook;Entries;Contact[0];firstName"`, etc., and that `count` values are > 0.
+- For `object_container_stats`: assert that a row exists for `container_path="AddressBook.Entries"` with `container_type="std::vector<Contact>"` and `element_count` > 0.
+- Verify that successive captures produce different `element_count` values (the mock simulates growth), confirming the time-varying behavior needed for histogram visualization.
+
+**Validation command:**
+```
+bazel test --config bpf \
+  src/stirling/source_connectors/dynamic_tracer:stirling_dt_bpf_test \
+  --test_arg='--gtest_filter=DynamicTraceAPITest.ObjectProfileAPI' \
+  --test_output=all
+```
+
+The pxl scripts can also be tested manually against the mock data by running Stirling with the mock connector and querying via the Pixie UI or CLI.
+
+### Milestone 2: Real OI Binary Integration
+
+#### Phase 2A: OI Binary Invocation
+
+Update `DynamicObjectTraceConnector` to replace the mock data generator with a real `oid` subprocess:
+- Invoke `oid` with the probe specification constructed from the tracepoint deployment proto's symbol and targets (e.g., `oid -S 'entry:<mangled_symbol>:this' -p <pid> -c <config> -J`).
+- Read and parse the resulting `oid_out.json` output file.
+- Pass the parsed JSON to the same `FlattenOIJson` function from Milestone 1.
+
+#### Phase 2B: End-to-End Test with Real OI
+
+Update the test to use the real `oid` binary against the AddrBook target:
+- Ensure `oid` is available as a bazel dependency or test data.
+- Validate that real OI output for the AddrBook binary produces the expected `stack_trace` paths and `container_path` values matching the actual `AddressBook` class hierarchy in `src/stirling/obj_tools/testdata/cc/AddrBook.cpp`.
 
 ## How to Run
 
