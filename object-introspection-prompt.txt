@@ -31,51 +31,94 @@ The branch `ddelnano/implement-object-tracing` has initial scaffolding:
 
 1. **Real OI binary integration** — The connector currently reads target stdout instead of invoking an actual OI binary (`oid`). It needs to invoke `oid` with the correct probe specification (e.g., `entry:_ZN11AddressBook12DumpContactsEv:this`) against the target PID and parse its JSON output.
 
-2. **DataTable schema** — The `object_trace` table needs a statically-defined schema that can represent OI's nested output structure. This table must store the object name, type name, sizes, padding savings, and the nested member hierarchy. See `src/stirling/source_connectors/socket_tracer/http_table.h` for an example of a statically-defined table.
+2. **DataTable schemas** — The current `object_trace` table has only a `time` column. We need two statically-defined tables (see `src/stirling/source_connectors/socket_tracer/http_table.h` for an example) with schemas designed for Pixie's existing visualization widgets. See "Design: Flatten at Ingestion" below for rationale.
 
-3. **Data persistence** — `TransferDataImpl` must parse OI's JSON output and write rows into the DataTable.
+3. **Data persistence** — `TransferDataImpl` must parse OI's JSON output, walk the nested tree in C++, and emit flat rows into both DataTables.
 
-4. **PXL scripts for visualization** — Two pxl scripts are needed:
+4. **PXL scripts for visualization** — Two pxl scripts are needed, one per table/visualization type. See Phase 3 below.
 
-   a. **Histogram** — Show the distribution of a container's element counts (e.g., how many entries does `AddressBook::Entries` typically have?). Reference: @/home/ddelnano/code/pixie-worktree/src/pxl_scripts/px/mysql_stats or @/home/ddelnano/code/pixie-worktree/src/pxl_scripts/px/pgsql_stats for histogram patterns.
+## Design: Flatten at Ingestion
 
-   b. **Flame graph** — Show an object's memory hierarchy as a flame graph where each level represents a member/sub-member and width represents memory footprint. Must support selecting a depth range to focus on specific levels of the object hierarchy. Reference: @/home/ddelnano/code/pixie-worktree/src/pxl_scripts/px/perf_flamegraph for flame graph patterns (`.pxl` for data querying, `vis.json` for visualization wiring).
+pxl (Pixie's query language) supports dataframe operations (filter, groupby, agg, merge) but has no recursion or arbitrary-depth iteration. Functions like `px.pluck()` and `px.pluck_float64()` extract known keys from JSON but cannot walk an unknown/variable-depth tree. This means **OI's arbitrarily nested JSON cannot be traversed in pxl**.
+
+The solution is to flatten the OI hierarchy in C++ at ingestion time, producing pre-flattened rows that pxl can consume directly. This follows the same pattern used by Pixie's CPU profiler: the `stack_traces.beta` table (see `src/stirling/source_connectors/perf_profiler/stack_traces_table.h`) stores stack traces as semicolon-delimited folded strings (e.g., `"main;func1;func2"`), which the `StackTraceFlameGraph` vis widget renders directly.
+
+The connector's C++ code will use rapidjson (already in the codebase) to recursively walk OI's JSON output and emit flat rows into two separate tables:
+
+### Table 1: `object_memory_traces` (flame graph)
+
+Each row represents one path from the object root to a member/leaf, with memory size as the count. This directly reuses the `StackTraceFlameGraph` visualization widget.
+
+| Column | Type | Example | Description |
+|---|---|---|---|
+| `time_` | TIME64NS | | Timestamp of the OI capture |
+| `upid` | UINT128 | | Target process identifier |
+| `stack_trace` | STRING | `"AddressBook;Owner;[string data]"` | Semicolon-delimited path from root to member, in folded format |
+| `count` | INT64 | `96` | Memory size in bytes (staticSize + dynamicSize) at this node |
+| `padding_savings` | INT64 | `4` | Potential padding savings in bytes at this node |
+
+The `stack_trace` column format mirrors CPU profiling folded stacks. The connector walks OI's JSON tree and for each node emits a row with the full ancestor path. For example, given OI output for an `AddressBook` with member `Entries` containing `Contact[0]` with member `firstName`, the connector emits:
+
+```
+stack_trace="AddressBook"                                    count=23249
+stack_trace="AddressBook;rev"                                count=4
+stack_trace="AddressBook;Owner"                              count=56
+stack_trace="AddressBook;Entries"                             count=23185
+stack_trace="AddressBook;Entries;Contact[0]"                  count=432
+stack_trace="AddressBook;Entries;Contact[0];firstName"        count=96
+...
+```
+
+### Table 2: `object_container_stats` (histogram)
+
+Each row represents one container observation — its path, type, and element count. This enables histogram visualization of container size distributions over time.
+
+| Column | Type | Example | Description |
+|---|---|---|---|
+| `time_` | TIME64NS | | Timestamp of the OI capture |
+| `upid` | UINT128 | | Target process identifier |
+| `container_path` | STRING | `"AddressBook.Entries"` | Dot-delimited path to the container within the object |
+| `container_type` | STRING | `"std::vector<Contact>"` | C++ type of the container |
+| `element_count` | INT64 | `47` | Number of elements in the container at capture time |
+| `total_size` | INT64 | `23185` | Total memory (static + dynamic) consumed by this container |
+
+The histogram pxl script bins on `element_count` with `px.bin()` and aggregates with `groupby`, exactly like the MySQL latency histogram in @/home/ddelnano/code/pixie-worktree/src/pxl_scripts/px/mysql_stats .
 
 ## Implementation Plan
 
-### Phase 1: DataTable Schema
+### Phase 1: DataTable Schemas
 
-Define a static table schema in a new header (e.g., `object_trace_table.h`) with columns:
-- `time_` — timestamp
-- `upid` — target process identifier
-- `object_name` — name of the introspected object (e.g., "this")
-- `type_name` — C++ type name (e.g., "AddressBook")
-- `static_size` — static memory footprint in bytes
-- `dynamic_size` — dynamic memory footprint in bytes
-- `padding_savings` — potential padding savings in bytes
-- `members_json` — JSON string of the full nested member hierarchy
+Define two static table schemas in `src/stirling/source_connectors/dynamic_object/`:
 
-### Phase 2: OI Binary Integration
+1. **`object_memory_traces_table.h`** — The flame graph table with `time_`, `upid`, `stack_trace`, `count`, and `padding_savings` columns. Follows the pattern of `src/stirling/source_connectors/perf_profiler/stack_traces_table.h`.
+
+2. **`object_container_stats_table.h`** — The histogram table with `time_`, `upid`, `container_path`, `container_type`, `element_count`, and `total_size` columns.
+
+### Phase 2: OI Binary Integration and JSON Flattening
 
 Update `DynamicObjectTraceConnector`:
 - Replace the `cat /proc/<pid>/fd/1` subprocess with an invocation of the `oid` binary.
-- Construct the probe specification from the tracepoint deployment proto's symbol and targets.
-- Parse the resulting JSON output file (`oid_out.json`).
-- Write parsed data into the DataTable via `TransferDataImpl`.
+- Construct the probe specification from the tracepoint deployment proto's symbol and targets (e.g., `entry:<mangled_symbol>:this`).
+- Parse the resulting JSON output file (`oid_out.json`) using rapidjson.
+- Recursively walk the JSON tree to emit rows:
+  - For each node: emit a row into `object_memory_traces` with the semicolon-delimited ancestor path as `stack_trace` and the node's memory size as `count`.
+  - For each container node (identified by having a `length` or element array in OI output): emit a row into `object_container_stats` with the element count and total size.
 
 ### Phase 3: PXL Scripts
 
 Create two pxl script directories under `src/pxl_scripts/`:
 
-1. **`px/object_memory_histogram/`** — Queries the `object_trace` table, extracts container element counts from `members_json`, and renders a histogram visualization.
+1. **`px/object_memory_flamegraph/`** — Queries the `object_memory_traces` table. The `stack_trace` column is already in folded format, so this script follows the same pattern as @/home/ddelnano/code/pixie-worktree/src/pxl_scripts/px/perf_flamegraph (groupby, sum counts, compute percentages). The `vis.json` uses `@type: types.px.dev/px.vispb.StackTraceFlameGraph` with `stacktraceColumn: "stack_trace"` and `countColumn: "count"`.
 
-2. **`px/object_memory_flamegraph/`** — Queries the `object_trace` table, transforms the nested `members_json` into a folded stack format (parent > child > grandchild), and renders a flame graph. Supports filtering by depth to focus on specific levels.
+2. **`px/object_container_histogram/`** — Queries the `object_container_stats` table, filters by `container_path`, bins on `element_count` using `px.bin()`, and aggregates with `groupby('element_count_bin').agg(count=('time_', px.count))`. Follows the histogram pattern from @/home/ddelnano/code/pixie-worktree/src/pxl_scripts/px/mysql_stats .
 
 ### Phase 4: End-to-End Test
 
 Update `DynamicTraceAPITest.ObjectProfileAPI` to:
 - Assume `oid` is accessible to the test binary.
-- Verify that OI data flows into the `object_trace` DataTable with expected columns populated.
+- Verify that OI data flows into both DataTables with expected columns populated.
+- For `object_memory_traces`: assert that rows exist with `stack_trace` paths like `"AddressBook"`, `"AddressBook;Entries"`, etc., and that `count` values are > 0.
+- For `object_container_stats`: assert that a row exists for `container_path="AddressBook.Entries"` with `element_count` > 0.
 - Validate the AddrBook example produces correct hierarchy data.
 
 ## How to Run
