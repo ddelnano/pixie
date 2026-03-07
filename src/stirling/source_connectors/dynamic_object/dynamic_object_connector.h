@@ -22,9 +22,14 @@
 #include <memory>
 #include <string>
 
+#include <rapidjson/document.h>
+
 #include "src/common/base/base.h"
 #include "src/common/exec/subprocess.h"
+#include "src/stirling/core/data_table.h"
 #include "src/stirling/core/source_connector.h"
+#include "src/stirling/source_connectors/dynamic_object/object_container_stats_table.h"
+#include "src/stirling/source_connectors/dynamic_object/object_memory_traces_table.h"
 #include "src/stirling/source_connectors/dynamic_tracer/dynamic_tracing/ir/logicalpb/logical.pb.h"
 
 namespace px {
@@ -40,6 +45,13 @@ class DynamicObjectTraceConnector : public SourceConnector {
  public:
   static constexpr auto kSamplingPeriod = std::chrono::milliseconds{100};
   static constexpr auto kPushPeriod = std::chrono::milliseconds{1000};
+
+  static constexpr auto kTables =
+      MakeArray(kObjectMemoryTracesTable, kObjectContainerStatsTable);
+  static constexpr uint32_t kTracesTableNum =
+      SourceConnector::TableNum(kTables, kObjectMemoryTracesTable);
+  static constexpr uint32_t kStatsTableNum =
+      SourceConnector::TableNum(kTables, kObjectContainerStatsTable);
 
   ~DynamicObjectTraceConnector() override = default;
 
@@ -90,6 +102,16 @@ class DynamicObjectTraceConnector : public SourceConnector {
 
   // The final status of the trace.
   Status trace_status_ = Status::OK();
+
+  // Mock data entry count, grows each cycle to simulate AddressBook growth.
+  int mock_entry_count_ = 0;
+
+  // Generate mock OI JSON output simulating an AddressBook capture.
+  void GenerateMockOIJson(std::string* output);
+
+  // Flatten an OI JSON document into the traces and stats data tables.
+  static void FlattenOIJson(const rapidjson::Document& doc, uint64_t timestamp_ns,
+                            md::UPID upid, DataTable* traces_table, DataTable* stats_table);
 };
 
 }  // namespace stirling

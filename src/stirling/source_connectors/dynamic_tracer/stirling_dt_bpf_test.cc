@@ -71,9 +71,9 @@ class StirlingDynamicTraceBPFTest : public ::testing::Test {
 
   Status AppendData(uint64_t table_id, types::TabletID tablet_id,
                     std::unique_ptr<types::ColumnWrapperRecordBatch> record_batch) {
-    PX_UNUSED(table_id);
     PX_UNUSED(tablet_id);
     record_batches_.push_back(std::move(record_batch));
+    record_batch_table_ids_.push_back(table_id);
     return Status::OK();
   }
 
@@ -138,6 +138,7 @@ class StirlingDynamicTraceBPFTest : public ::testing::Test {
 
   std::unique_ptr<Stirling> stirling_;
   std::vector<std::unique_ptr<types::ColumnWrapperRecordBatch>> record_batches_;
+  std::vector<uint64_t> record_batch_table_ids_;
   stirlingpb::InfoClass info_class_;
 };
 
@@ -265,12 +266,24 @@ TEST_F(DynamicTraceAPITest, ObjectProfileAPI) {
   stirling_->RegisterTracepoint(trace_id, std::move(trace_program));
 
   // Immediately after registering, state should be pending.
-  // TODO(oazizi): How can we make sure this is not flaky?
   s = stirling_->GetTracepointInfo(trace_id);
   EXPECT_EQ(s.code(), px::statuspb::Code::RESOURCE_UNAVAILABLE) << s.ToString();
 
-  // Should deploy.
-  ASSERT_OK(WaitForStatus(trace_id));
+  // Should deploy. With 2 tables we expect 2 published info classes.
+  stirlingpb::Publish publication;
+  ASSERT_OK_AND_ASSIGN(publication, WaitForStatus(trace_id));
+  ASSERT_EQ(publication.published_info_classes_size(), 2);
+
+  // Find the table IDs for each info class.
+  uint64_t traces_table_id = 0;
+  uint64_t stats_table_id = 0;
+  for (const auto& info_class : publication.published_info_classes()) {
+    if (info_class.schema().name() == "object_memory_traces") {
+      traces_table_id = info_class.id();
+    } else if (info_class.schema().name() == "object_container_stats") {
+      stats_table_id = info_class.id();
+    }
+  }
 
   // Run Stirling data collector to start TransferDataImpl calls.
   ASSERT_OK(stirling_->RunAsThread());
@@ -280,6 +293,53 @@ TEST_F(DynamicTraceAPITest, ObjectProfileAPI) {
 
   // Stop Stirling.
   stirling_->Stop();
+
+  // Validate that we received data in both tables.
+  bool found_traces = false;
+  bool found_stats = false;
+  bool found_addressbook_trace = false;
+  bool found_entries_trace = false;
+  bool found_entries_container = false;
+
+  for (size_t i = 0; i < record_batches_.size(); ++i) {
+    const auto& rb = *record_batches_[i];
+    uint64_t table_id = record_batch_table_ids_[i];
+
+    if (table_id == traces_table_id && rb.size() > 0 && rb[0]->Size() > 0) {
+      found_traces = true;
+      // Check for expected stack_trace paths. Column index 2 is stack_trace.
+      for (size_t row = 0; row < rb[2]->Size(); ++row) {
+        std::string trace = std::string(rb[2]->Get<types::StringValue>(row));
+        if (trace == "this") {
+          found_addressbook_trace = true;
+        }
+        if (trace == "this;Entries") {
+          found_entries_trace = true;
+        }
+        // Count column (index 3) should be > 0.
+        EXPECT_GT(rb[3]->Get<types::Int64Value>(row).val, 0);
+      }
+    }
+
+    if (table_id == stats_table_id && rb.size() > 0 && rb[0]->Size() > 0) {
+      found_stats = true;
+      // Check for expected container paths. Column index 2 is container_path.
+      for (size_t row = 0; row < rb[2]->Size(); ++row) {
+        std::string path = std::string(rb[2]->Get<types::StringValue>(row));
+        if (path == "this.Entries") {
+          found_entries_container = true;
+          // element_count (index 4) should be > 0.
+          EXPECT_GT(rb[4]->Get<types::Int64Value>(row).val, 0);
+        }
+      }
+    }
+  }
+
+  EXPECT_TRUE(found_traces) << "Expected to find object_memory_traces data";
+  EXPECT_TRUE(found_stats) << "Expected to find object_container_stats data";
+  EXPECT_TRUE(found_addressbook_trace) << "Expected 'this' in stack traces";
+  EXPECT_TRUE(found_entries_trace) << "Expected 'this;Entries' in stack traces";
+  EXPECT_TRUE(found_entries_container) << "Expected 'this.Entries' in container stats";
 }
 
 TEST_F(DynamicTraceAPITest, NonExistentBinary) {

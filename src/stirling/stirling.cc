@@ -572,14 +572,17 @@ void StirlingImpl::DeployDynamicTraceConnector(
   LOG(INFO) << absl::Substitute("DynamicTraceConnector [$0] created in $1 ms.", source->name(),
                                 timer.ElapsedTime_us() / 1000.0);
 
-  // Cache table schema name as source will be moved below.
-  std::string output_name(source->table_schemas()[0].name());
+  // Cache table schema names as source will be moved below.
+  std::vector<std::string> output_names;
+  for (const auto& schema : source->table_schemas()) {
+    output_names.emplace_back(schema.name());
+  }
 
   {
     absl::base_internal::SpinLockHolder lock(&dynamic_trace_status_map_lock_);
     auto it = trace_id_info_map_.find(trace_id);
     if (it != trace_id_info_map_.end()) {
-      trace_id_info_map_[trace_id].output_table = output_name;
+      trace_id_info_map_[trace_id].output_table = output_names[0];
     }
   }
 
@@ -593,7 +596,9 @@ void StirlingImpl::DeployDynamicTraceConnector(
   stirlingpb::Publish publication;
   {
     absl::base_internal::SpinLockHolder lock(&info_class_mgrs_lock_);
-    PopulatePublishProto(&publication, info_class_mgrs_, output_name);
+    for (const auto& name : output_names) {
+      PopulatePublishProto(&publication, info_class_mgrs_, name);
+    }
   }
 
   UpdateDynamicTraceStatus(trace_id, publication);

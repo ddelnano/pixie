@@ -32,5 +32,6 @@ pl_cc_library(
         "//src/common/fs:cc_library",
         "//src/stirling/core:cc_library",
         "//src/stirling/source_connectors/dynamic_tracer/dynamic_tracing/ir/logicalpb:logical_pl_cc_proto",
+        "@com_github_tencent_rapidjson//:rapidjson",
     ],
 )
