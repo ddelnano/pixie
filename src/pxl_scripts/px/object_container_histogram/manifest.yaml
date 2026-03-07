@@ -1,0 +1,5 @@
+---
+short: Object Container Histogram
+long: >
+  Visualizes container element count distributions from Object Introspection data.
+  Shows how container sizes vary across captures.

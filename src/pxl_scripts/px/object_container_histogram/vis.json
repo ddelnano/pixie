@@ -1,0 +1,56 @@
+{
+  "variables": [
+    {
+      "name": "start_time",
+      "type": "PX_STRING",
+      "description": "The relative start time of the window. Current time is assumed to be now",
+      "defaultValue": "-5m"
+    },
+    {
+      "name": "container_path",
+      "type": "PX_STRING",
+      "description": "The container path to filter on (e.g. 'this.Entries')",
+      "defaultValue": ""
+    }
+  ],
+  "globalFuncs": [],
+  "widgets": [
+    {
+      "name": "Container Element Count Histogram",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 6
+      },
+      "func": {
+        "name": "container_histogram",
+        "args": [
+          {
+            "name": "start_time",
+            "variable": "start_time"
+          },
+          {
+            "name": "container_path",
+            "variable": "container_path"
+          }
+        ]
+      },
+      "displaySpec": {
+        "@type": "types.px.dev/px.vispb.HistogramChart",
+        "histogram": {
+          "value": "binned_count",
+          "prebinCount": "count",
+          "maxbins": 20,
+          "minstep": 1
+        },
+        "xAxis": {
+          "label": "Element Count"
+        },
+        "yAxis": {
+          "label": "# of captures"
+        }
+      }
+    }
+  ]
+}

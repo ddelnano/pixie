@@ -1,0 +1,5 @@
+---
+short: Object Memory Flamegraph
+long: >
+  Visualizes object memory layout as a flamegraph using Object Introspection data.
+  Shows memory consumption at each level of the object hierarchy.
