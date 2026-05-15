@@ -1,0 +1,142 @@
+# Copyright 2018- The Pixie Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+''' Per-Pod NFS File IO (VFS layer)
+
+Hooks the NFS-specific file_operations entry points so every read/write that
+an application issues against an NFS-backed file is captured, regardless of
+whether the mount came from the in-tree nfs plugin or a CSI nfs driver.
+Probes fire in the calling task's context, so PID -> UPID -> Pod attribution
+is direct.
+'''
+
+import pxtrace
+import px
+
+program = """
+#include <linux/sched.h>
+#include <linux/fs.h>
+#include <linux/dcache.h>
+
+kprobe:nfs_file_read_iter,
+kprobe:nfs_file_write_iter
+{
+  @start[tid] = nsecs;
+  @kiocb[tid] = arg0;
+}
+
+kretprobe:nfs_file_read_iter
+/@start[tid]/
+{
+  $kiocb = (struct kiocb *)@kiocb[tid];
+  $file = $kiocb->ki_filp;
+  $inode = $file->f_inode;
+  $dentry = $file->f_path.dentry;
+  $parent = $dentry->d_parent;
+
+  printf(\"time_:%llu pid:%u pid_start_time:%llu op:%s bytes:%lld latency_ns:%llu dev:%u inode:%llu filename:%s parent:%s\",
+    nsecs,
+    pid,
+    ((struct task_struct*)curtask)->group_leader->start_time / 10000000,
+    \"read\",
+    (int64)retval,
+    nsecs - @start[tid],
+    $inode->i_sb->s_dev,
+    $inode->i_ino,
+    str($dentry->d_name.name),
+    str($parent->d_name.name));
+
+  delete(@start[tid]);
+  delete(@kiocb[tid]);
+}
+
+kretprobe:nfs_file_write_iter
+/@start[tid]/
+{
+  $kiocb = (struct kiocb *)@kiocb[tid];
+  $file = $kiocb->ki_filp;
+  $inode = $file->f_inode;
+  $dentry = $file->f_path.dentry;
+  $parent = $dentry->d_parent;
+
+  printf(\"time_:%llu pid:%u pid_start_time:%llu op:%s bytes:%lld latency_ns:%llu dev:%u inode:%llu filename:%s parent:%s\",
+    nsecs,
+    pid,
+    ((struct task_struct*)curtask)->group_leader->start_time / 10000000,
+    \"write\",
+    (int64)retval,
+    nsecs - @start[tid],
+    $inode->i_sb->s_dev,
+    $inode->i_ino,
+    str($dentry->d_name.name),
+    str($parent->d_name.name));
+
+  delete(@start[tid]);
+  delete(@kiocb[tid]);
+}
+"""
+
+
+def add_pod_name(df):
+    proc = px.DataFrame(table='process_stats')
+    proc.pod = proc.ctx['pod']
+    proc.namespace = proc.ctx['namespace']
+    proc.service = proc.ctx['service']
+    proc.pid = px.upid_to_pid(proc.upid)
+    proc.asid = px.upid_to_asid(proc.upid)
+    proc = proc.groupby(['pod', 'namespace', 'service', 'pid', 'asid']).agg()
+
+    df = df.merge(proc,
+                  how='left',
+                  left_on=['pid', 'asid'],
+                  right_on=['pid', 'asid'],
+                  suffixes=['', '_x'])
+    df = df.drop(['pid_x', 'asid_x'])
+    return df
+
+
+def nfs_io_events(pod_filter: str):
+    table_name = 'nfs_io'
+    pxtrace.UpsertTracepoint('nfs_io_tracer',
+                             table_name,
+                             program,
+                             pxtrace.kprobe(),
+                             "10m")
+
+    df = px.DataFrame(table=table_name)
+    df.node = px._exec_hostname()
+    df.asid = px.asid()
+    df = add_pod_name(df)
+    df.path = "/" + df.parent + "/" + df.filename
+
+    # Negative bytes are kernel error codes (-EIO etc.); zero them for
+    # accounting but keep the row visible.
+    df.bytes_ok = px.select(df.bytes < 0, 0, df.bytes)
+    df.error = df.bytes < 0
+
+    df = df[px.contains(df.pod, pod_filter)]
+    return df['time_', 'node', 'pod', 'namespace', 'service', 'pid', 'op',
+              'bytes', 'bytes_ok', 'error', 'latency_ns', 'dev', 'inode', 'path']
+
+
+def nfs_io_per_pod(pod_filter: str):
+    df = nfs_io_events(pod_filter)
+    df = df.groupby(['pod', 'namespace', 'op']).agg(
+        bytes_total=('bytes_ok', px.sum),
+        ops=('bytes_ok', px.count),
+        latency_p50_ns=('latency_ns', px.quantiles),
+    )
+    return df

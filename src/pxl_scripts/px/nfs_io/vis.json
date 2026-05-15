@@ -1,0 +1,48 @@
+{
+    "variables": [
+        {
+            "name": "pod_filter",
+            "type": "PX_STRING",
+            "description": "Substring of the pod name to filter on (empty = all pods).",
+            "defaultValue": ""
+        }
+    ],
+    "globalFuncs": [
+        {
+            "outputName": "events",
+            "func": {
+                "name": "nfs_io_events",
+                "args": [
+                    { "name": "pod_filter", "variable": "pod_filter" }
+                ]
+            }
+        },
+        {
+            "outputName": "per_pod",
+            "func": {
+                "name": "nfs_io_per_pod",
+                "args": [
+                    { "name": "pod_filter", "variable": "pod_filter" }
+                ]
+            }
+        }
+    ],
+    "widgets": [
+        {
+            "name": "Per-Pod NFS IO Summary",
+            "position": { "x": 0, "y": 0, "w": 12, "h": 4 },
+            "globalFuncOutputName": "per_pod",
+            "displaySpec": {
+                "@type": "types.px.dev/px.vispb.Table"
+            }
+        },
+        {
+            "name": "NFS IO Events",
+            "position": { "x": 0, "y": 4, "w": 12, "h": 6 },
+            "globalFuncOutputName": "events",
+            "displaySpec": {
+                "@type": "types.px.dev/px.vispb.Table"
+            }
+        }
+    ]
+}

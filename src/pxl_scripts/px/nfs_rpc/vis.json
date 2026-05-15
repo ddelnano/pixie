@@ -1,0 +1,56 @@
+{
+    "variables": [
+        {
+            "name": "start_time",
+            "type": "PX_STRING",
+            "description": "Window over which to read events (e.g. -5m).",
+            "defaultValue": "-5m"
+        },
+        {
+            "name": "pod_filter",
+            "type": "PX_STRING",
+            "description": "Substring of the pod name to filter on. Empty matches all, including '<writeback>'.",
+            "defaultValue": ""
+        }
+    ],
+    "globalFuncs": [
+        {
+            "outputName": "events",
+            "func": {
+                "name": "nfs_rpc_events",
+                "args": [
+                    { "name": "start_time", "variable": "start_time" },
+                    { "name": "pod_filter", "variable": "pod_filter" }
+                ]
+            }
+        },
+        {
+            "outputName": "per_pod_per_mount",
+            "func": {
+                "name": "nfs_rpc_per_pod_per_mount",
+                "args": [
+                    { "name": "start_time", "variable": "start_time" },
+                    { "name": "pod_filter", "variable": "pod_filter" }
+                ]
+            }
+        }
+    ],
+    "widgets": [
+        {
+            "name": "Per-Pod / Per-Mount NFS RPC",
+            "position": { "x": 0, "y": 0, "w": 12, "h": 4 },
+            "globalFuncOutputName": "per_pod_per_mount",
+            "displaySpec": {
+                "@type": "types.px.dev/px.vispb.Table"
+            }
+        },
+        {
+            "name": "NFS RPC Events",
+            "position": { "x": 0, "y": 4, "w": 12, "h": 6 },
+            "globalFuncOutputName": "events",
+            "displaySpec": {
+                "@type": "types.px.dev/px.vispb.Table"
+            }
+        }
+    ]
+}

@@ -1,0 +1,8 @@
+---
+short: Per-Pod NFS File IO
+long: |
+  Traces NFS-backed file reads and writes at the VFS layer
+  (nfs_file_read_iter / nfs_file_write_iter) and attributes each event to the
+  originating Kubernetes Pod. Captures bytes, latency, and the dev/inode
+  pair, which can be joined with the nfs_rpc table for wire-level
+  correlation.
