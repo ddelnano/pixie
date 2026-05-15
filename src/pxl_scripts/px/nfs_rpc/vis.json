@@ -11,6 +11,12 @@
             "type": "PX_STRING",
             "description": "Substring of the pod name to filter on. Empty matches all, including '<writeback>'.",
             "defaultValue": ""
+        },
+        {
+            "name": "server_filter",
+            "type": "PX_STRING",
+            "description": "Substring of the NFS server IP to filter on (empty = all servers).",
+            "defaultValue": ""
         }
     ],
     "globalFuncs": [
@@ -20,33 +26,62 @@
                 "name": "nfs_rpc_events",
                 "args": [
                     { "name": "start_time", "variable": "start_time" },
-                    { "name": "pod_filter", "variable": "pod_filter" }
+                    { "name": "pod_filter", "variable": "pod_filter" },
+                    { "name": "server_filter", "variable": "server_filter" }
                 ]
             }
         },
         {
-            "outputName": "per_pod_per_mount",
+            "outputName": "per_pod_per_server",
             "func": {
-                "name": "nfs_rpc_per_pod_per_mount",
+                "name": "nfs_rpc_per_pod_per_server",
                 "args": [
                     { "name": "start_time", "variable": "start_time" },
-                    { "name": "pod_filter", "variable": "pod_filter" }
+                    { "name": "pod_filter", "variable": "pod_filter" },
+                    { "name": "server_filter", "variable": "server_filter" }
+                ]
+            }
+        },
+        {
+            "outputName": "flow",
+            "func": {
+                "name": "nfs_rpc_flow",
+                "args": [
+                    { "name": "start_time", "variable": "start_time" },
+                    { "name": "pod_filter", "variable": "pod_filter" },
+                    { "name": "server_filter", "variable": "server_filter" }
                 ]
             }
         }
     ],
     "widgets": [
         {
-            "name": "Per-Pod / Per-Mount NFS RPC",
-            "position": { "x": 0, "y": 0, "w": 12, "h": 4 },
-            "globalFuncOutputName": "per_pod_per_mount",
+            "name": "Pod -> NFS Server Flow",
+            "position": { "x": 0, "y": 0, "w": 12, "h": 5 },
+            "globalFuncOutputName": "flow",
+            "displaySpec": {
+                "@type": "types.px.dev/px.vispb.Graph",
+                "adjacencyList": {
+                    "fromColumn": "pod",
+                    "toColumn": "server_addr"
+                },
+                "edgeWeightColumn": "bytes_total",
+                "edgeColorColumn": "bytes_total",
+                "edgeLength": 300,
+                "edgeHoverInfo": ["bytes_total", "rpcs"]
+            }
+        },
+        {
+            "name": "Per-Pod / Per-Server NFS RPC",
+            "position": { "x": 0, "y": 5, "w": 12, "h": 4 },
+            "globalFuncOutputName": "per_pod_per_server",
             "displaySpec": {
                 "@type": "types.px.dev/px.vispb.Table"
             }
         },
         {
             "name": "NFS RPC Events",
-            "position": { "x": 0, "y": 4, "w": 12, "h": 6 },
+            "position": { "x": 0, "y": 9, "w": 12, "h": 6 },
             "globalFuncOutputName": "events",
             "displaySpec": {
                 "@type": "types.px.dev/px.vispb.Table"

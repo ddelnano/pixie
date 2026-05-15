@@ -14,48 +14,98 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-''' Per-Pod NFS RPC (wire layer)
+''' Per-Pod / Per-NFS-Server RPC (wire layer)
 
-Hooks the kernel NFS client RPC initiation tracepoints so every RPC the
-client actually puts on the wire is captured. Synchronous reads run in the
+Hooks the NFS client RPC initiation functions and walks the pgio header
+through inode -> super_block -> nfs_server -> nfs_client -> cl_addr to
+recover the NFS server's socket address. Synchronous reads run in the
 originating task's context and attribute cleanly to a Pod via PID. Async
 writeback fires from rpciod kworkers; those rows surface with no Pod and
 are joined back to the nfs_io table on (dev, inode) to recover the writer
 on a best-effort basis.
 
-dev_t is exposed as the per-mount dimension - mapping dev_t to NFS server
-address is a node-side concern (e.g. /proc/mounts) and a follow-up for the
-metadata layer.
+We kprobe nfs_initiate_read / nfs_initiate_write rather than the
+nfs:nfs_initiate_* tracepoints because the tracepoint __entry only carries
+{dev, fhandle, fileid, offset, count} - no server. The kprobe targets are
+static functions but are stored as function pointers in the .rw_initiate
+ops table, so the compiler cannot inline them, and they are kprobeable on
+both NFSv3 and NFSv4 mounts.
 '''
 
 import pxtrace
 import px
 
 program = """
-tracepoint:nfs:nfs_initiate_read
+#include <linux/sched.h>
+#include <linux/fs.h>
+#include <linux/socket.h>
+#include <linux/in.h>
+#include <linux/in6.h>
+#include <linux/nfs_fs_sb.h>
+#include <linux/nfs_xdr.h>
+
+kprobe:nfs_initiate_read
 {
-  printf(\"time_:%llu pid:%u pid_start_time:%llu op:%s dev:%u inode:%llu offset:%lld bytes:%u\",
+  $hdr = (struct nfs_pgio_header *)arg0;
+  $inode = $hdr->inode;
+  $server = (struct nfs_server *)$inode->i_sb->s_fs_info;
+  $client = $server->nfs_client;
+
+  $AF_INET = (uint16) 2;
+  $AF_INET6 = (uint16) 10;
+  $family = ((struct sockaddr *)&$client->cl_addr)->sa_family;
+
+  $saddr = ntop(0);
+  if ($family == $AF_INET) {
+    $sin = (struct sockaddr_in *)&$client->cl_addr;
+    $saddr = ntop($sin->sin_addr.s_addr);
+  } else {
+    $sin6 = (struct sockaddr_in6 *)&$client->cl_addr;
+    $saddr = ntop($sin6->sin6_addr.in6_u.u6_addr8);
+  }
+
+  printf(\"time_:%llu pid:%u pid_start_time:%llu op:%s server_addr:%s dev:%u inode:%llu offset:%llu bytes:%u\",
     nsecs,
     pid,
     ((struct task_struct*)curtask)->group_leader->start_time / 10000000,
     \"read\",
-    args->dev,
-    args->fileid,
-    args->offset,
-    args->count);
+    $saddr,
+    $inode->i_sb->s_dev,
+    $inode->i_ino,
+    $hdr->args.offset,
+    $hdr->args.count);
 }
 
-tracepoint:nfs:nfs_initiate_write
+kprobe:nfs_initiate_write
 {
-  printf(\"time_:%llu pid:%u pid_start_time:%llu op:%s dev:%u inode:%llu offset:%lld bytes:%u\",
+  $hdr = (struct nfs_pgio_header *)arg0;
+  $inode = $hdr->inode;
+  $server = (struct nfs_server *)$inode->i_sb->s_fs_info;
+  $client = $server->nfs_client;
+
+  $AF_INET = (uint16) 2;
+  $AF_INET6 = (uint16) 10;
+  $family = ((struct sockaddr *)&$client->cl_addr)->sa_family;
+
+  $saddr = ntop(0);
+  if ($family == $AF_INET) {
+    $sin = (struct sockaddr_in *)&$client->cl_addr;
+    $saddr = ntop($sin->sin_addr.s_addr);
+  } else {
+    $sin6 = (struct sockaddr_in6 *)&$client->cl_addr;
+    $saddr = ntop($sin6->sin6_addr.in6_u.u6_addr8);
+  }
+
+  printf(\"time_:%llu pid:%u pid_start_time:%llu op:%s server_addr:%s dev:%u inode:%llu offset:%llu bytes:%u\",
     nsecs,
     pid,
     ((struct task_struct*)curtask)->group_leader->start_time / 10000000,
     \"write\",
-    args->dev,
-    args->fileid,
-    args->offset,
-    args->count);
+    $saddr,
+    $inode->i_sb->s_dev,
+    $inode->i_ino,
+    $hdr->args.offset,
+    $hdr->args.count);
 }
 """
 
@@ -104,7 +154,7 @@ def attribute_writeback(df, start_time: str):
     return df.drop(['io_pod'])
 
 
-def nfs_rpc_events(start_time: str, pod_filter: str):
+def nfs_rpc_events(start_time: str, pod_filter: str, server_filter: str):
     table_name = 'nfs_rpc'
     pxtrace.UpsertTracepoint('nfs_rpc_tracer',
                              table_name,
@@ -119,13 +169,23 @@ def nfs_rpc_events(start_time: str, pod_filter: str):
     df = attribute_writeback(df, start_time)
 
     df = df[px.contains(df.pod, pod_filter)]
+    df = df[px.contains(df.server_addr, server_filter)]
     return df['time_', 'node', 'pod', 'namespace', 'pid', 'op',
-              'bytes', 'offset', 'dev', 'inode']
+              'server_addr', 'bytes', 'offset', 'dev', 'inode']
 
 
-def nfs_rpc_per_pod_per_mount(start_time: str, pod_filter: str):
-    df = nfs_rpc_events(start_time, pod_filter)
-    df = df.groupby(['pod', 'dev', 'op']).agg(
+def nfs_rpc_per_pod_per_server(start_time: str, pod_filter: str, server_filter: str):
+    df = nfs_rpc_events(start_time, pod_filter, server_filter)
+    df = df.groupby(['pod', 'server_addr', 'op']).agg(
+        bytes_total=('bytes', px.sum),
+        rpcs=('bytes', px.count),
+    )
+    return df
+
+
+def nfs_rpc_flow(start_time: str, pod_filter: str, server_filter: str):
+    df = nfs_rpc_events(start_time, pod_filter, server_filter)
+    df = df.groupby(['pod', 'server_addr']).agg(
         bytes_total=('bytes', px.sum),
         rpcs=('bytes', px.count),
     )

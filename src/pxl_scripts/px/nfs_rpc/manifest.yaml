@@ -1,9 +1,11 @@
 ---
-short: Per-Pod NFS RPC (wire layer)
+short: Per-Pod / Per-NFS-Server RPC
 long: |
-  Traces every NFS read/write RPC the kernel client puts on the wire via
-  the nfs:nfs_initiate_read / nfs:nfs_initiate_write tracepoints.
-  Synchronous reads attribute directly to the originating Pod; async
-  writeback (rpciod kworker context) is reattributed best-effort by
-  joining against the nfs_io VFS-layer table on (dev, inode), and
-  otherwise rolls up as the pod '<writeback>' per mount.
+  Traces every NFS read/write RPC the kernel client puts on the wire by
+  kprobing nfs_initiate_read / nfs_initiate_write and walking the pgio
+  header through inode -> super_block -> nfs_server -> nfs_client to
+  recover the server socket address. Synchronous reads attribute directly
+  to the originating Pod; async writeback (rpciod kworker context) is
+  reattributed best-effort by joining against the nfs_io VFS-layer table
+  on (dev, inode), and otherwise rolls up as the pod '<writeback>' per
+  server.
