@@ -142,5 +142,14 @@ spec:
           path: /sys
           type: Directory
       - name: certs
-        secret:
-          secretName: service-tls-certs
+        projected:
+          sources:
+          - secret:
+              name: service-tls-client-certs
+              items:
+              - key: tls.crt
+                path: client.crt
+              - key: tls.key
+                path: client.key
+              - key: ca.crt
+                path: ca.crt
